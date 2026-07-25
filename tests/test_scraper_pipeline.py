@@ -4,10 +4,56 @@ from pathlib import Path
 from src.db.repository import Repository
 from src.db.schema import SCHEMA_SQL
 from src.scraper.html_parser import parse_discovery_page, parse_series_page
+from src.scraper.client import ScraperClient
 from src.scraper.refresh import artifact_status, prepare_artifact
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+class FakeTransport:
+    def __init__(self, text, status=200):
+        self.text = text
+        self.status = status
+        self.calls = []
+        self.closed = False
+
+    def fetch(self, url, *, post_data=None, timeout=30.0):
+        self.calls.append((url, post_data, timeout))
+        return self.text, self.status
+
+    def close(self):
+        self.closed = True
+
+
+def test_client_transport_caches_success_and_can_be_closed(tmp_path):
+    transport = FakeTransport("<html>catalog</html>")
+    client = ScraperClient(
+        cache_dir=str(tmp_path),
+        delay_range=(0, 0),
+        transport=transport,
+    )
+
+    first = client.fetch("https://www.novelupdates.com/latest-series/")
+    second = client.fetch("https://www.novelupdates.com/latest-series/")
+    client.close()
+
+    assert first == ("<html>catalog</html>", 200, False)
+    assert second == ("<html>catalog</html>", 200, True)
+    assert len(transport.calls) == 1
+    assert transport.closed
+
+
+def test_client_marks_browser_challenge_as_blocked_without_caching(tmp_path):
+    transport = FakeTransport("<title>Just a moment...</title>")
+    client = ScraperClient(
+        cache_dir=str(tmp_path),
+        delay_range=(0, 0),
+        transport=transport,
+    )
+
+    assert client.fetch("https://www.novelupdates.com/") == (None, 403, False)
+    assert list(tmp_path.iterdir()) == []
 
 
 def memory_repo() -> Repository:

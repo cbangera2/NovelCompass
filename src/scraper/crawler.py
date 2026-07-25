@@ -6,12 +6,17 @@ import sqlite3
 import sys
 import urllib.robotparser
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from src.db.schema import DEFAULT_DB_PATH, init_db
 from src.db.repository import Repository
-from src.scraper.client import ScraperClient
+from src.scraper.client import (
+    DEFAULT_BROWSER_PROFILE,
+    BrowserSessionTransport,
+    ScraperClient,
+)
 from src.scraper.html_parser import (
     parse_discovery_page,
     parse_series_page,
@@ -35,9 +40,10 @@ class Crawler:
         *,
         delay_range: tuple[float, float] = (3.0, 6.0),
         max_attempts: int = 4,
+        client: Optional[ScraperClient] = None,
     ):
         self.repo = Repository(db_conn)
-        self.client = ScraperClient(delay_range=delay_range)
+        self.client = client or ScraperClient(delay_range=delay_range)
         self.max_attempts = max_attempts
         self.stop_requested = False
 
@@ -351,6 +357,22 @@ def main() -> int:
     parser.add_argument("--min-delay", type=float, default=3.0)
     parser.add_argument("--max-delay", type=float, default=6.0)
     parser.add_argument(
+        "--transport",
+        choices=("urllib", "browser"),
+        default="urllib",
+        help="Network transport; browser reuses a manually prepared local session",
+    )
+    parser.add_argument(
+        "--browser-profile",
+        default=str(DEFAULT_BROWSER_PROFILE),
+        help="Private persistent profile directory for browser transport",
+    )
+    parser.add_argument(
+        "--setup-browser-session",
+        action="store_true",
+        help="Open the headed browser for manual login/challenge handling, then exit",
+    )
+    parser.add_argument(
         "--seed",
         action="store_true",
         help="Refresh the full snapshot seed and discovery queue first",
@@ -359,16 +381,39 @@ def main() -> int:
     if args.min_delay < 1 or args.max_delay < args.min_delay:
         parser.error("require 1 <= min-delay <= max-delay")
 
+    transport = None
+    if args.transport == "browser" or args.setup_browser_session:
+        try:
+            transport = BrowserSessionTransport(Path(args.browser_profile))
+        except RuntimeError as exc:
+            parser.error(str(exc))
+        if args.setup_browser_session:
+            print(
+                "A browser window is open. Complete any login or challenge "
+                "manually, then return here and press Enter. No crawl will run."
+            )
+            transport.open_for_manual_setup()
+            try:
+                input()
+            finally:
+                transport.close()
+            return 0
+
     conn = init_db(args.db)
     if args.seed:
         seed_database_from_dataset(conn)
-    crawler = Crawler(
-        conn, delay_range=(args.min_delay, args.max_delay)
+    client = ScraperClient(
+        delay_range=(args.min_delay, args.max_delay),
+        transport=transport,
     )
+    crawler = Crawler(conn, client=client)
     signal.signal(signal.SIGINT, crawler.request_stop)
     signal.signal(signal.SIGTERM, crawler.request_stop)
-    result = crawler.run_queue(max_items=args.max_items)
-    conn.close()
+    try:
+        result = crawler.run_queue(max_items=args.max_items)
+    finally:
+        client.close()
+        conn.close()
     return 0 if result["status"] in {"complete", "partial", "aborted"} else 1
 
 

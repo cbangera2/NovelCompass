@@ -9,6 +9,7 @@
 *.sqlite3
 data/raw/
 data/cache/
+data/browser-profile/
 supporting/artifacts/*.sqlite*
 supporting/artifacts/*.manifest.json
 

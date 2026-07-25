@@ -1,0 +1,2 @@
+# Optional dependency for the opt-in, headed browser scraper transport.
+playwright>=1.45,<2

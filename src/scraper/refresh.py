@@ -9,6 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.db.schema import DEFAULT_DB_PATH, init_db
+from src.scraper.client import (
+    DEFAULT_BROWSER_PROFILE,
+    BrowserSessionTransport,
+    ScraperClient,
+)
 from src.scraper.crawler import Crawler
 from src.scraper.seed_loader import CBBOSS_PROFILE_URL, SEED_LIST_IDS
 
@@ -189,6 +194,12 @@ def main() -> int:
     crawl.add_argument("--max-items", type=int, default=None)
     crawl.add_argument("--min-delay", type=float, default=3.0)
     crawl.add_argument("--max-delay", type=float, default=6.0)
+    crawl.add_argument(
+        "--transport", choices=("urllib", "browser"), default="urllib"
+    )
+    crawl.add_argument(
+        "--browser-profile", type=Path, default=DEFAULT_BROWSER_PROFILE
+    )
     args = parser.parse_args()
 
     if args.command == "prepare":
@@ -199,13 +210,25 @@ def main() -> int:
         if args.min_delay < 1 or args.max_delay < args.min_delay:
             parser.error("require 1 <= min-delay <= max-delay")
         conn = init_db(str(args.db))
-        crawler = Crawler(
-            conn, delay_range=(args.min_delay, args.max_delay)
+        transport = None
+        if args.transport == "browser":
+            try:
+                transport = BrowserSessionTransport(args.browser_profile)
+            except RuntimeError as exc:
+                conn.close()
+                parser.error(str(exc))
+        client = ScraperClient(
+            delay_range=(args.min_delay, args.max_delay),
+            transport=transport,
         )
+        crawler = Crawler(conn, client=client)
         signal.signal(signal.SIGINT, crawler.request_stop)
         signal.signal(signal.SIGTERM, crawler.request_stop)
-        result = crawler.run_queue(max_items=args.max_items)
-        conn.close()
+        try:
+            result = crawler.run_queue(max_items=args.max_items)
+        finally:
+            client.close()
+            conn.close()
         status = artifact_status(args.db)
         artifact_state = (
             "complete" if result["status"] == "complete" else "partial"
