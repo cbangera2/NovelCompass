@@ -7,6 +7,7 @@ from src.engine.ranking_contract import (
     SCHEMA_VERSION,
     calculate_match_percent,
 )
+from src.engine.explainer import EvidenceExplainer
 
 
 def contract_db() -> sqlite3.Connection:
@@ -96,3 +97,25 @@ def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch)
     )
     assert [item["title"] for item in filtered["items"]] == ["Acclaimed"]
     assert filtered["items"][0]["genres"] == ["Fantasy"]
+
+
+def test_evidence_uses_real_list_titles_and_labels_missing_titles_honestly():
+    conn = contract_db()
+    conn.execute(
+        "INSERT INTO novels(id, slug, title) VALUES (39, 'target', 'Target')"
+    )
+    conn.executemany(
+        "INSERT INTO rec_lists(id, title, item_count) VALUES (?, ?, 2)",
+        [(10, "Carefully curated gems"), (11, "Novel Updates List 11")],
+    )
+    conn.executemany(
+        "INSERT INTO rec_list_items(list_id, novel_id, position) VALUES (?, ?, ?)",
+        [(10, 38, 1), (10, 39, 2), (11, 38, 1), (11, 39, 2)],
+    )
+    result = EvidenceExplainer(conn).explain_recommendation(38, 39, 0.1, {})
+    assert result["curated_lists"] == [
+        {"id": 10, "title": "Carefully curated gems"},
+        {"id": 11, "title": None},
+    ]
+    assert any("Carefully curated gems" in item for item in result["evidence_bullets"])
+    assert all("Novel Updates List 11" not in item for item in result["evidence_bullets"])

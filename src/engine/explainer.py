@@ -1,4 +1,5 @@
 import sqlite3
+import re
 from typing import Dict, Any, List
 
 class EvidenceExplainer:
@@ -63,7 +64,13 @@ class EvidenceExplainer:
         for l_id, l_title, comment in cur.fetchall():
             co_lists.append({
                 'list_id': l_id,
-                'title': l_title,
+                'title': (
+                    None
+                    if not l_title or re.fullmatch(
+                        rf"Novel Updates List\s+{l_id}", l_title, re.I
+                    )
+                    else l_title
+                ),
                 'comment': comment
             })
 
@@ -76,7 +83,17 @@ class EvidenceExplainer:
             mutual_str = "Mutual" if direct_rec_info['is_mutual'] else "One-way"
             evidence_bullets.append(f"{mutual_str} human recommendation ({direct_rec_info['votes']} votes)")
         if co_lists:
-            evidence_bullets.append(f"Co-occurs on {len(co_lists)} curated list(s) including '{co_lists[0]['title']}'")
+            named = next((item for item in co_lists if item["title"]), None)
+            if named:
+                evidence_bullets.append(
+                    f"Co-occurs on {len(co_lists)} curated list(s) including "
+                    f"'{named['title']}'"
+                )
+            else:
+                evidence_bullets.append(
+                    f"Co-occurs on {len(co_lists)} curated list(s); "
+                    "list titles are unavailable in this snapshot"
+                )
             if co_lists[0]['comment']:
                 evidence_bullets.append(f"Curator comment: \"{co_lists[0]['comment'][:120]}\"")
 
@@ -96,5 +113,9 @@ class EvidenceExplainer:
             'rrf_score': round(rrf_score, 4),
             'channel_ranks': channel_ranks,
             'shared_tags': shared_tags,
+            'curated_lists': [
+                {"id": item["list_id"], "title": item["title"]}
+                for item in co_lists
+            ],
             'evidence_bullets': evidence_bullets
         }

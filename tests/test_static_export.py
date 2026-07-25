@@ -46,6 +46,14 @@ class StaticExportTest(unittest.TestCase):
                 conn.executemany("INSERT INTO novel_genres VALUES (?, 1)", [(1,), (257,)])
                 conn.executemany("INSERT INTO novel_tags VALUES (?, 1)", [(1,), (257,)])
                 conn.execute("INSERT INTO direct_recs VALUES (1, 257, 1, 3)")
+                conn.execute(
+                    """INSERT INTO rec_lists(id, title, item_count)
+                       VALUES (10, 'Thoughtful progression fantasy', 2)"""
+                )
+                conn.executemany(
+                    "INSERT INTO rec_list_items(list_id, novel_id, position) VALUES (10, ?, ?)",
+                    [(1, 1), (257, 2)],
+                )
             conn.close()
 
             with patch("build_static_export.CandidateGenerator", FakeCandidateGenerator):
@@ -62,6 +70,10 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(pool["candidates"][0]["r"], [1, 1, None, None, None])
             self.assertEqual(pool["candidates"][0]["shared_tag_ids"], [0])
             self.assertEqual(pool["candidates"][0]["direct_votes"], 3)
+            self.assertEqual(
+                pool["candidates"][0]["lists"],
+                [{"id": 10, "title": "Thoughtful progression fantasy"}],
+            )
             empty = json.loads((root / "out/recs/01/257.json").read_text())
             self.assertEqual(empty["reason"], "not_precomputed")
             detail = json.loads((root / "out/details/01/1.json").read_text())

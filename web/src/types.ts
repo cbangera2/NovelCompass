@@ -23,6 +23,7 @@ export interface Recommendation {
   match_score_percent: number;
   channel_ranks: Record<string, number>;
   shared_tags: string[];
+  curated_lists?: Array<{ id: number; title?: string | null }>;
   evidence_bullets: string[];
 }
 

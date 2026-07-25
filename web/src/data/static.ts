@@ -53,6 +53,7 @@ type StaticCandidate = {
   mutual?: boolean;
   list_count?: number;
   list_ids?: number[];
+  lists?: Array<{ id: number; title?: string | null }>;
   evidence_bullets?: string[];
 };
 
@@ -317,7 +318,10 @@ export class StaticDataSource implements RecommendationDataSource {
         match_score_percent: 0,
         channel_ranks: ranks,
         shared_tags: sharedTags,
-        evidence_bullets: candidate.evidence_bullets || buildEvidence(candidate, sharedTags),
+        curated_lists: candidate.lists || (candidate.list_ids || []).map((id) => ({ id, title: null })),
+        evidence_bullets: candidate.evidence_bullets
+          ? sanitizeEvidence(candidate.evidence_bullets, candidate.lists || [])
+          : buildEvidence(candidate, sharedTags),
         adjusted: score * hiddenGemMultiplier
       }];
     });
@@ -430,6 +434,22 @@ function buildEvidence(candidate: StaticCandidate, sharedTags: string[]): string
   const evidence: string[] = [];
   if (sharedTags.length) evidence.push(`Shared key tropes: ${sharedTags.slice(0, 5).join(', ')}`);
   if (candidate.direct_votes) evidence.push(`${candidate.mutual ? 'Mutual' : 'Human'} recommendation (${candidate.direct_votes} votes)`);
-  if (candidate.list_count) evidence.push(`Co-occurs on ${candidate.list_count} curated list(s)`);
+  if (candidate.list_count) {
+    const named = candidate.lists?.find((item) => item.title)?.title;
+    evidence.push(named
+      ? `Co-occurs on ${candidate.list_count} curated list(s) including '${named}'`
+      : `Co-occurs on ${candidate.list_count} curated list(s); list titles are unavailable in this snapshot`);
+  }
   return evidence.length ? evidence : ['Related through catalog evidence'];
+}
+
+function sanitizeEvidence(
+  bullets: string[],
+  lists: Array<{ id: number; title?: string | null }>
+): string[] {
+  const titles = new Map(lists.filter((item) => item.title).map((item) => [item.id, item.title!]));
+  return bullets.map((bullet) => bullet.replace(
+    /Novel Updates List\s+(\d+)/gi,
+    (_match, rawId) => titles.get(Number(rawId)) || `curated list #${rawId} (title unavailable)`
+  ));
 }

@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,9 +73,13 @@ def _dataset_version(conn: Any) -> str:
 
 
 def _candidate_evidence(
-    conn: Any, seed_id: int, candidate_ids: list[int], tag_indices: dict[int, int]
+    conn: Any,
+    seed_id: int,
+    candidate_ids: list[int],
+    tag_indices: dict[int, int],
+    list_titles: dict[int, str | None],
 ) -> dict[int, dict[str, Any]]:
-    evidence = {candidate_id: {"shared_tag_ids": [], "direct_votes": 0, "list_count": 0, "list_ids": []}
+    evidence = {candidate_id: {"shared_tag_ids": [], "direct_votes": 0, "list_count": 0, "list_ids": [], "lists": []}
                 for candidate_id in candidate_ids}
     if not candidate_ids:
         return evidence
@@ -105,6 +110,22 @@ def _candidate_evidence(
         item["shared_tag_ids"].sort()
         item["list_ids"] = sorted(set(item["list_ids"]))
         item["list_count"] = len(item["list_ids"])
+        if item["list_ids"]:
+            item["lists"] = [
+                {
+                    "id": list_id,
+                    "title": (
+                        None
+                        if not list_titles.get(list_id) or re.fullmatch(
+                            rf"Novel Updates List\s+{list_id}",
+                            list_titles[list_id],
+                            re.I,
+                        )
+                        else list_titles[list_id]
+                    ),
+                }
+                for list_id in item["list_ids"]
+            ]
     return evidence
 
 
@@ -114,6 +135,7 @@ def _export_pool(
     seed_id: int,
     limit: int,
     tag_indices: dict[int, int],
+    list_titles: dict[int, str | None],
 ) -> dict[str, Any]:
     raw_channels = generator.get_candidate_channels(seed_id, limit_per_channel=limit)
     ranks: dict[int, dict[str, int]] = {}
@@ -130,7 +152,9 @@ def _export_pool(
             candidate_id,
         ),
     )[:limit]
-    evidence = _candidate_evidence(conn, seed_id, selected, tag_indices)
+    evidence = _candidate_evidence(
+        conn, seed_id, selected, tag_indices, list_titles
+    )
     candidates = []
     for candidate_id in selected:
         item = evidence[candidate_id]
@@ -172,6 +196,10 @@ def export_static_dataset(
         tags = [row["name"] for row in tag_rows]
         genre_indices = {row["id"]: index for index, row in enumerate(genre_rows)}
         tag_indices = {row["id"]: index for index, row in enumerate(tag_rows)}
+        list_titles = {
+            row["id"]: row["title"]
+            for row in conn.execute("SELECT id, title FROM rec_lists")
+        }
         genre_map: dict[int, list[int]] = {}
         tag_map: dict[int, list[int]] = {}
         for novel_id, genre_id in conn.execute("SELECT novel_id, genre_id FROM novel_genres ORDER BY novel_id, genre_id"):
@@ -244,7 +272,10 @@ def export_static_dataset(
         for index, row in enumerate(novels, 1):
             novel_id = row["id"]
             if novel_id in selected:
-                pool = _export_pool(conn, generator, novel_id, candidate_limit, tag_indices)
+                pool = _export_pool(
+                    conn, generator, novel_id, candidate_limit,
+                    tag_indices, list_titles
+                )
                 recommendable += bool(pool["candidates"])
             else:
                 pool = {"seed": novel_id, "algorithm_version": ALGORITHM_VERSION,
