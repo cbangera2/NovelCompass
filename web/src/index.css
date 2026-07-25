@@ -70,6 +70,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   text-transform: uppercase;
 }
 
+.dataset-badge {
+  display: inline-flex;
+  margin-top: 0.85rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgba(155, 126, 255, 0.3);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: rgba(119, 77, 220, 0.08);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
 .header h1 {
   font-size: clamp(2.2rem, 5vw, 4.25rem);
   font-weight: 760;

@@ -49,6 +49,29 @@ export interface RecommendRequest {
   require_completed?: boolean;
 }
 
+export interface DatasetManifest {
+  schema_version: number;
+  algorithm_version?: number;
+  dataset_version: string;
+  generated_at?: string;
+  novel_count: number;
+  recommendable_seed_count?: number;
+  catalog_url?: string;
+  facets_url?: string;
+}
+
+export interface FilterOptions {
+  genres: string[];
+  tags?: string[];
+  languages?: string[];
+}
+
+export interface DataSourceStatus {
+  mode: 'api' | 'static';
+  label: string;
+  datasetVersion?: string;
+}
+
 export interface RecommendResponse {
   seed_novel: SeedNovel;
   count: number;

@@ -11,12 +11,14 @@ import {
   X
 } from 'lucide-react';
 import {
+  DatasetManifest,
   RecommendResponse,
   RecommendRequest,
   Recommendation,
   NovelDetail,
   NovelSearchResult
 } from './types';
+import { createDataSource, RecommendationDataSource } from './data';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -31,6 +33,9 @@ const DEFAULT_NOVEL: NovelSearchResult = {
 export default function App(): JSX.Element {
   const searchSectionRef = useRef<HTMLElement>(null);
   const detailRequestRef = useRef(0);
+  const dataSourceRef = useRef<RecommendationDataSource | null>(null);
+  const [dataSource, setDataSource] = useState<RecommendationDataSource | null>(null);
+  const [dataset, setDataset] = useState<DatasetManifest | null>(null);
   const [query, setQuery] = useState(DEFAULT_NOVEL.title);
   const [selectedNovel, setSelectedNovel] = useState<NovelSearchResult | null>(DEFAULT_NOVEL);
   const [suggestions, setSuggestions] = useState<NovelSearchResult[]>([]);
@@ -69,6 +74,24 @@ export default function App(): JSX.Element {
   const [detailEvidence, setDetailEvidence] = useState<string[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+    createDataSource()
+      .then(async (source) => {
+        const [manifest, options] = await Promise.all([source.getManifest(), source.getOptions()]);
+        if (cancelled) return;
+        dataSourceRef.current = source;
+        setDataSource(source);
+        setDataset(manifest);
+        setGenres(options.genres || []);
+      })
+      .catch((initializationError: any) => {
+        if (!cancelled) setError(initializationError.message || 'Could not load a recommendation dataset.');
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!dataSource) return;
     const trimmed = query.trim();
     if (
       trimmed.length < 2 ||
@@ -81,12 +104,8 @@ export default function App(): JSX.Element {
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}&limit=8`, {
-          signal: controller.signal
-        });
-        if (!response.ok) return;
-        const body = await response.json();
-        setSuggestions(body.results || []);
+        const results = await dataSource.searchNovels(trimmed, 8, controller.signal);
+        setSuggestions(results);
         setShowSuggestions(true);
       } catch (searchError: any) {
         if (searchError.name !== 'AbortError') setSuggestions([]);
@@ -97,17 +116,12 @@ export default function App(): JSX.Element {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, selectedNovel]);
-
-  useEffect(() => {
-    fetch('/api/options')
-      .then((response) => response.ok ? response.json() : null)
-      .then((body) => setGenres(body?.genres || []))
-      .catch(() => setGenres([]));
-  }, []);
+  }, [query, selectedNovel, dataSource]);
 
   const fetchRecommendations = async (novel: NovelSearchResult | null = selectedNovel) => {
-    const requestedQuery = novel ? String(novel.id) : query.trim();
+    const source = dataSourceRef.current;
+    if (!source) return;
+    const requestedQuery = novel ? String(novel.id) : selectedNovel ? String(selectedNovel.id) : query.trim();
     if (!requestedQuery) return;
 
     setLoading(true);
@@ -141,17 +155,7 @@ export default function App(): JSX.Element {
         hidden_gem_strength: hiddenGemStrength
       };
 
-      const res = await fetch('/api/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.detail || `Server returned ${res.status}: ${res.statusText}`);
-      }
-      const json: RecommendResponse = await res.json();
+      const json = await source.getRecommendations(payload);
       setData(json);
       setVisibleCount(8);
     } catch (err: any) {
@@ -162,10 +166,11 @@ export default function App(): JSX.Element {
   };
 
   useEffect(() => {
+    if (!dataSource) return;
     fetchRecommendations(DEFAULT_NOVEL);
     // Load the initial recommendation set once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dataSource]);
 
   const chooseNovel = (novel: NovelSearchResult) => {
     setSelectedNovel(novel);
@@ -175,6 +180,8 @@ export default function App(): JSX.Element {
   };
 
   const openNovelDetail = async (novel: Recommendation) => {
+    const source = dataSourceRef.current;
+    if (!source) return;
     const requestId = ++detailRequestRef.current;
     setActiveDetailId(novel.target_id);
     setDetail(null);
@@ -182,12 +189,7 @@ export default function App(): JSX.Element {
     setDetailError(null);
     setDetailLoading(true);
     try {
-      const response = await fetch(`/api/novels/${novel.target_id}`);
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.detail || 'Could not load this novel.');
-      }
-      const body: NovelDetail = await response.json();
+      const body = await source.getNovel(novel.target_id);
       if (detailRequestRef.current === requestId) setDetail(body);
     } catch (detailFetchError: any) {
       if (detailRequestRef.current === requestId) {
@@ -277,6 +279,12 @@ export default function App(): JSX.Element {
           <div className="eyebrow">Relationship-first discovery</div>
           <h1>Find your next obsession.</h1>
           <p>Start with a novel you loved. We trace shared tropes, reader recommendations, and curated lists to find what belongs beside it.</p>
+          {dataSource && (
+            <span className="dataset-badge" title={dataset?.dataset_version}>
+              {dataSource.mode === 'api' ? 'Live database' : 'Static snapshot'}
+              {dataset?.generated_at ? ` · ${new Date(dataset.generated_at).toLocaleDateString()}` : ''}
+            </span>
+          )}
         </div>
       </header>
 
@@ -298,8 +306,8 @@ export default function App(): JSX.Element {
               }}
             />
           </div>
-          <button type="submit" className="search-button" disabled={loading}>
-            {loading ? 'Finding matches…' : <><Sparkles size={16} aria-hidden="true" /> Find related</>}
+          <button type="submit" className="search-button" disabled={loading || !dataSource}>
+            {!dataSource ? 'Loading dataset…' : loading ? 'Finding matches…' : <><Sparkles size={16} aria-hidden="true" /> Find related</>}
           </button>
         </form>
 
