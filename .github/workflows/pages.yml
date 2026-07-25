@@ -30,21 +30,33 @@ jobs:
       - name: Install exporter dependencies
         run: python -m pip install --requirement requirements-ci.txt
 
-      - name: Require an approved database artifact
+      - name: Select static data source
+        id: static-source
         env:
           STATIC_DATA_URL: ${{ vars.STATIC_DATA_URL }}
           STATIC_DATA_SHA256: ${{ vars.STATIC_DATA_SHA256 }}
         run: |
+          if [[ -z "${STATIC_DATA_URL}" && -z "${STATIC_DATA_SHA256}" ]]; then
+            echo "mode=committed" >> "${GITHUB_OUTPUT}"
+            echo "Using the normalized static snapshot committed under web/public/data."
+            exit 0
+          fi
           if [[ -z "${STATIC_DATA_URL}" || -z "${STATIC_DATA_SHA256}" ]]; then
-            echo "::error::Pages needs repository variables STATIC_DATA_URL and STATIC_DATA_SHA256. Point them to an approved, immutable SQLite release artifact and its lowercase SHA-256."
+            echo "::error::Set both STATIC_DATA_URL and STATIC_DATA_SHA256, or leave both unset to deploy the committed snapshot."
+            exit 1
+          fi
+          if [[ ! "${STATIC_DATA_URL}" =~ ^https:// ]]; then
+            echo "::error::STATIC_DATA_URL must use HTTPS."
             exit 1
           fi
           if [[ ! "${STATIC_DATA_SHA256}" =~ ^[0-9a-f]{64}$ ]]; then
             echo "::error::STATIC_DATA_SHA256 must be a lowercase 64-character SHA-256 digest."
             exit 1
           fi
+          echo "mode=external" >> "${GITHUB_OUTPUT}"
 
       - name: Download and verify database
+        if: steps.static-source.outputs.mode == 'external'
         env:
           STATIC_DATA_URL: ${{ vars.STATIC_DATA_URL }}
           STATIC_DATA_SHA256: ${{ vars.STATIC_DATA_SHA256 }}
@@ -55,6 +67,7 @@ jobs:
           echo "${STATIC_DATA_SHA256}  ${RUNNER_TEMP}/recommender.sqlite" | sha256sum --check --strict
 
       - name: Generate and validate normalized static data
+        if: steps.static-source.outputs.mode == 'external'
         env:
           STATIC_MAX_NOVELS: ${{ vars.STATIC_MAX_NOVELS }}
           STATIC_CATALOG_LIMIT: ${{ vars.STATIC_CATALOG_LIMIT }}
@@ -78,7 +91,9 @@ jobs:
             --db "${RUNNER_TEMP}/recommender.sqlite" \
             --output web/public/data \
             "${export_args[@]}"
-          python build_static_export.py --output web/public/data --verify-only
+
+      - name: Validate normalized static data
+        run: python build_static_export.py --output web/public/data --verify-only
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
