@@ -1,6 +1,9 @@
 # Novel Compass
 
 A local-first browser for finding translated novels through shared tags, reader recommendations, and curated lists.
+<img width="1512" height="861" alt="image" src="https://github.com/user-attachments/assets/92b85ac6-eb6b-4374-be62-281ab560203e" />
+<img width="1509" height="865" alt="image" src="https://github.com/user-attachments/assets/22f00d72-5d22-4c54-9d8a-3a5f0c9c72aa" />
+<img width="3024" height="7496" alt="localhost_3000__view=novel id=18721" src="https://github.com/user-attachments/assets/50cb9b26-8f53-4614-b049-210b91f74a56" />
 
 ## Features
 
