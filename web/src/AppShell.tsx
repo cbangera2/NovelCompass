@@ -6,6 +6,7 @@ import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { Tooltip } from './ui';
 import { Badge } from './design-system';
 import './app-shell.css';
+import { defaultHomeUrl } from './preferences';
 
 export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
 
@@ -18,7 +19,7 @@ const NAV_ITEMS = [
 
 function viewUrl(view: AppView): string {
   const base = import.meta.env.BASE_URL;
-  return view === 'discover' ? base : `${base}?view=${view}`;
+  return view === 'discover' ? `${base}?view=discover` : `${base}?view=${view}`;
 }
 
 export default function AppShell({ activeView, children }: { activeView: AppView; children: ReactNode }): JSX.Element {
@@ -26,6 +27,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem('novel-compass:sidebar-collapsed') === 'true');
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [homeUrl, setHomeUrl] = useState(defaultHomeUrl);
   const dataMode = configuredDataMode();
   const staticDeployment = dataMode === 'static' || window.location.hostname.endsWith('.github.io');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
@@ -45,6 +47,16 @@ export default function AppShell({ activeView, children }: { activeView: AppView
     return () => {
       unsubscribe();
       window.removeEventListener('focus', refreshProfile);
+    };
+  }, []);
+
+  useEffect(() => {
+    const refreshHome = () => setHomeUrl(defaultHomeUrl());
+    window.addEventListener('storage', refreshHome);
+    window.addEventListener('novel-navigation-preferences', refreshHome);
+    return () => {
+      window.removeEventListener('storage', refreshHome);
+      window.removeEventListener('novel-navigation-preferences', refreshHome);
     };
   }, []);
 
@@ -69,7 +81,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   return (
     <div className={`application-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <header className="shell-mobile-header">
-        <a className="shell-brand compact" href={viewUrl('discover')} aria-label="Novel Compass home">
+        <a className="shell-brand compact" href={homeUrl} aria-label="Novel Compass home">
           <span><BookMarked size={18} /></span><strong>Novel Compass</strong>
         </a>
         <div className="shell-mobile-actions">
@@ -85,7 +97,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
       </header>
       {menuOpen && <button className="shell-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
       <aside className={`shell-sidebar ${menuOpen ? 'open' : ''}`}>
-        <a className="shell-brand" href={viewUrl('discover')}>
+        <a className="shell-brand" href={homeUrl}>
           <span><BookMarked size={21} /></span>
           <div><strong>Novel Compass</strong><small>Relationship-first discovery</small></div>
         </a>

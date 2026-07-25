@@ -1,9 +1,14 @@
-import { Monitor, Moon, Sun, Type } from 'lucide-react';
+import { Compass, FilterX, Monitor, Moon, Sun, Type } from 'lucide-react';
 import { useDisplaySettings } from './settings';
 import { Badge, Card, CardHeader } from './design-system';
+import { loadFilterControlPreferences, loadNavigationPreferences, resetSavedFilters, saveFilterControlPreferences, saveNavigationPreferences } from './preferences';
+import { useState } from 'react';
 
 export default function SettingsPage(): JSX.Element {
   const { settings, updateSettings } = useDisplaySettings();
+  const [homeView, setHomeView] = useState(() => loadNavigationPreferences().homeView);
+  const [rememberFilters, setRememberFilters] = useState(() => loadFilterControlPreferences().rememberFilters);
+  const [resetMessage, setResetMessage] = useState('');
   return (
     <main className="settings-page">
       <header>
@@ -24,6 +29,21 @@ export default function SettingsPage(): JSX.Element {
             </button>
           ))}
         </div>
+      </Card>
+      <Card className="settings-card">
+        <CardHeader title="Home & filters" description="Choose where the logo opens and whether filter controls return as you left them." action={<Compass size={19} />} />
+        <div className="settings-choice-grid title-choices">
+          {(['discover', 'browse'] as const).map((value) => <button key={value} className={homeView === value ? 'selected' : ''}
+            aria-pressed={homeView === value} onClick={() => { setHomeView(value); saveNavigationPreferences(value); }}>
+            <span><strong>{value === 'discover' ? 'Discover home' : 'Browse home'}</strong><small>{value === 'discover' ? 'Start from a novel relationship search' : 'Start from the full catalog'}</small></span>
+          </button>)}
+        </div>
+        <label className="settings-toggle"><input type="checkbox" checked={rememberFilters}
+          onChange={(event) => { setRememberFilters(event.target.checked); saveFilterControlPreferences(event.target.checked); }} />
+          <span><strong>Remember Browse and Discover filters</strong><small>Restore the most recently used filters when returning. Explicit URL filters always win.</small></span>
+        </label>
+        <button className="settings-reset-button" onClick={() => { resetSavedFilters(); setResetMessage('Saved filter snapshots cleared.'); }}><FilterX size={15} />Reset saved filters</button>
+        {resetMessage && <p className="settings-disclosure" role="status">{resetMessage}</p>}
       </Card>
       <Card className="settings-card">
         <CardHeader title="Novel titles" description="Choose how titles are displayed when the active dataset provides associated names." action={<Type size={19} />} />

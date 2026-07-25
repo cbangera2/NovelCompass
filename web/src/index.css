@@ -300,6 +300,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .settings-storage-note { background: rgba(115,212,174,.06); border: 1px solid rgba(115,212,174,.2); border-radius: 11px; margin-top: .8rem; padding: .8rem; }
 .settings-storage-note strong { color: var(--green); font-size: .78rem; }
 .settings-storage-note p { color: var(--muted); font-size: .7rem; }
+.settings-toggle{align-items:flex-start;background:var(--surface-soft);border:1px solid var(--border);border-radius:10px;display:flex;gap:.65rem;margin-top:.8rem;padding:.75rem}.settings-toggle input{accent-color:var(--accent);margin-top:.15rem}.settings-toggle span{display:flex;flex-direction:column}.settings-toggle strong{font-size:.75rem}.settings-toggle small{color:var(--muted);font-size:.65rem}.settings-reset-button{align-items:center;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;display:flex;font-size:.68rem;gap:.35rem;margin-top:.7rem;padding:.45rem .6rem}.settings-reset-button:hover{background:var(--surface-raised);color:var(--text)}
 
 .profile-backdrop {
   align-items: center;
