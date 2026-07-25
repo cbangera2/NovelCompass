@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Database, Pause, Play, Radar, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Database, FileUp, Pause, Play, Radar, RefreshCw } from 'lucide-react';
 import './scraper-dashboard.css';
 
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
@@ -40,6 +40,9 @@ export default function ScraperDashboard() {
   const [maxItems, setMaxItems] = useState(10);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [importResult, setImportResult] = useState<Record<string, number> | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -73,6 +76,26 @@ export default function ScraperDashboard() {
 
   const counts = status?.queue.counts || {};
   const latest = status?.latest_run;
+  const uploadImport = async () => {
+    if (!importFile) throw new Error('Choose a HAR or saved HTML file.');
+    const isHtml = /\.html?$/i.test(importFile.name);
+    if (isHtml && !sourceUrl.trim()) {
+      throw new Error('Enter the original Novel Updates URL for saved HTML.');
+    }
+    const response = await fetch(`${API}/api/scraper/import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': isHtml ? 'text/html' : 'application/json',
+        'X-Filename': importFile.name,
+        ...(isHtml ? { 'X-Source-URL': sourceUrl.trim() } : {})
+      },
+      body: importFile
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || 'Import failed');
+    setImportResult(payload);
+    return payload;
+  };
 
   return (
     <main className="scraper-shell">
@@ -135,6 +158,34 @@ export default function ScraperDashboard() {
             <div className="wide"><dt>Last heartbeat</dt><dd>{latest.heartbeat_at}</dd></div>
           </dl> : <p className="empty">Run a small batch when you are ready.</p>}
         </article>
+      </section>
+
+      <section className="scraper-panel import-panel">
+        <div className="panel-heading"><FileUp /><div><h2>Import captured pages</h2><p>Use a HAR or saved HTML when the live site presents a bot challenge.</p></div></div>
+        <div className="import-grid">
+          <label>Captured file
+            <input type="file" accept=".har,.html,.htm,application/json,text/html"
+              onChange={(event) => {
+                setImportFile(event.target.files?.[0] || null);
+                setImportResult(null);
+              }} />
+          </label>
+          <label>Original page URL <span>(HTML only)</span>
+            <input type="url" placeholder="https://www.novelupdates.com/series/..."
+              value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
+          </label>
+          <button disabled={busy || !importFile} onClick={() =>
+            act(uploadImport, 'Offline capture processed.')
+          }><FileUp size={17} /> Import locally</button>
+        </div>
+        <p className="safety-note"><AlertTriangle size={16} />
+          The importer reads only successful Novel Updates HTML responses. It never replays cookies or headers and never stores the raw HAR.
+        </p>
+        {importResult && <dl className="import-results">
+          {['accepted', 'rejected', 'duplicate', 'parse_failed', 'novels_updated', 'novels_queued', 'lists_updated'].map(key =>
+            <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{importResult[key] || 0}</dd></div>
+          )}
+        </dl>}
       </section>
 
       <section className="scraper-panel error-panel">

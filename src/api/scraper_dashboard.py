@@ -10,13 +10,16 @@ import threading
 import os
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from src.db.repository import Repository
 from src.db.schema import init_db
 from src.scraper.crawler import Crawler
 from src.scraper.refresh import DEFAULT_ARTIFACT
+from src.scraper.offline_import import MAX_UPLOAD_BYTES, import_har, import_html
 
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
@@ -54,11 +57,28 @@ class BatchRequest(BaseModel):
     max_items: int = Field(default=10, ge=1, le=100)
 
 
+async def _bounded_body(request: Request) -> bytes:
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Import file exceeds 100 MB.")
+    return bytes(body)
+
+
 def _require_local(request: Request) -> None:
     """Prevent a remote deployment from becoming a public scraper control plane."""
     host = request.client.host if request.client else ""
     if host not in {"127.0.0.1", "::1", "localhost", "testclient"}:
         raise HTTPException(status_code=403, detail="Scraper controls are local-only.")
+    origin = request.headers.get("origin")
+    if origin:
+        origin_host = (urlsplit(origin).hostname or "").lower()
+        if origin_host not in {"127.0.0.1", "::1", "localhost"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Scraper controls only accept requests from a local page.",
+            )
 
 
 def _queue_breakdown(conn) -> dict:
@@ -227,3 +247,38 @@ def pause_scraper(request: Request):
         "running": running,
         "message": "The batch will stop after its current request." if running else "No batch is running.",
     }
+
+
+@router.post("/import")
+async def import_saved_pages(request: Request):
+    """Process a HAR or saved HTML locally; never replay session credentials."""
+    _require_local(request)
+    body = await _bounded_body(request)
+    filename = request.headers.get("x-filename", "").lower()
+    content_type = request.headers.get("content-type", "").split(";", 1)[0]
+    conn = _dashboard_db()
+    try:
+        repo = Repository(conn)
+        if filename.endswith(".har") or content_type == "application/json":
+            result = import_har(repo, body)
+        elif filename.endswith((".html", ".htm")) or content_type == "text/html":
+            source_url = request.headers.get("x-source-url", "")
+            if not source_url:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Saved HTML imports require its original Novel Updates URL.",
+                )
+            result = import_html(repo, body, source_url)
+        else:
+            raise HTTPException(
+                status_code=415, detail="Choose a .har, .html, or .htm file."
+            )
+        return {
+            **result,
+            "message": (
+                "Processed locally. Request headers and cookies were ignored; "
+                "the uploaded file was not stored."
+            ),
+        }
+    finally:
+        conn.close()

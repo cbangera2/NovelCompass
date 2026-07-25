@@ -23,5 +23,11 @@
 .run-detail { display:grid; gap:.8rem; grid-template-columns:repeat(2,1fr); }.run-detail div { border-bottom:1px solid var(--border); padding-bottom:.55rem; }
 .run-detail .wide { grid-column:1/-1; }.run-detail dt { color:var(--dim); font-size:.7rem; text-transform:uppercase; }.run-detail dd { margin-top:.2rem; }
 .error-panel { margin-top:1rem; }.error-list { display:grid; gap:.5rem; }.error-list>div { align-items:center; background:var(--surface-soft); border-radius:9px; display:grid; gap:.6rem; grid-template-columns:75px 80px 1fr auto; padding:.65rem .8rem; }
+.import-panel { margin-top:1rem; }.import-grid { align-items:end; display:grid; gap:.8rem; grid-template-columns:1fr 1.4fr auto; }
+.import-grid label { color:var(--muted); display:grid; font-size:.8rem; gap:.35rem; }.import-grid label span { color:var(--dim); }
+.import-grid input { background:var(--surface-soft); border:1px solid var(--border); border-radius:9px; color:var(--text); padding:.65rem; width:100%; }
+.import-grid input[type=file] { padding:.48rem; }.import-grid button { align-items:center; background:var(--accent); border:0; border-radius:9px; color:#0b0911; cursor:pointer; display:flex; font-weight:700; gap:.45rem; justify-content:center; padding:.7rem .9rem; }
+.import-grid button:disabled { cursor:not-allowed; opacity:.45; }.import-results { display:grid; gap:.55rem; grid-template-columns:repeat(7,1fr); margin-top:1rem; }
+.import-results div { background:var(--surface-soft); border-radius:9px; padding:.65rem; }.import-results dt { color:var(--dim); font-size:.65rem; text-transform:uppercase; }.import-results dd { font-size:1.15rem; margin:.15rem 0 0; }
 .error-list span { color:var(--red); text-transform:capitalize; }.error-list code { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.error-list small { color:var(--dim); }
-@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}.scraper-hero{align-items:flex-start;flex-wrap:wrap}.error-list>div{grid-template-columns:1fr}.error-list code{white-space:normal}}
+@media(max-width:800px){.metrics{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}.scraper-hero{align-items:flex-start;flex-wrap:wrap}.error-list>div{grid-template-columns:1fr}.error-list code{white-space:normal}.import-grid{grid-template-columns:1fr}.import-results{grid-template-columns:repeat(2,1fr)}}
