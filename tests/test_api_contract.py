@@ -119,3 +119,30 @@ def test_evidence_uses_real_list_titles_and_labels_missing_titles_honestly():
     ]
     assert any("Carefully curated gems" in item for item in result["evidence_bullets"])
     assert all("Novel Updates List 11" not in item for item in result["evidence_bullets"])
+
+
+def test_random_browse_is_seeded_and_respects_filters(monkeypatch):
+    def random_db():
+        conn = contract_db()
+        conn.executemany(
+            """INSERT INTO novels(id, slug, title, author, language, rating)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            [
+                (39, "one", "One", "A", "Korean", 4.5),
+                (40, "two", "Two", "A", "Korean", 4.2),
+                (41, "other", "Other", "B", "Chinese", 5.0),
+            ],
+        )
+        return conn
+
+    monkeypatch.setattr(main, "get_db", random_db)
+    args = dict(
+        query="", sort="title", language="Korean", author="A", genre="",
+        tag="", min_rating=4, min_votes=0, seed=123
+    )
+    first = main.random_browse_novel(**args)
+    second = main.random_browse_novel(**args)
+    assert first == second
+    assert first["eligible_count"] == 2
+    assert first["novel"]["author"] == "A"
+    assert first["novel"]["language"] == "Korean"

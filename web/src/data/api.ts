@@ -105,11 +105,16 @@ export class ApiDataSource implements RecommendationDataSource {
   }
 
   async getRandomNovel(request: BrowseRequest, randomValue = Math.random()): Promise<BrowseNovel> {
-    const count = await this.browseNovels({ ...request, page: 1, page_size: 1 });
-    if (!count.total) throw new DataSourceError('No novels match the active filters.');
-    const page = Math.min(count.total, Math.floor(Math.max(0, Math.min(0.999999, randomValue)) * count.total) + 1);
-    const result = await this.browseNovels({ ...request, page, page_size: 1 });
-    if (!result.items[0]) throw new DataSourceError('The selected novel is unavailable.');
-    return result.items[0];
+    const params = new URLSearchParams();
+    Object.entries(request).forEach(([key, value]) => {
+      if (!['page', 'page_size'].includes(key) && value !== '' && value != null) params.set(key, String(value));
+    });
+    // Supplying a seed makes adapter tests reproducible. Normal UI use leaves
+    // selection to the server's cryptographic random source.
+    if (randomValue !== undefined && arguments.length > 1) {
+      params.set('seed', String(Math.floor(Math.max(0, Math.min(0.999999, randomValue)) * 2147483647)));
+    }
+    const result = await apiFetch<{ novel: BrowseNovel }>(`/api/browse/random?${params}`);
+    return result.novel;
   }
 }

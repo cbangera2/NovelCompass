@@ -2,6 +2,8 @@ import os
 import json
 import hashlib
 import sqlite3
+import random
+import secrets
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -283,6 +285,35 @@ def browse_novels(
         }
     finally:
         conn.close()
+
+
+@app.get("/api/browse/random")
+def random_browse_novel(
+    query: str = "",
+    sort: str = Query("popular", pattern="^(popular|rating|votes|title|newest)$"),
+    language: str = "",
+    author: str = "",
+    genre: str = "",
+    tag: str = "",
+    min_rating: float = Query(0, ge=0, le=5),
+    min_votes: int = Query(0, ge=0),
+    seed: Optional[int] = None,
+):
+    """Select uniformly from eligible rows without returning the full catalog."""
+    filters = dict(
+        query=query, sort=sort, language=language, author=author, genre=genre,
+        tag=tag, min_rating=min_rating, min_votes=min_votes
+    )
+    first = browse_novels(page=1, page_size=1, **filters)
+    if first["total"] == 0:
+        raise HTTPException(status_code=404, detail="No novels match the active filters.")
+    offset = (
+        random.Random(seed).randrange(first["total"])
+        if seed is not None
+        else secrets.randbelow(first["total"])
+    )
+    selected = browse_novels(page=offset + 1, page_size=1, **filters)
+    return {"novel": selected["items"][0], "eligible_count": first["total"]}
 
 
 @app.get("/api/novels/{novel_id}")
