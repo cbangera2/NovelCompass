@@ -6,6 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Novel Updates — Human-Curated Recommender</title>
     <meta name="description" content="Discover explainable web novel recommendations powered by human evidence, tropes, and vector similarity." />
+    <script>
+      (() => {
+        try {
+          const saved = JSON.parse(localStorage.getItem('novel-recommender-display-settings-v1') || '{}');
+          const theme = saved.theme === 'light' || saved.theme === 'dark'
+            ? saved.theme
+            : (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch (_) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">

@@ -25,6 +25,8 @@ import {
   RecommendationDataSource
 } from './data';
 import { LocalUserProfile, ProfileEntry, ProfilePanel } from './profile';
+import { saveLocalProfile } from './profile/store';
+import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
@@ -38,6 +40,7 @@ const DEFAULT_NOVEL: NovelSearchResult = {
 };
 
 export default function App(): JSX.Element {
+  const { settings } = useDisplaySettings();
   const searchSectionRef = useRef<HTMLElement>(null);
   const detailRequestRef = useRef(0);
   const dataSourceRef = useRef<RecommendationDataSource | null>(null);
@@ -232,6 +235,32 @@ export default function App(): JSX.Element {
   };
 
   const profileEntries = useMemo(() => new Map(profile?.entries.map((entry) => [entry.novel_id, entry]) || []), [profile]);
+  const feedbackByNovel = useMemo(() => new Map((profile?.feedback || []).map((item) => [item.novel_id, item.signal])), [profile]);
+
+  const setNovelFeedback = async (rec: Recommendation, signal: 'love' | 'read' | 'not_for_me') => {
+    const current = profile || {
+      profile_id: crypto.randomUUID(),
+      parser_version: 1,
+      dataset_version: dataset?.dataset_version || 'unknown',
+      imported_at: new Date().toISOString(),
+      source_fingerprints: [],
+      entries: [],
+      curated_lists: [],
+      feedback: []
+    };
+    const existingSignal = current.feedback?.find((item) => item.novel_id === rec.target_id)?.signal;
+    const feedback = (current.feedback || []).filter((item) => item.novel_id !== rec.target_id);
+    if (existingSignal !== signal) feedback.push({
+      novel_id: rec.target_id,
+      slug: rec.slug,
+      title: rec.title,
+      signal,
+      updated_at: new Date().toISOString()
+    });
+    const next = { ...current, feedback };
+    await saveLocalProfile(next);
+    setProfile(next);
+  };
 
   const openNovelDetail = async (novel: Recommendation) => {
     const source = dataSourceRef.current;
@@ -397,7 +426,7 @@ export default function App(): JSX.Element {
               >
                 <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
                 <span className="suggestion-copy">
-                  <strong>{novel.title}</strong>
+                  <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
                   <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
                 </span>
                 <span className="select-label">Use this</span>
@@ -571,7 +600,7 @@ export default function App(): JSX.Element {
               <span className="eyebrow">Based on your seed novel</span>
               <h2>
                 <a href={data.seed_novel.novelupdates_url} target="_blank" rel="noopener noreferrer">
-                  {data.seed_novel.title}<ExternalLink size={15} aria-hidden="true" />
+                  {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}<ExternalLink size={15} aria-hidden="true" />
                 </a>
               </h2>
               <p><span>{data.count}</span> evidence-backed matches, ranked for fit</p>
@@ -580,6 +609,7 @@ export default function App(): JSX.Element {
 
           <div className="results-grid">
             {data.recommendations
+              .filter((rec) => feedbackByNovel.get(rec.target_id) !== 'not_for_me')
               .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
               .slice(0, visibleCount).map((rec, index) => (
               <article
@@ -592,7 +622,7 @@ export default function App(): JSX.Element {
                 <div className="card-content">
                   <div className="card-top">
                     <div className="card-cover">
-                      <CoverImage src={rec.cover_url} alt={`Cover of ${rec.title}`} variant="card" />
+                      <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
                       <span className="card-rank">#{index + 1}</span>
                     </div>
 
@@ -600,7 +630,7 @@ export default function App(): JSX.Element {
                       <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
                       <h3 className="novel-title">
                         <button type="button" onClick={() => openNovelDetail(rec)}>
-                          {rec.title}
+                          {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
                         </button>
                         <a
                           className="card-external-link"
@@ -657,9 +687,9 @@ export default function App(): JSX.Element {
                       status: profileEntries.get(rec.target_id)?.status || 'reading',
                       source_file: 'recommendation'
                     })}><Sparkles size={14} aria-hidden="true" /> Use as seed</button>
-                    <button className="btn-feedback" onClick={() => alert(`Marked ${rec.title} as loved`)}><Heart size={14} aria-hidden="true" /> Love</button>
-                    <button className="btn-feedback" onClick={() => alert(`Marked ${rec.title} as read`)}><BookOpen size={14} aria-hidden="true" /> Read</button>
-                    <button className="btn-feedback" onClick={() => alert(`Excluded ${rec.title}`)}><X size={14} aria-hidden="true" /> Not for me</button>
+                    <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'} onClick={() => setNovelFeedback(rec, 'love')}><Heart size={14} aria-hidden="true" /> Love</button>
+                    <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'read' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'read'} onClick={() => setNovelFeedback(rec, 'read')}><BookOpen size={14} aria-hidden="true" /> Read</button>
+                    <button className="btn-feedback" onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={14} aria-hidden="true" /> Not for me</button>
                   </div>
                 </div>
               </article>
@@ -690,6 +720,7 @@ export default function App(): JSX.Element {
           onClose={closeNovelDetail}
           onRecommend={recommendFromDetail}
           profileEntry={detail ? profileEntries.get(detail.id) : undefined}
+          titlePreference={settings.titlePreference}
         />
       )}
     </div>
@@ -703,7 +734,8 @@ function NovelDetailDialog({
   evidence,
   onClose,
   onRecommend,
-  profileEntry
+  profileEntry,
+  titlePreference
 }: {
   detail: NovelDetail | null;
   loading: boolean;
@@ -712,6 +744,7 @@ function NovelDetailDialog({
   onClose: () => void;
   onRecommend: () => void;
   profileEntry?: ProfileEntry;
+  titlePreference: 'catalog' | 'alternate';
 }) {
   return (
     <div className="detail-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -733,10 +766,10 @@ function NovelDetailDialog({
         {detail && (
           <>
             <div className="detail-hero">
-              <CoverImage src={detail.cover_url} alt={`Cover of ${detail.title}`} variant="detail" />
+              <CoverImage src={detail.cover_url} alt={`Cover of ${displayNovelTitle(detail.title, detail.associated_names, titlePreference)}`} variant="detail" />
               <div className="detail-heading">
                 <span className="eyebrow">{detail.language || 'Web novel'}{detail.year ? ` · ${detail.year}` : ''}</span>
-                <h2 id="novel-detail-title">{detail.title}</h2>
+                <h2 id="novel-detail-title">{displayNovelTitle(detail.title, detail.associated_names, titlePreference)}</h2>
                 <p className="detail-author">{detail.author || 'Unknown author'}</p>
                 {profileEntry && <span className={`detail-library-badge status-${profileEntry.status}`}>
                   In your library · {profileEntry.status.replace(/_/g, ' ')}

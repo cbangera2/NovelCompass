@@ -47,6 +47,7 @@ export function mergeProfiles(current: LocalUserProfile | null, incoming: LocalU
     profile_id: current.profile_id,
     source_fingerprints: [...new Set([...(current.source_fingerprints || []), ...incoming.source_fingerprints])],
     entries: [...entries.values()],
-    curated_lists: [...lists.values()]
+    curated_lists: [...lists.values()],
+    feedback: [...new Map([...(current.feedback || []), ...(incoming.feedback || [])].map((item) => [item.novel_id, item])).values()]
   };
 }

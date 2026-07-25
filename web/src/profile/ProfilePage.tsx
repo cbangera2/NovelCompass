@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from '../data';
-import { DatasetManifest, NovelDetail } from '../types';
+import { DatasetManifest, NovelDetail, NovelSearchResult } from '../types';
 import { ProfilePanel } from './ProfilePanel';
 import { loadLocalProfile } from './store';
 import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
+import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { browseFacetUrl } from '../metadataLinks';
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
@@ -18,12 +19,15 @@ function appUrl(params = ''): string {
 }
 
 export default function ProfilePage(): JSX.Element {
+  const { settings } = useDisplaySettings();
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [dataset, setDataset] = useState<DatasetManifest | null>(null);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | ReadingStatus>('all');
   const [rating, setRating] = useState(0);
+  const [visibleLibraryCount, setVisibleLibraryCount] = useState(60);
+  const [libraryCatalog, setLibraryCatalog] = useState<Map<string, NovelSearchResult>>(new Map());
   const [taste, setTaste] = useState<{
     details: NovelDetail[];
     requested: number;
@@ -95,6 +99,28 @@ export default function ProfilePage(): JSX.Element {
       .filter((entry) => !needle || entry.imported_title.toLocaleLowerCase().includes(needle) || entry.slug.includes(needle))
       .sort((a, b) => (b.rating || 0) - (a.rating || 0) || a.imported_title.localeCompare(b.imported_title));
   }, [profile, query, rating, status]);
+  const visibleEntries = entries.slice(0, visibleLibraryCount);
+
+  useEffect(() => {
+    setVisibleLibraryCount(60);
+  }, [query, rating, status]);
+
+  useEffect(() => {
+    if (!source || !visibleEntries.length) {
+      setLibraryCatalog(new Map());
+      return;
+    }
+    let cancelled = false;
+    source.resolveSlugs(visibleEntries.filter((entry) => entry.novel_id != null).map((entry) => ({
+      slug: entry.slug,
+      title: entry.imported_title
+    }))).then((resolved) => {
+      if (!cancelled) setLibraryCatalog(resolved);
+    }).catch(() => {
+      if (!cancelled) setLibraryCatalog(new Map());
+    });
+    return () => { cancelled = true; };
+  }, [source, visibleLibraryCount, query, rating, status, profile]);
 
   const useSeed = (entry: ProfileEntry) => {
     if (entry.novel_id == null) return;
@@ -111,6 +137,10 @@ export default function ProfilePage(): JSX.Element {
         </div>
         <ProfilePanel source={source} dataset={dataset} profile={profile} onProfileChange={setProfile} onUseSeed={useSeed} showPageLink={false} />
       </header>
+
+      <a className="profile-settings-link" href={`${import.meta.env.BASE_URL}?view=settings`}>
+        Appearance and title settings <span>Theme · title fallback · local only</span>
+      </a>
 
       {!profile ? (
         <>
@@ -136,6 +166,18 @@ export default function ProfilePage(): JSX.Element {
             <div><strong>{counts.plan_to_read.toLocaleString()}</strong><span>Plan to read</span></div>
             <div><strong>{profile.entries.filter((entry) => entry.novel_id != null).length.toLocaleString()}</strong><span>Matched</span></div>
           </section>
+
+          {(profile.feedback?.length || 0) > 0 && (
+            <section className="profile-feedback-summary">
+              <div><span className="eyebrow">Explicit local signals</span><h2>Recommendation feedback</h2></div>
+              <p>Love is a favorite signal, Read is a local read marker, and Not for me hides that title from recommendation results. None of these edits your Novel Updates account.</p>
+              <div>{profile.feedback!.map((item) => (
+                <span key={item.novel_id} className={`feedback-${item.signal}`}>
+                  {item.title}<strong>{item.signal === 'not_for_me' ? 'Not for me' : item.signal === 'love' ? 'Loved' : 'Read'}</strong>
+                </span>
+              ))}</div>
+            </section>
+          )}
 
           <section className="profile-control-strip">
             <div><ShieldCheck size={18} /><span><strong>Private local profile</strong><small>Normalized data stays in IndexedDB on this browser.</small></span></div>
@@ -176,7 +218,7 @@ export default function ProfilePage(): JSX.Element {
                 </div>
                 <details className="taste-sample">
                   <summary>Titles used in this snapshot</summary>
-                  <ul>{taste.details.map((detail) => <li key={detail.id}>{detail.title}</li>)}</ul>
+                  <ul>{taste.details.map((detail) => <li key={detail.id}>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</li>)}</ul>
                 </details>
               </>
             )}
@@ -201,8 +243,15 @@ export default function ProfilePage(): JSX.Element {
               </select>
             </div>
             <div className="profile-entry-grid">
-              {entries.map((entry) => (
+              {visibleEntries.map((entry) => {
+                const catalog = libraryCatalog.get(entry.slug);
+                return (
                 <article key={entry.slug} className="profile-entry">
+                  <div className="profile-entry-cover">
+                    {catalog?.cover_url
+                      ? <img src={catalog.cover_url} alt="" loading="lazy" />
+                      : <BookOpen size={18} aria-hidden="true" />}
+                  </div>
                   <div>
                     <span className={`profile-status status-${entry.status}`}>{STATUS_LABELS[entry.status]}</span>
                     <h3>{entry.imported_title}</h3>
@@ -215,9 +264,10 @@ export default function ProfilePage(): JSX.Element {
                     <a href={appUrl(`?seed=${entry.novel_id}`)}><Sparkles size={14} /> Use as seed</a>
                   ) : <span className="profile-unmatched">Not in this snapshot</span>}
                 </article>
-              ))}
+              )})}
             </div>
             {!entries.length && <p className="profile-no-results">No library titles match those filters.</p>}
+            {visibleLibraryCount < entries.length && <button className="profile-load-more" onClick={() => setVisibleLibraryCount((count) => count + 60)}>Show 60 more</button>}
           </section>
 
           <section className="profile-lists-section">

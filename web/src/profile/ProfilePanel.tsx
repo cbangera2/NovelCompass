@@ -133,7 +133,8 @@ export function ProfilePanel({
       imported_at: new Date().toISOString(),
       source_fingerprints: preview.files.map((file) => file.fingerprint),
       entries: preview.entries,
-      curated_lists: preview.curated_lists
+      curated_lists: preview.curated_lists,
+      feedback: mode === 'merge' ? profile?.feedback || [] : []
     };
     const next = mode === 'merge' ? mergeProfiles(profile, incoming) : incoming;
     await saveLocalProfile(next);

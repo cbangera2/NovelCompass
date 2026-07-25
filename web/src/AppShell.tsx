@@ -1,16 +1,17 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { BookMarked, BookOpen, ChevronLeft, ChevronRight, Database, ExternalLink, Menu, Sparkles, User, X } from 'lucide-react';
+import { BookMarked, BookOpen, ChevronLeft, ChevronRight, Database, ExternalLink, Menu, Settings, Sparkles, User, X } from 'lucide-react';
 import { configuredDataMode } from './data';
 import { LocalUserProfile } from './profile';
 import { loadLocalProfile } from './profile/store';
 import './app-shell.css';
 
-export type AppView = 'discover' | 'browse' | 'profile' | 'scraper';
+export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper';
 
 const NAV_ITEMS = [
   { view: 'discover' as const, label: 'Discover', note: 'Find related novels', icon: Sparkles },
   { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen },
   { view: 'profile' as const, label: 'Profile', note: 'Your local library', icon: User },
+  { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings },
   { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database }
 ];
 

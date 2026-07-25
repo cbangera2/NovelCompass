@@ -29,6 +29,15 @@ export interface LocalUserProfile {
   source_fingerprints: string[];
   entries: ProfileEntry[];
   curated_lists: CuratedListSummary[];
+  feedback?: LocalNovelFeedback[];
+}
+
+export interface LocalNovelFeedback {
+  novel_id: number;
+  slug: string;
+  title: string;
+  signal: 'love' | 'read' | 'not_for_me';
+  updated_at: string;
 }
 
 export interface ParsedProfileFile {

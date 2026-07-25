@@ -4,10 +4,12 @@ import { configuredDataMode, createDataSource, RecommendationDataSource } from '
 import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
+import { displayNovelTitle, useDisplaySettings } from './settings';
 
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
+  const { settings } = useDisplaySettings();
   const initialParams = new URLSearchParams(window.location.search);
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
@@ -139,9 +141,10 @@ export default function BrowsePage(): JSX.Element {
           {detailLoading && !detail ? <p>Loading details…</p> : detail && <>
             {detail.cover_url && <img src={detail.cover_url} alt="" />}
             <div><p className="eyebrow">{detail.language || 'Language unknown'}{detail.year ? ` · ${detail.year}` : ''}</p>
-              <h2>{detail.title}</h2><p>{detail.author || 'Unknown author'}</p>
+              <h2>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</h2><p>{detail.author || 'Unknown author'}</p>
               <p>{detail.synopsis || 'No synopsis is available in this dataset.'}</p>
-              <div className="browse-chips">{detail.genres.map((item) => <span key={item}>{item}</span>)}</div>
+              <div className="browse-chips">{detail.genres.map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
+              <div className="browse-chips browse-tag-chips">{detail.tags.map((item) => <a key={item} href={browseFacetUrl('tag', item)}>{item}</a>)}</div>
               <footer>
                 <a href={`${import.meta.env.BASE_URL}?seed=${detail.id}`}>Show recommendations</a>
                 <a href={detail.novelupdates_url} target="_blank" rel="noopener noreferrer">Novel Updates <ExternalLink size={14} /></a>
@@ -155,17 +158,19 @@ export default function BrowsePage(): JSX.Element {
 }
 
 function BrowseCard({ novel, onOpen }: { novel: BrowseNovel; onOpen: () => void }) {
+  const { settings } = useDisplaySettings();
+  const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
   return <article className="browse-card">
     <button className="browse-cover" onClick={onOpen}>
       {novel.cover_url ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
     </button>
     <div>
-      <button className="browse-title" onClick={onOpen}>{novel.title}</button>
+      <button className="browse-title" onClick={onOpen}>{title}</button>
       <p>{novel.author || 'Unknown author'}</p>
       <div className="browse-meta"><span><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></span>
         <span><Users size={14} /> {novel.reading_list_count.toLocaleString()}</span></div>
-      <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <span key={item}>{item}</span>)}</div>
-      <footer><button onClick={onOpen}>Details</button><a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`${novel.title} on Novel Updates`}><ExternalLink size={15} /></a></footer>
+      <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
+      <footer><button onClick={onOpen}>Details</button><a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`${title} on Novel Updates`}><ExternalLink size={15} /></a></footer>
     </div>
   </article>;
 }
