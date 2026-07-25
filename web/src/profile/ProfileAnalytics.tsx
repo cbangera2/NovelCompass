@@ -2,15 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
-  Area,
-  AreaChart,
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
-  Tooltip as ChartTooltip,
   XAxis,
   YAxis
 } from 'recharts';
@@ -18,8 +17,15 @@ import { NovelDetail } from '../types';
 import { RecommendationDataSource } from '../data';
 import { LocalUserProfile } from './types';
 import { novelPageUrl } from '../novelLinks';
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '../chart';
 
 const SAMPLE_LIMIT = 40;
+const ratingChartConfig = {
+  count: {
+    label: 'Rated titles',
+    color: 'var(--chart-1)'
+  }
+} satisfies ChartConfig;
 
 function AnalyticsTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -113,7 +119,12 @@ export default function ProfileAnalytics({
     hidden: hiddenGem(detail)
   }));
   const languageData = languages.map(([language, count]) => ({ language, count }));
-  const ratingData = ratingCounts.map(([rating, count]) => ({ label: `${rating}★`, count }));
+  const ratingLookup = new Map(ratingCounts);
+  const ratingData = [1, 2, 3, 4, 5].map((rating) => ({
+    rating,
+    label: `${rating}★`,
+    count: ratingLookup.get(rating) || 0
+  }));
 
   return (
     <section className="profile-analytics" aria-labelledby="analytics-title">
@@ -150,18 +161,41 @@ export default function ProfileAnalytics({
           <article className="analytics-card">
             <h3>Personal rating summary</h3>
             <p>{ratingCounts.reduce((sum, [, count]) => sum + count, 0)} entries have an explicit imported rating; unrated entries are excluded.</p>
-            <div className="analytics-chart analytics-chart-bars" aria-hidden="true">
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={ratingData} margin={{ top: 8, right: 10, bottom: 4, left: -18 }}>
-                  <defs><linearGradient id="ratingGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.42} /><stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.03} /></linearGradient></defs>
-                  <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                  <XAxis dataKey="label" tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={{ stroke: 'var(--border-strong)' }} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <ChartTooltip content={<AnalyticsTooltip />} cursor={{ fill: 'var(--accent-soft)' }} />
-                  <Area type="monotone" dataKey="count" name="Rated titles" stroke="var(--chart-1)" strokeWidth={2} fill="url(#ratingGradient)" isAnimationActive={!reducedMotion} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            <ChartContainer config={ratingChartConfig} className="analytics-chart rating-line-chart">
+              <LineChart accessibilityLayer data={ratingData} margin={{ top: 12, right: 14, bottom: 4, left: 4 }}>
+                <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                  tickLine={false}
+                  tickMargin={10}
+                  axisLine={false}
+                  minTickGap={18}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  domain={[0, 'auto']}
+                  tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                  tickLine={false}
+                  tickMargin={8}
+                  axisLine={false}
+                  width={34}
+                />
+                <ChartTooltip
+                  cursor={{ stroke: 'var(--border-strong)', strokeDasharray: '3 3' }}
+                  content={<ChartTooltipContent config={ratingChartConfig} />}
+                />
+                <Line
+                  type="natural"
+                  dataKey="count"
+                  stroke="var(--color-count)"
+                  strokeWidth={2.5}
+                  dot={{ fill: 'var(--surface)', stroke: 'var(--color-count)', strokeWidth: 2, r: 3 }}
+                  activeDot={{ fill: 'var(--color-count)', stroke: 'var(--surface)', strokeWidth: 3, r: 6 }}
+                  isAnimationActive={!reducedMotion}
+                />
+              </LineChart>
+            </ChartContainer>
             <table><caption>Personal rating distribution data</caption><thead><tr><th>Rating</th><th>Titles</th></tr></thead><tbody>{ratingCounts.map(([rating, count]) => <tr key={rating}><th>{rating}★</th><td>{count}</td></tr>)}</tbody></table>
           </article>
         </div>

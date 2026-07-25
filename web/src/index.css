@@ -202,6 +202,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .analytics-card h3 { font-size: .9rem; }
 .analytics-card > p { color: var(--muted); font-size: .7rem; margin: .2rem 0 .8rem; }
 .analytics-chart { height: 260px; min-width: 0; width: 100%; }
+.chart-container { color: var(--muted); min-height: 230px; min-width: 0; width: 100%; }
+.chart-container .recharts-cartesian-grid-horizontal line:last-child { display: none; }
+.chart-tooltip { background: color-mix(in srgb,var(--surface) 96%,transparent); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.24); display: grid; gap: .38rem; min-width: 130px; padding: .55rem .65rem; }
+.chart-tooltip>strong { color: var(--text); font-size: .68rem; font-weight: 700; }
+.chart-tooltip-row { align-items: center; display: grid; font-size: .66rem; gap: .4rem; grid-template-columns: 7px 1fr auto; }
+.chart-tooltip-row i { border-radius: 2px; height: 7px; width: 7px; }
+.chart-tooltip-row span { color: var(--muted); }
+.chart-tooltip-row b { color: var(--text); font-variant-numeric: tabular-nums; }
+.rating-line-chart { margin-top: .4rem; }
 .analytics-chart-scatter { height: 340px; }
 .analytics-card { min-width: 0; }
 .analytics-tooltip { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.22); display: flex; flex-direction: column; gap: .15rem; max-width: 220px; padding: .5rem .6rem; }
