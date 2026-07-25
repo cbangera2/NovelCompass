@@ -7,6 +7,7 @@ import { loadLocalProfile } from './store';
 import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { browseFacetUrl } from '../metadataLinks';
+import { ProfileAnalytics } from './ProfileAnalytics';
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
@@ -131,12 +132,17 @@ export default function ProfilePage(): JSX.Element {
   };
 
   const openLibraryDetail = async (entry: ProfileEntry) => {
-    if (!source || entry.novel_id == null) return;
+    if (entry.novel_id == null) return;
+    openDetailById(entry.novel_id);
+  };
+
+  const openDetailById = async (novelId: number) => {
+    if (!source) return;
     setDetailLoading(true);
     setDetailError('');
     setActiveDetail(null);
     try {
-      setActiveDetail(await source.getNovel(entry.novel_id));
+      setActiveDetail(await source.getNovel(novelId));
     } catch (error: any) {
       setDetailError(error.message || 'Details are unavailable in this dataset.');
     } finally {
@@ -195,6 +201,13 @@ export default function ProfilePage(): JSX.Element {
             <div><strong>{counts.plan_to_read.toLocaleString()}</strong><span>Plan to read</span></div>
             <div><strong>{profile.entries.filter((entry) => entry.novel_id != null).length.toLocaleString()}</strong><span>Matched</span></div>
           </section>
+
+          <ProfileAnalytics
+            profile={profile}
+            source={source}
+            datasetVersion={dataset?.dataset_version || profile.dataset_version}
+            onOpenNovel={openDetailById}
+          />
 
           {(profile.feedback?.length || 0) > 0 && (
             <section className="profile-feedback-summary">
