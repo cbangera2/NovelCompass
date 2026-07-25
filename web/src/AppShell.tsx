@@ -15,7 +15,12 @@ import {
   X,
 } from 'lucide-react';
 import type { LocalUserProfile } from './profile/types';
-import { clearLocalProfile, loadLocalProfile, saveLocalProfile, subscribeLocalProfile } from './profile/store';
+import {
+  clearLocalProfile,
+  loadLocalProfile,
+  saveLocalProfile,
+  subscribeLocalProfile,
+} from './profile/store';
 import { downloadProfileBackup, parseProfileBackup } from './profile/transfer';
 import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
@@ -24,6 +29,7 @@ import type { NovelSearchResult } from './types';
 import { novelPageUrl } from './novelLinks';
 import {
   Sidebar,
+  SidebarCollapseButton,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
@@ -119,15 +125,18 @@ export default function AppShell({
       </header>
       <Sidebar>
         <SidebarHeader>
-          <a className="shell-brand" href={homeUrl}>
-            <span>
-              <BookMarked size={21} />
-            </span>
-            <div className="sidebar-brand-copy">
-              <strong>Novel Compass</strong>
-              <small>Relationship-first discovery</small>
-            </div>
-          </a>
+          <div className="shell-sidebar-heading">
+            <a className="shell-brand" href={homeUrl}>
+              <span>
+                <BookMarked size={21} />
+              </span>
+              <div className="sidebar-brand-copy">
+                <strong>Novel Compass</strong>
+                <small>Relationship-first discovery</small>
+              </div>
+            </a>
+            <SidebarCollapseButton />
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
@@ -207,7 +216,13 @@ export default function AppShell({
 
 const RECENT_SEARCH_KEY = 'novel-compass:recent-searches:v1';
 
-function GlobalNovelSearch({ mobile = false, compact = false }: { mobile?: boolean; compact?: boolean }) {
+function GlobalNovelSearch({
+  mobile = false,
+  compact = false,
+}: {
+  mobile?: boolean;
+  compact?: boolean;
+}) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NovelSearchResult[]>([]);
   const [recent, setRecent] = useState<NovelSearchResult[]>(() => {
@@ -370,7 +385,9 @@ function GlobalNovelSearch({ mobile = false, compact = false }: { mobile?: boole
       >
         <Search size={17} />
       </button>
-      {open && <div className={mobile ? 'shell-mobile-search' : 'shell-compact-search'}>{searchPanel}</div>}
+      {open && (
+        <div className={mobile ? 'shell-mobile-search' : 'shell-compact-search'}>{searchPanel}</div>
+      )}
     </>
   );
 }
@@ -393,16 +410,28 @@ function AccountMenu({
     if (!file) return;
     try {
       const next = parseProfileBackup(JSON.parse(await file.text()));
-      if (!window.confirm(`Import ${file.name} and ${profile ? 'replace your current local profile' : 'restore this local profile'}?`)) return;
+      if (
+        !window.confirm(
+          `Import ${file.name} and ${profile ? 'replace your current local profile' : 'restore this local profile'}?`,
+        )
+      )
+        return;
       await saveLocalProfile(next);
       setMessage(`Imported ${next.entries.length.toLocaleString()} saved titles.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'This profile backup could not be imported.');
+      setMessage(
+        error instanceof Error ? error.message : 'This profile backup could not be imported.',
+      );
     }
   };
 
   const clearSession = async () => {
-    if (!window.confirm('Clear this local session? This permanently deletes the profile, library, ratings, and recommendation feedback stored in this browser. It does not affect Novel Updates.')) return;
+    if (
+      !window.confirm(
+        'Clear this local session? This permanently deletes the profile, library, ratings, and recommendation feedback stored in this browser. It does not affect Novel Updates.',
+      )
+    )
+      return;
     await clearLocalProfile();
     localStorage.removeItem(RECENT_SEARCH_KEY);
     setMessage('Local session cleared.');
@@ -440,11 +469,40 @@ function AccountMenu({
           </span>
         </a>
         <div className="shell-account-divider" />
-        <button type="button" onClick={() => inputRef.current?.click()}><FileUp size={16} /><span>Import profile<small>Restore a JSON backup</small></span></button>
-        <input ref={inputRef} className="shell-account-file" type="file" accept=".json,application/json" onChange={importBackup} />
-        <button type="button" disabled={!profile} onClick={() => profile && downloadProfileBackup(profile)}><Download size={16} /><span>Export profile<small>Download library and ratings</small></span></button>
-        <button type="button" className="shell-clear-session" onClick={clearSession}><LogOut size={16} /><span>Clear local session<small>Delete browser-only data</small></span></button>
-        {message && <p className="shell-account-message" role="status">{message}</p>}
+        <button type="button" onClick={() => inputRef.current?.click()}>
+          <FileUp size={16} />
+          <span>
+            Import profile<small>Restore a JSON backup</small>
+          </span>
+        </button>
+        <input
+          ref={inputRef}
+          className="shell-account-file"
+          type="file"
+          accept=".json,application/json"
+          onChange={importBackup}
+        />
+        <button
+          type="button"
+          disabled={!profile}
+          onClick={() => profile && downloadProfileBackup(profile)}
+        >
+          <Download size={16} />
+          <span>
+            Export profile<small>Download library and ratings</small>
+          </span>
+        </button>
+        <button type="button" className="shell-clear-session" onClick={clearSession}>
+          <LogOut size={16} />
+          <span>
+            Clear local session<small>Delete browser-only data</small>
+          </span>
+        </button>
+        {message && (
+          <p className="shell-account-message" role="status">
+            {message}
+          </p>
+        )}
       </nav>
     </details>
   );
