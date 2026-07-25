@@ -9,3 +9,17 @@
 :root[data-theme="light"] .browse-controls,:root[data-theme="light"] .browse-card{background:rgba(255,255,255,.94)}
 .browse-card footer .ds-button{background:transparent;border-color:transparent;padding:.45rem .5rem}.browse-controls.ds-card{box-shadow:0 14px 38px rgba(0,0,0,.12)}
 @media(max-width:900px){.browse-controls{grid-template-columns:1fr 1fr}.browse-search,.browse-advanced{grid-column:1/-1}.browse-advanced .ui-field-group{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.browse-controls{grid-template-columns:1fr;position:static}.browse-search,.browse-advanced{grid-column:auto}.browse-advanced .ui-field-group{grid-template-columns:1fr}}
+
+/* Keep catalog cards dense: navigation lives on the cover/title, while the
+   footer exposes one text action and two compact destinations. */
+.browse-grid{align-items:start}
+.browse-card-actions{align-items:center;border-top:1px solid var(--border);display:flex;gap:.25rem;margin-top:.7rem;padding-top:.55rem}
+.browse-card-actions .browse-quick-look{flex:1;justify-content:flex-start;min-width:0;padding-inline:.4rem}
+.browse-card-actions .ui-tooltip{flex:0 0 auto}
+.browse-card-actions .browse-icon-action{align-items:center;display:inline-flex;flex:0 0 36px;height:36px;justify-content:center;padding:0;width:36px}
+
+@media(max-width:680px){
+  .browse-card{grid-template-columns:96px minmax(0,1fr)}
+  .browse-card-actions .browse-quick-look{min-height:44px}
+  .browse-card-actions .browse-icon-action{flex-basis:44px;height:44px;width:44px}
+}

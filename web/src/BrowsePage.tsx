@@ -5,7 +5,7 @@ import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { FieldGroup, Select } from './ui';
+import { FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { novelPageUrl } from './novelLinks';
@@ -275,7 +275,21 @@ function BrowseCard({ novel, onQuickLook }: { novel: BrowseNovel; onQuickLook: (
       <div className="browse-meta"><Badge tone="amber"><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></Badge>
         <Badge><Users size={14} /> {novel.reading_list_count.toLocaleString()}</Badge></div>
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
-      <footer><DSButton variant="ghost" onClick={onQuickLook}>Quick look</DSButton><a href={novelPageUrl(novel.id)}>View novel</a><a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`${title} on Novel Updates`}><ExternalLink size={15} /></a></footer>
+      <footer className="browse-card-actions">
+        <DSButton variant="ghost" className="browse-quick-look" onClick={onQuickLook}>
+          <Search size={14} aria-hidden="true" /> Quick look
+        </DSButton>
+        <Tooltip content="Open the full novel page">
+          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novelPageUrl(novel.id)} aria-label={`Open the full page for ${title}`}>
+            <BookOpen size={16} aria-hidden="true" />
+          </DSButton>
+        </Tooltip>
+        <Tooltip content="Open on Novel Updates">
+          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} on Novel Updates`}>
+            <ExternalLink size={16} aria-hidden="true" />
+          </DSButton>
+        </Tooltip>
+      </footer>
     </div>
   </Card>;
 }
