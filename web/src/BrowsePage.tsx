@@ -2,23 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import { BookOpen, ExternalLink, Search, Star, Users, X } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from './data';
 import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
+import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
+  const initialParams = new URLSearchParams(window.location.search);
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<BrowseSort>('popular');
   const [language, setLanguage] = useState('');
-  const [genre, setGenre] = useState('');
-  const [tag, setTag] = useState('');
+  const [genre, setGenre] = useState(initialParams.get('genre') || '');
+  const [tag, setTag] = useState(initialParams.get('tag') || '');
   const [minRating, setMinRating] = useState(0);
   const [minVotes, setMinVotes] = useState(0);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [tagSupported, setTagSupported] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -48,6 +51,7 @@ export default function BrowsePage(): JSX.Element {
         if (requestId !== requestRef.current) return;
         setItems((current) => page === 1 ? result.items : [...current, ...result.items]);
         setTotal(result.total);
+        setHasLoaded(true);
         setHasMore(result.has_more);
         setTagSupported(result.capabilities.tags);
       } catch (reason: any) {
@@ -120,12 +124,12 @@ export default function BrowsePage(): JSX.Element {
       </section>
 
       {!tagSupported && <p className="browse-notice">Tag filtering is unavailable in this static snapshot, so the selected tag was not applied.</p>}
-      <div className="browse-heading"><div><BookOpen /><h2>Novels</h2></div><span>{total.toLocaleString()} matches</span></div>
+      <div className="browse-heading"><div><BookOpen /><h2>Novels</h2></div><span>{hasLoaded ? `${total.toLocaleString()} matches` : 'Catalog status unavailable'}</span></div>
       {error && <p className="browse-error">{error}</p>}
       <section className="browse-grid">
         {items.map((novel) => <BrowseCard key={novel.id} novel={novel} onOpen={() => openDetail(novel.id)} />)}
       </section>
-      {!loading && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
+      {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
       {loading && <p className="browse-loading">Loading catalog…</p>}
       {hasMore && !loading && <button className="browse-more" onClick={() => setPage((value) => value + 1)}>Load more novels</button>}
 

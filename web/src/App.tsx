@@ -25,6 +25,7 @@ import {
   RecommendationDataSource
 } from './data';
 import { LocalUserProfile, ProfileEntry, ProfilePanel } from './profile';
+import { browseFacetUrl } from './metadataLinks';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -628,6 +629,13 @@ export default function App(): JSX.Element {
                         {rec.language && <span>{rec.language}</span>}
                         {rec.status_trans && <span>{rec.status_trans}</span>}
                       </div>
+                      {rec.shared_tags.length > 0 && (
+                        <div className="detail-chips card-tag-links">
+                          {rec.shared_tags.slice(0, 4).map((tag) => (
+                            <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -761,7 +769,7 @@ function NovelDetailDialog({
               {detail.genres.length > 0 && (
                 <section className="detail-section">
                   <h3>Genres</h3>
-                  <div className="detail-chips">{detail.genres.map((genre) => <span key={genre}>{genre}</span>)}</div>
+                  <div className="detail-chips">{detail.genres.map((genre) => <a key={genre} href={browseFacetUrl('genre', genre)}>{genre}</a>)}</div>
                 </section>
               )}
               {detail.synopsis && (
@@ -785,7 +793,7 @@ function NovelDetailDialog({
               {detail.tags.length > 0 && (
                 <section className="detail-section">
                   <h3>Tags</h3>
-                  <div className="detail-chips detail-tags">{detail.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                  <div className="detail-chips detail-tags">{detail.tags.map((tag) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>)}</div>
                 </section>
               )}
               {detail.associated_names.length > 0 && (

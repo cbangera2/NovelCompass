@@ -92,6 +92,14 @@ export class ApiDataSource implements RecommendationDataSource {
     Object.entries(request).forEach(([key, value]) => {
       if (value !== '' && value != null) params.set(key, String(value));
     });
-    return apiFetch(`/api/browse?${params}`);
+    return apiFetch<BrowseResponse>(`/api/browse?${params}`).catch((error) => {
+      if (error instanceof DataSourceError && /not found|404/i.test(error.message)) {
+        throw new DataSourceError(
+          'This API process is older than the Browse page. Restart the local API, or switch to a regenerated static snapshot.',
+          error
+        );
+      }
+      throw error;
+    });
   }
 }

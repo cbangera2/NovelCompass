@@ -5,6 +5,7 @@ import { DatasetManifest, NovelDetail } from '../types';
 import { ProfilePanel } from './ProfilePanel';
 import { loadLocalProfile } from './store';
 import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
+import { browseFacetUrl } from '../metadataLinks';
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
@@ -161,14 +162,14 @@ export default function ProfilePage(): JSX.Element {
                   <div>
                     <h3>Recurring genres</h3>
                     <div className="taste-chips">
-                      {taste.genres.map(([genre, count]) => <span key={genre}>{genre}<strong>{count}/{taste.details.length}</strong></span>)}
+                      {taste.genres.map(([genre, count]) => <a key={genre} href={browseFacetUrl('genre', genre)}>{genre}<strong>{count}/{taste.details.length}</strong></a>)}
                       {!taste.genres.length && <small>No genre metadata was available.</small>}
                     </div>
                   </div>
                   <div>
                     <h3>Recurring tags</h3>
                     <div className="taste-chips">
-                      {taste.tags.map(([tag, count]) => <span key={tag}>{tag}<strong>{count}/{taste.details.length}</strong></span>)}
+                      {taste.tags.map(([tag, count]) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}<strong>{count}/{taste.details.length}</strong></a>)}
                       {!taste.tags.length && <small>No tag metadata was available.</small>}
                     </div>
                   </div>
