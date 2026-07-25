@@ -19,6 +19,9 @@
   --chart-2: #73d4ae;
   --chart-3: #d89113;
   --chart-grid: rgba(255,255,255,.08);
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --ring: #b8a8ff;
 }
 
 :root[data-theme="light"] {
@@ -41,6 +44,7 @@
   --chart-2: #177a59;
   --chart-3: #b56b00;
   --chart-grid: rgba(37,27,64,.1);
+  --ring: #6648c8;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
