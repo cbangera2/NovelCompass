@@ -1,0 +1,28 @@
+# Sensitive browsing/session captures
+*.har
+
+# Local data and derived snapshots
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/raw/
+data/cache/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+.venv/
+*.py[cod]
+
+# JavaScript
+node_modules/
+dist/
+
+# macOS
+.DS_Store

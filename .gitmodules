@@ -1,0 +1,3 @@
+[submodule "supporting/novel-dataset"]
+	path = supporting/novel-dataset
+	url = https://github.com/shaido987/novel-dataset.git
