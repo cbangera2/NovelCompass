@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from '../data';
 import { DatasetManifest, NovelDetail, NovelSearchResult } from '../types';
 import { ProfilePanel } from './ProfilePanel';
@@ -8,6 +8,7 @@ import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { novelPageUrl } from '../novelLinks';
 import { browseFacetUrl } from '../metadataLinks';
+import { Card } from '../design-system';
 const ProfileAnalytics = lazy(() => import('./ProfileAnalytics'));
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
@@ -30,9 +31,6 @@ export default function ProfilePage(): JSX.Element {
   const [rating, setRating] = useState(0);
   const [visibleLibraryCount, setVisibleLibraryCount] = useState(60);
   const [libraryCatalog, setLibraryCatalog] = useState<Map<string, NovelSearchResult>>(new Map());
-  const [activeDetail, setActiveDetail] = useState<NovelDetail | null>(null);
-  const [detailLoading] = useState(false);
-  const [detailError, setDetailError] = useState('');
   const [taste, setTaste] = useState<{
     details: NovelDetail[];
     requested: number;
@@ -141,18 +139,6 @@ export default function ProfilePage(): JSX.Element {
     window.location.href = novelPageUrl(novelId);
   };
 
-  useEffect(() => {
-    if (!activeDetail && !detailLoading && !detailError) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setActiveDetail(null);
-        setDetailError('');
-      }
-    };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, [activeDetail, detailError, detailLoading]);
-
   return (
     <div className="profile-page">
       <header className="profile-page-hero">
@@ -170,12 +156,12 @@ export default function ProfilePage(): JSX.Element {
 
       {!profile ? (
         <>
-          <section className="profile-empty">
+          <Card className="profile-empty">
             <BookOpen size={30} />
             <h2>Bring your reading history into discovery</h2>
             <p>Use “Import my library” above to preview saved Novel Updates profile pages before anything is stored. The page stays entirely local to this browser.</p>
             <ProfilePanel source={source} dataset={dataset} profile={profile} onProfileChange={setProfile} onUseSeed={useSeed} showPageLink={false} />
-          </section>
+          </Card>
           <section className="profile-empty-features" aria-label="Local profile features">
             <article><span>01</span><h3>Library</h3><p>Search Reading, Completed, and Plan-to-read titles with ratings and progress.</p></article>
             <article><span>02</span><h3>Taste snapshot</h3><p>See recurring genres and tags with the exact contributing sample disclosed.</p></article>
@@ -203,7 +189,7 @@ export default function ProfilePage(): JSX.Element {
           </Suspense>
 
           {(profile.feedback?.length || 0) > 0 && (
-            <section className="profile-feedback-summary">
+          <Card className="profile-feedback-summary">
               <div><span className="eyebrow">Explicit local signals</span><h2>Recommendation feedback</h2></div>
               <p>Love is a favorite signal, Read is a local read marker, and Not for me hides that title from recommendation results. None of these edits your Novel Updates account.</p>
               <div>{profile.feedback!.map((item) => (
@@ -211,15 +197,15 @@ export default function ProfilePage(): JSX.Element {
                   {item.title}<strong>{item.signal === 'not_for_me' ? 'Not for me' : item.signal === 'love' ? 'Loved' : 'Read'}</strong>
                 </span>
               ))}</div>
-            </section>
+            </Card>
           )}
 
-          <section className="profile-control-strip">
+          <Card className="profile-control-strip">
             <div><ShieldCheck size={18} /><span><strong>Private local profile</strong><small>Normalized data stays in IndexedDB on this browser.</small></span></div>
             <ProfilePanel source={source} dataset={dataset} profile={profile} onProfileChange={setProfile} onUseSeed={useSeed} showPageLink={false} />
-          </section>
+          </Card>
 
-          <section className="taste-snapshot" aria-labelledby="taste-title">
+          <Card className="taste-snapshot" aria-labelledby="taste-title">
             <div className="profile-library-heading">
               <div><span className="eyebrow">Descriptive, not predictive</span><h2 id="taste-title">Taste snapshot</h2></div>
               <span>{dataset?.dataset_version || profile.dataset_version}</span>
@@ -257,9 +243,9 @@ export default function ProfilePage(): JSX.Element {
                 </details>
               </>
             )}
-          </section>
+          </Card>
 
-          <section className="profile-library-section">
+          <Card className="profile-library-section">
             <div className="profile-library-heading">
               <div><span className="eyebrow">Personal shelf</span><h2>Library</h2></div>
               <span>{entries.length.toLocaleString()} shown</span>
@@ -308,9 +294,9 @@ export default function ProfilePage(): JSX.Element {
             </div>
             {!entries.length && <p className="profile-no-results">No library titles match those filters.</p>}
             {visibleLibraryCount < entries.length && <button className="profile-load-more" onClick={() => setVisibleLibraryCount((count) => count + 60)}>Show 60 more</button>}
-          </section>
+          </Card>
 
-          <section className="profile-lists-section">
+          <Card className="profile-lists-section">
             <div className="profile-library-heading">
               <div><span className="eyebrow">Saved metadata</span><h2>Created lists</h2></div>
               <span>{profile.curated_lists.length} summaries</span>
@@ -328,33 +314,8 @@ export default function ProfilePage(): JSX.Element {
                 </article>
               ))}
             </div>
-          </section>
+          </Card>
         </>
-      )}
-      {(detailLoading || activeDetail || detailError) && (
-        <div className="profile-detail-backdrop" onMouseDown={(event) => event.target === event.currentTarget && (setActiveDetail(null), setDetailError(''))}>
-          <article className="profile-detail-dialog" role="dialog" aria-modal="true" aria-label="Novel details">
-            <button className="detail-close" onClick={() => { setActiveDetail(null); setDetailError(''); }} aria-label="Close details"><X size={18} /></button>
-            {detailLoading && <p className="detail-state">Loading details…</p>}
-            {detailError && <p className="detail-state detail-error">{detailError}</p>}
-            {activeDetail && <>
-              <div className="profile-detail-hero">
-                {activeDetail.cover_url ? <img src={activeDetail.cover_url} alt="" /> : <span className="profile-detail-cover-fallback"><BookOpen /></span>}
-                <div>
-                  <span className="eyebrow">{activeDetail.language || 'Web novel'}{activeDetail.year ? ` · ${activeDetail.year}` : ''}</span>
-                  <h2>{displayNovelTitle(activeDetail.title, activeDetail.associated_names, settings.titlePreference)}</h2>
-                  <p>{activeDetail.author || 'Unknown author'}</p>
-                  <div className="detail-actions">
-                    <a className="detail-recommend-button" href={appUrl(`?seed=${activeDetail.id}`)}><Sparkles size={15} /> Find similar</a>
-                    <a href={activeDetail.novelupdates_url} target="_blank" rel="noopener noreferrer">Novel Updates <ExternalLink size={14} /></a>
-                  </div>
-                </div>
-              </div>
-              {activeDetail.synopsis && <p className="profile-detail-synopsis">{activeDetail.synopsis}</p>}
-              <div className="detail-chips">{activeDetail.genres.map((genre) => <a key={genre} href={browseFacetUrl('genre', genre)}>{genre}</a>)}</div>
-            </>}
-          </article>
-        </div>
       )}
     </div>
   );

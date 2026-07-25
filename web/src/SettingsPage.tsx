@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sun, Type } from 'lucide-react';
 import { useDisplaySettings } from './settings';
+import { Badge, Card, CardHeader } from './design-system';
 
 export default function SettingsPage(): JSX.Element {
   const { settings, updateSettings } = useDisplaySettings();
@@ -10,8 +11,8 @@ export default function SettingsPage(): JSX.Element {
         <h1>Settings</h1>
         <p>Appearance and display choices stay in this browser and apply to Browse, recommendations, profiles, and novel details.</p>
       </header>
-      <section className="settings-card">
-        <div className="settings-card-heading"><Sun size={19} /><div><h2>Appearance</h2><p>Follow your device or choose a fixed theme.</p></div></div>
+      <Card className="settings-card">
+        <CardHeader title="Appearance" description="Follow your device or choose a fixed theme." action={<Sun size={19} />} />
         <div className="settings-choice-grid">
           {([
             ['system', Monitor, 'System', 'Follow this device'],
@@ -23,9 +24,9 @@ export default function SettingsPage(): JSX.Element {
             </button>
           ))}
         </div>
-      </section>
-      <section className="settings-card">
-        <div className="settings-card-heading"><Type size={19} /><div><h2>Novel titles</h2><p>Choose how titles are displayed when the active dataset provides associated names.</p></div></div>
+      </Card>
+      <Card className="settings-card">
+        <CardHeader title="Novel titles" description="Choose how titles are displayed when the active dataset provides associated names." action={<Type size={19} />} />
         <div className="settings-choice-grid title-choices">
           <button className={settings.titlePreference === 'catalog' ? 'selected' : ''} onClick={() => updateSettings({ titlePreference: 'catalog' })} aria-pressed={settings.titlePreference === 'catalog'}>
             <span><strong>Catalog title</strong><small>Use the primary title from the active snapshot</small></span>
@@ -35,15 +36,15 @@ export default function SettingsPage(): JSX.Element {
           </button>
         </div>
         <p className="settings-disclosure">Associated names are unordered. The dataset does not prove which title is English, original-language, official, or fan-translated, so this setting deliberately makes none of those claims. Catalog search and compact recommendation records may not include alternates and will fall back consistently.</p>
-      </section>
-      <section className="settings-storage-note">
-        <strong>Private local setting</strong>
+      </Card>
+      <Card className="settings-storage-note">
+        <Badge tone="green">Private local setting</Badge>
         <p>These choices use browser local storage. They are not sent to Novel Updates and do not represent a Novel Updates account preference.</p>
-      </section>
-      <section className="settings-storage-note">
-        <strong>Keyboard shortcut</strong>
+      </Card>
+      <Card className="settings-storage-note">
+        <Badge>Keyboard shortcut</Badge>
         <p><kbd>Alt</kbd> + <kbd>\</kbd> collapses or expands the sidebar. It is disabled while focus is inside a text field, select, or editable area.</p>
-      </section>
+      </Card>
     </main>
   );
 }

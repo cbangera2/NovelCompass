@@ -319,8 +319,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   max-width: 920px;
   overflow-y: auto;
   padding: clamp(1.25rem, 3vw, 2rem);
-  position: relative;
+  left: 50%;
+  position: fixed;
+  top: 50%;
+  transform: translate(-50%, -50%);
   width: 100%;
+  z-index: 51;
 }
 
 .profile-heading h2 { font-size: 1.65rem; margin: .3rem 0; }
@@ -460,6 +464,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   position: relative;
   z-index: 5;
 }
+.search-section.ds-card { background: transparent; border: 0; box-shadow: none; padding: 0; }
 
 .search-input-wrapper {
   align-items: center;
@@ -670,10 +675,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 .results-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); }
 .novel-card {
-  background: linear-gradient(150deg, rgba(22,27,40,.98), rgba(15,19,29,.98));
+  background: var(--surface);
   border: 1px solid var(--border); border-radius: 15px; cursor: pointer; min-width: 0; overflow: hidden;
   transition: border-color .2s, box-shadow .2s, transform .2s;
 }
+.novel-card.ds-card { padding: 0; }
 .novel-card:hover { border-color: rgba(155,135,245,.35); box-shadow: 0 16px 45px rgba(0,0,0,.22); transform: translateY(-2px); }
 .card-content { display: flex; flex-direction: column; min-height: 100%; padding: .85rem; }
 .card-top { display: flex; gap: .85rem; }

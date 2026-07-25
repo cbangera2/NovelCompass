@@ -4,6 +4,7 @@ import { configuredDataMode } from './data';
 import { LocalUserProfile } from './profile';
 import { loadLocalProfile } from './profile/store';
 import { Tooltip } from './ui';
+import { Badge } from './design-system';
 import './app-shell.css';
 
 export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
@@ -67,7 +68,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
         <div className="shell-mobile-actions">
           <a className="shell-mobile-account" href={viewUrl('profile')}
             aria-label={profile ? `Open local profile for ${profile.username || 'reader'}` : 'Open local profile'}>
-            <User size={17} />{profile && <span>{profile.entries.length}</span>}
+            <User size={17} />{profile && <Badge tone="violet">{profile.entries.length}</Badge>}
           </a>
           <button className="shell-menu-button" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
             aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>

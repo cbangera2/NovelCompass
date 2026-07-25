@@ -1,4 +1,5 @@
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { Dialog } from '@base-ui/react/dialog';
 import { Download, FileUp, Trash2, User, X } from 'lucide-react';
 import { DatasetManifest } from '../types';
 import { RecommendationDataSource } from '../data';
@@ -161,20 +162,20 @@ export function ProfilePanel({
   };
 
   return (
-    <>
-      <button type="button" className="profile-launch" onClick={() => setOpen(true)}>
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger className="profile-launch">
         <User size={16} aria-hidden="true" />
         {profile ? `${profile.username || 'Local profile'} · ${profile.entries.length.toLocaleString()} titles` : 'Import my library'}
-      </button>
+      </Dialog.Trigger>
       {showPageLink && <a className="profile-page-link" href={`${import.meta.env.BASE_URL}?view=profile`}>Open profile page</a>}
-      {open && (
-        <div className="profile-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}>
-          <section className="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-            <button type="button" className="detail-close" onClick={() => setOpen(false)} aria-label="Close profile"><X size={20} /></button>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="profile-backdrop" />
+          <Dialog.Popup className="profile-panel">
+            <Dialog.Close className="detail-close" aria-label="Close profile"><X size={20} /></Dialog.Close>
             <div className="profile-heading">
               <span className="eyebrow">Private and local</span>
-              <h2 id="profile-title">Your Novel Updates library</h2>
-              <p>Import saved Reading, Plan to read, and Completed profile pages. HTML is parsed in memory and never stored.</p>
+              <Dialog.Title id="profile-title">Your Novel Updates library</Dialog.Title>
+              <Dialog.Description>Import saved Reading, Plan to read, and Completed profile pages. HTML is parsed in memory and never stored.</Dialog.Description>
             </div>
 
             {profile && (
@@ -253,9 +254,8 @@ export function ProfilePanel({
                 {profile.entries.filter((entry) => entry.novel_id).length > 60 && <p>Showing the first 60 matched titles.</p>}
               </div>
             )}
-          </section>
-        </div>
-      )}
-    </>
+          </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

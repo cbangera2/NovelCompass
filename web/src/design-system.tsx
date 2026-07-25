@@ -1,4 +1,4 @@
-import { AnchorHTMLAttributes, ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
+import { AnchorHTMLAttributes, ButtonHTMLAttributes, forwardRef, HTMLAttributes, ReactNode } from 'react';
 import './design-system.css';
 
 type ButtonVariant = 'default' | 'primary' | 'outline' | 'ghost';
@@ -10,9 +10,9 @@ export function DSButton({ variant = 'default', className = '', as = 'button', .
   if (as === 'a') return <a className={`ds-button ds-button-${variant} ${className}`} {...props as AnchorHTMLAttributes<HTMLAnchorElement>} />;
   return <button className={`ds-button ds-button-${variant} ${className}`} {...props as ButtonHTMLAttributes<HTMLButtonElement>} />;
 }
-export function Card({ className = '', ...props }: HTMLAttributes<HTMLElement>) {
-  return <section className={`ds-card ${className}`} {...props} />;
-}
+export const Card = forwardRef<HTMLElement, HTMLAttributes<HTMLElement>>(function Card({ className = '', ...props }, ref) {
+  return <section ref={ref} className={`ds-card ${className}`} {...props} />;
+});
 export function CardHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: ReactNode; description?: ReactNode; action?: ReactNode }) {
   return <header className="ds-card-header"><div>{eyebrow && <span>{eyebrow}</span>}<h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>;
 }
