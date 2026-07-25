@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react"],
+  "ignorePatterns": ["dist/**", "public/data/**"],
+  "rules": {
+    "react/react-in-jsx-scope": "off"
+  }
+}

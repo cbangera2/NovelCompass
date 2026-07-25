@@ -370,7 +370,7 @@ export class StaticDataSource implements RecommendationDataSource {
     const genreNames = this.genres;
     const tagNames = this.tags;
     const channels = pool.channels || DEFAULT_CHANNELS;
-    const weights = { ...DEFAULT_WEIGHTS, ...(request.channel_weights || {}) };
+    const weights = { ...DEFAULT_WEIGHTS, ...request.channel_weights };
 
     const scored = pool.candidates.flatMap((candidate): Array<Recommendation & { adjusted: number }> => {
       const card = this.cards.get(candidate.id);
@@ -381,7 +381,7 @@ export class StaticDataSource implements RecommendationDataSource {
       const tags = (novelFacet?.t || []).map((id) => tagNames[id]).filter(Boolean).map(normalize);
       if (!passesFilters(card, genres, tags, request)) return [];
 
-      const ranks: Record<string, number> = { ...(candidate.ranks || {}) };
+      const ranks: Record<string, number> = { ...candidate.ranks };
       (candidate.r || []).forEach((rank, index) => {
         if (rank != null && channels[index]) ranks[channels[index]] = rank;
       });

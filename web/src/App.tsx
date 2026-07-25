@@ -563,6 +563,9 @@ export default function App(): JSX.Element {
     }, { rootMargin: '500px 0px' });
     observer.observe(sentinel);
     return () => observer.disconnect();
+    // The explicit dependencies keep the observer synchronized with pagination
+    // state without recreating it solely for the callback's function identity.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [data, visibleCount, filteredRecommendations.length, loading, availableExhausted, maxResults, loadedLimit, selectedNovel]);
 
   return (

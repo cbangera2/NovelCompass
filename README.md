@@ -26,11 +26,25 @@ Open <http://localhost:3000>.
 ## Checks
 
 ```bash
-.venv/bin/python -m pytest -q
-pnpm --dir web run build
-pnpm --dir web run build:static
-pnpm --dir web run build:pages
+PATH="$PWD/.venv/bin:$PATH" pnpm --dir web run check
 ```
+
+The combined check runs Oxlint, Prettier verification, TypeScript, pytest, and
+the production build without rewriting source files. During development:
+
+```bash
+pnpm --dir web run lint
+pnpm --dir web run lint:fix
+pnpm --dir web run format:check
+pnpm --dir web run format
+pnpm --dir web run typecheck
+pnpm --dir web run test
+```
+
+Formatting is intentionally enforced on maintained configuration and
+contributor documentation first. The existing frontend has not been
+mass-formatted, keeping behavior changes reviewable while Oxlint covers all
+TypeScript and React source.
 
 Static export and deployment details are in [DEPLOYMENT.md](DEPLOYMENT.md).
 

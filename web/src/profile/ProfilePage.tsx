@@ -113,7 +113,10 @@ export default function ProfilePage(): JSX.Element {
       .filter((entry) => !needle || entry.imported_title.toLocaleLowerCase().includes(needle) || entry.slug.includes(needle))
       .sort((a, b) => (b.rating || 0) - (a.rating || 0) || a.imported_title.localeCompare(b.imported_title));
   }, [profile, query, rating, status]);
-  const visibleEntries = entries.slice(0, visibleLibraryCount);
+  const visibleEntries = useMemo(
+    () => entries.slice(0, visibleLibraryCount),
+    [entries, visibleLibraryCount],
+  );
 
   useEffect(() => {
     setVisibleLibraryCount(60);
@@ -134,7 +137,7 @@ export default function ProfilePage(): JSX.Element {
       if (!cancelled) setLibraryCatalog(new Map());
     });
     return () => { cancelled = true; };
-  }, [source, visibleLibraryCount, query, rating, status, profile]);
+  }, [source, visibleEntries]);
 
   const useSeed = (entry: ProfileEntry) => {
     if (entry.novel_id == null) return;

@@ -1,0 +1,12 @@
+web/dist/
+web/public/data/
+data/
+supporting/
+cbboss _ Novel Updates.html
+cbboss _ Novel Updates_files/
+**/__pycache__/
+**/*.pyc
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+*.har
