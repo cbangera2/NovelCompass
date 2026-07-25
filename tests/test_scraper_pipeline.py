@@ -1,0 +1,85 @@
+import sqlite3
+from pathlib import Path
+
+from src.db.repository import Repository
+from src.db.schema import SCHEMA_SQL
+from src.scraper.html_parser import parse_discovery_page, parse_series_page
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def memory_repo() -> Repository:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA_SQL)
+    return Repository(conn)
+
+
+def test_current_series_markup_discovers_relationships_and_lists():
+    parsed = parse_series_page(
+        (FIXTURES / "series_page.html").read_text(encoding="utf-8"),
+        url=(
+            "https://www.novelupdates.com/series/"
+            "sword-devouring-swordmaster/"
+        ),
+    )
+    assert parsed["id"] == 135608
+    assert parsed["direct_recs"] == [
+        {
+            "id": 161263,
+            "slug": "the-sleeping-demon-god",
+            "title": "The Sleeping Demon God",
+            "url": (
+                "https://www.novelupdates.com/series/"
+                "the-sleeping-demon-god/"
+            ),
+            "votes": 1,
+        }
+    ]
+    assert 141735 in parsed["recommendation_list_ids"]
+
+
+def test_discovery_parser_extracts_canonical_links_and_pagination():
+    parsed = parse_discovery_page(
+        """
+        <a id="sid42" href="/series/a-title/">A title</a>
+        <a href="?rank=sixmonths&pg=9">9</a>
+        """,
+        "https://www.novelupdates.com/series-ranking/?rank=sixmonths&pg=1",
+    )
+    assert parsed["max_page"] == 9
+    assert parsed["series"][0]["id"] == 42
+    assert parsed["series"][0]["url"] == (
+        "https://www.novelupdates.com/series/a-title/"
+    )
+
+
+def test_queue_claim_is_restartable_and_relationships_are_replaced():
+    repo = memory_repo()
+    repo.add_to_crawl_queue(
+        "http://novelupdates.com/series/source", "novel", 1
+    )
+    claimed = repo.claim_next_queue_item()
+    assert claimed["status"] == "in_progress"
+    assert claimed["attempts"] == 1
+    assert repo.recover_interrupted_items() == 1
+    assert repo.claim_next_queue_item()["attempts"] == 2
+
+    repo.conn.executemany(
+        "INSERT INTO novels(id, slug, title) VALUES (?, ?, ?)",
+        [(1, "source", "Source"), (2, "target", "Target")],
+    )
+    repo.replace_novel_relationships(
+        1,
+        [{"id": 2, "votes": 3}],
+        [{"id": 2, "relation_type": "sequel"}],
+    )
+    assert tuple(
+        repo.conn.execute(
+            """
+            SELECT target_novel_id, votes FROM direct_recs
+            WHERE source_novel_id = 1
+            """
+        ).fetchone()
+    ) == (2, 3)
