@@ -18,13 +18,15 @@ export function ProfilePanel({
   dataset,
   profile,
   onProfileChange,
-  onUseSeed
+  onUseSeed,
+  showPageLink = true
 }: {
   source: RecommendationDataSource | null;
   dataset: DatasetManifest | null;
   profile: LocalUserProfile | null;
   onProfileChange: (profile: LocalUserProfile | null) => void;
   onUseSeed: (entry: ProfileEntry) => void;
+  showPageLink?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<ParsedProfileFile[]>([]);
@@ -161,8 +163,9 @@ export function ProfilePanel({
     <>
       <button type="button" className="profile-launch" onClick={() => setOpen(true)}>
         <User size={16} aria-hidden="true" />
-        {profile ? `${profile.entries.length.toLocaleString()} library titles` : 'Import my library'}
+        {profile ? `${profile.username || 'Local profile'} · ${profile.entries.length.toLocaleString()} titles` : 'Import my library'}
       </button>
+      {showPageLink && profile && <a className="profile-page-link" href={`${import.meta.env.BASE_URL}?view=profile`}>View profile</a>}
       {open && (
         <div className="profile-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}>
           <section className="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">

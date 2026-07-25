@@ -181,7 +181,27 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     if (!dataSource) return;
-    fetchRecommendations(DEFAULT_NOVEL);
+    const seedId = Number(new URLSearchParams(window.location.search).get('seed'));
+    if (Number.isInteger(seedId) && seedId > 0) {
+      dataSource.getNovel(seedId)
+        .then((detail) => {
+          const seed: NovelSearchResult = {
+            id: detail.id,
+            title: detail.title,
+            slug: detail.slug,
+            novelupdates_url: detail.novelupdates_url,
+            author: detail.author || '',
+            cover_url: detail.cover_url,
+            rating: detail.rating,
+            rating_votes: detail.rating_votes
+          };
+          chooseNovel(seed);
+          return fetchRecommendations(seed);
+        })
+        .catch(() => fetchRecommendations(DEFAULT_NOVEL));
+    } else {
+      fetchRecommendations(DEFAULT_NOVEL);
+    }
     // Load the initial recommendation set once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataSource]);
