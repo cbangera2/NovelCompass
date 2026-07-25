@@ -40,6 +40,10 @@ export default function SettingsPage(): JSX.Element {
         <strong>Private local setting</strong>
         <p>These choices use browser local storage. They are not sent to Novel Updates and do not represent a Novel Updates account preference.</p>
       </section>
+      <section className="settings-storage-note">
+        <strong>Keyboard shortcut</strong>
+        <p><kbd>Alt</kbd> + <kbd>\</kbd> collapses or expands the sidebar. It is disabled while focus is inside a text field, select, or editable area.</p>
+      </section>
     </main>
   );
 }

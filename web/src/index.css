@@ -496,6 +496,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .suggestion-copy small { color: var(--muted); font-size: .76rem; }
 .select-label { color: var(--accent-bright); font-size: .72rem; font-weight: 700; }
 
+.filter-panel { background: color-mix(in srgb,var(--surface) 82%,transparent); border: 1px solid var(--border); border-radius: 14px; margin: 0 auto 1rem; max-width: 1120px; overflow: hidden; padding: .8rem; }
+.filter-panel-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: .65rem; }
+.filter-panel-heading > div { align-items: baseline; display: flex; gap: .55rem; }
+.filter-panel-heading strong { font-size: .82rem; }
+.filter-panel-heading span { color: var(--dim); font-size: .68rem; }
+.filter-basics { align-items: stretch; display: grid; gap: .65rem; grid-template-columns: auto auto minmax(280px,1fr); }
+.ui-field-group { align-content: start; border: 0; display: flex; flex-wrap: wrap; gap: .35rem; min-width: 0; padding: 0; }
+.ui-field-group legend,.ui-select > span { color: var(--dim); font-size: .61rem; font-weight: 750; letter-spacing: .08em; margin-bottom: .3rem; text-transform: uppercase; }
+.ui-checkbox { align-items: center; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); cursor: pointer; display: flex; gap: .4rem; min-height: 34px; padding: .38rem .5rem; position: relative; }
+.ui-checkbox:hover { border-color: var(--border-strong); color: var(--text); }
+.ui-checkbox input { height: 1px; opacity: 0; position: absolute; width: 1px; }
+.ui-checkbox-mark { border: 1px solid var(--border-strong); border-radius: 4px; flex: 0 0 15px; height: 15px; position: relative; }
+.ui-checkbox input:checked + .ui-checkbox-mark { background: var(--accent); border-color: var(--accent); }
+.ui-checkbox input:checked + .ui-checkbox-mark::after { border: solid white; border-width: 0 2px 2px 0; content: ""; height: 7px; left: 4px; position: absolute; top: 1px; transform: rotate(45deg); width: 3px; }
+.ui-checkbox input:focus-visible + .ui-checkbox-mark { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+.ui-checkbox strong { font-size: .7rem; font-weight: 650; white-space: nowrap; }
+.ui-checkbox small { color: var(--dim); display: block; font-size: .6rem; }
+.filter-selects { display: grid; gap: .4rem; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.ui-select { display: flex; flex-direction: column; min-width: 0; }
+.ui-select select { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px; color: var(--text); min-height: 34px; min-width: 0; padding: .38rem 1.5rem .38rem .5rem; width: 100%; }
+.ui-button { border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: .7rem; font-weight: 700; padding: .4rem .6rem; }
+.ui-button-ghost { background: transparent; color: var(--muted); }
+.ui-button-ghost:hover { background: var(--surface-raised); color: var(--text); }
+.ui-button-primary { background: var(--accent); border-color: transparent; color: white; }
+.active-filter-chips { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .65rem; padding-top: .55rem; }
+.active-filter-chips span { background: var(--accent-soft); border: 1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius: 999px; color: var(--accent-bright); font-size: .62rem; padding: .18rem .4rem; }
+
 .controls {
   align-items: center;
   background: rgba(17, 21, 32, .76);
@@ -701,6 +728,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .header h1 { font-size: 2.25rem; }
   .header p { font-size: .88rem; }
   .controls { align-items: stretch; flex-direction: column; }
+  .filter-basics { grid-template-columns: 1fr; }
+  .filter-selects { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .control-group + .control-group { border-left: 0; border-top: 1px solid var(--border); padding: .55rem 0 0; }
   .select-controls { display: grid; grid-template-columns: repeat(3, 1fr); }
   .select-controls select { width: 100%; }
@@ -715,6 +744,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .search-input-wrapper { align-items: stretch; display: grid; grid-template-columns: auto 1fr; }
   .search-icon { align-self: center; }
   .search-button { grid-column: 1 / -1; }
+  .filter-selects { grid-template-columns: 1fr; }
+  .filter-panel-heading > div { align-items: flex-start; flex-direction: column; gap: .05rem; }
   .select-label { display: none; }
   .results-grid { grid-template-columns: 1fr; }
   .section-heading { gap: .5rem; }

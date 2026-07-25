@@ -27,6 +27,10 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   const dataMode = configuredDataMode();
   const staticDeployment = dataMode === 'static' || window.location.hostname.endsWith('.github.io');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
+  const toggleSidebar = () => setCollapsed((value) => {
+    window.localStorage.setItem('novel-compass:sidebar-collapsed', String(!value));
+    return !value;
+  });
 
   useEffect(() => {
     const refreshProfile = () => loadLocalProfile().then(setProfile).catch(() => setProfile(null));
@@ -41,6 +45,17 @@ export default function AppShell({ activeView, children }: { activeView: AppView
     document.addEventListener('keydown', close);
     return () => document.removeEventListener('keydown', close);
   }, [menuOpen]);
+
+  useEffect(() => {
+    const toggleFromKeyboard = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!event.altKey || event.code !== 'Backslash' || target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      toggleSidebar();
+    };
+    window.addEventListener('keydown', toggleFromKeyboard);
+    return () => window.removeEventListener('keydown', toggleFromKeyboard);
+  }, []);
 
   return (
     <div className={`application-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
@@ -66,12 +81,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
           <div><strong>Novel Compass</strong><small>Relationship-first discovery</small></div>
         </a>
         <button className="shell-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!collapsed} onClick={() => {
-            setCollapsed((value) => {
-              window.localStorage.setItem('novel-compass:sidebar-collapsed', String(!value));
-              return !value;
-            });
-          }}>
+          aria-expanded={!collapsed} title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Alt+\\)`} onClick={toggleSidebar}>
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           <span>Collapse sidebar</span>
         </button>
@@ -92,10 +102,6 @@ export default function AppShell({ activeView, children }: { activeView: AppView
               <small>{profile ? `${profile.entries.length.toLocaleString()} saved title${profile.entries.length === 1 ? '' : 's'}` : 'Private to this browser'}</small>
             </span>
           </a>
-          <div className="shell-status"><i /><span>
-            <strong>{dataMode === 'auto' ? 'Automatic data source' : `${dataMode} data mode`}</strong>
-            <small>Private, local-first tools</small>
-          </span></div>
           <a href="https://www.novelupdates.com/" target="_blank" rel="noopener noreferrer">
             Novel Updates <ExternalLink size={13} />
           </a>

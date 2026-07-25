@@ -28,6 +28,7 @@ import { LocalUserProfile, ProfileEntry, ProfilePanel } from './profile';
 import { saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
+import { Button, Checkbox, FieldGroup, Select } from './ui';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -354,6 +355,38 @@ export default function App(): JSX.Element {
     setHiddenGemStrength(0.3);
   };
 
+  const resetFilters = () => {
+    setHideLibraryTitles(false);
+    setHiddenGemMode(false);
+    setRequireCompleted(false);
+    setExcludeHarem(false);
+    setExcludeBL(false);
+    setExcludeYuri(false);
+    setLanguage('');
+    setMinRating(0);
+    resetAdvanced();
+  };
+
+  const activeFilters = useMemo(() => {
+    const active: string[] = [];
+    if (hideLibraryTitles) active.push('Hide library');
+    if (hiddenGemMode) active.push('Hidden gems');
+    if (requireCompleted) active.push('Completed');
+    if (excludeHarem) active.push('No harem');
+    if (excludeBL) active.push('No BL');
+    if (excludeYuri) active.push('No yuri');
+    if (language) active.push(language);
+    if (minRating) active.push(`${minRating}+ rating`);
+    if (minRatingVotes) active.push(`${minRatingVotes}+ votes`);
+    if (maxReaders) active.push(`≤${maxReaders} readers`);
+    if (minYear || maxYear) active.push('Year range');
+    if (includeTagsText.trim()) active.push('Required tags');
+    if (excludeTagsText.trim()) active.push('Excluded tags');
+    active.push(...Object.entries(genreStates).map(([genre, state]) => `${state === 'include' ? '+' : '−'}${genre}`));
+    if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) active.push('Custom ranking');
+    return active;
+  }, [hideLibraryTitles, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
+
   return (
     <div className="app-container">
       <header className="header">
@@ -436,72 +469,45 @@ export default function App(): JSX.Element {
         )}
       </section>
 
-      <section className="controls" aria-label="Recommendation controls">
-        {profile && (
-          <div className="control-group">
-            <span className="control-heading">My library</span>
-            <label className="filter-toggle">
-              <input type="checkbox" checked={hideLibraryTitles} onChange={(e) => setHideLibraryTitles(e.target.checked)} />
-              Hide imported titles
-            </label>
-          </div>
-        )}
-        <div className="control-group">
-          <span className="control-heading">Boost</span>
-          <label className="filter-toggle">
-            <input type="checkbox" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.target.checked)} />
-            Hidden-gem boost
-          </label>
-          <label className="filter-toggle">
-            <input type="checkbox" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.target.checked)} />
-            Completed only
-          </label>
+      <section className="filter-panel" aria-label="Recommendation filters">
+        <div className="filter-panel-heading">
+          <div><strong>Refine matches</strong><span>{activeFilters.length ? `${activeFilters.length} active` : 'Using balanced defaults'}</span></div>
+          {activeFilters.length > 0 && <Button variant="ghost" onClick={resetFilters}>Reset all</Button>}
         </div>
-
-        <div className="control-group">
-          <span className="control-heading">Exclude</span>
-          <label className="filter-toggle">
-            <input type="checkbox" checked={excludeHarem} onChange={(e) => setExcludeHarem(e.target.checked)} />
-            Harem
-          </label>
-          <label className="filter-toggle">
-            <input type="checkbox" checked={excludeBL} onChange={(e) => setExcludeBL(e.target.checked)} />
-            BL
-          </label>
-          <label className="filter-toggle">
-            <input type="checkbox" checked={excludeYuri} onChange={(e) => setExcludeYuri(e.target.checked)} />
-            Yuri
-          </label>
-        </div>
-
-        <div className="control-group select-controls">
-          <label>
-            <span className="control-heading">Language</span>
-            <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+        <div className="filter-basics">
+          <FieldGroup label="Show">
+            {profile && <Checkbox label="Unread only" checked={hideLibraryTitles} onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)} />}
+            <Checkbox label="Hidden gems" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.currentTarget.checked)} />
+            <Checkbox label="Completed" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.currentTarget.checked)} />
+          </FieldGroup>
+          <FieldGroup label="Leave out">
+            <Checkbox label="Harem" checked={excludeHarem} onChange={(e) => setExcludeHarem(e.currentTarget.checked)} />
+            <Checkbox label="BL" checked={excludeBL} onChange={(e) => setExcludeBL(e.currentTarget.checked)} />
+            <Checkbox label="Yuri" checked={excludeYuri} onChange={(e) => setExcludeYuri(e.currentTarget.checked)} />
+          </FieldGroup>
+          <div className="filter-selects">
+            <Select label="Language" value={language} onChange={(e) => setLanguage(e.currentTarget.value)}>
               <option value="">Any</option>
               <option value="korean">Korean</option>
               <option value="chinese">Chinese</option>
               <option value="japanese">Japanese</option>
-            </select>
-          </label>
-          <label>
-            <span className="control-heading">Minimum rating</span>
-            <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))}>
+            </Select>
+            <Select label="Rating" value={minRating} onChange={(e) => setMinRating(Number(e.currentTarget.value))}>
               <option value="0">Any</option>
               <option value="3.5">3.5+</option>
               <option value="4">4.0+</option>
               <option value="4.3">4.3+</option>
-            </select>
-          </label>
-          <label>
-            <span className="control-heading">Results</span>
-            <select value={resultLimit} onChange={(e) => setResultLimit(Number(e.target.value))}>
+            </Select>
+            <Select label="Results" value={resultLimit} onChange={(e) => setResultLimit(Number(e.currentTarget.value))}>
               <option value="12">12</option>
               <option value="20">20</option>
               <option value="30">30</option>
-            </select>
-          </label>
+            </Select>
+          </div>
         </div>
+        {activeFilters.length > 0 && <div className="active-filter-chips" aria-label="Active filters">
+          {activeFilters.map((filter) => <span key={filter}>{filter}</span>)}
+        </div>}
       </section>
 
       <details className="advanced-panel">
