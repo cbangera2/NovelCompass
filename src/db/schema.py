@@ -14,6 +14,11 @@ CREATE TABLE IF NOT EXISTS novels (
     synopsis TEXT,
     rating REAL DEFAULT 0.0,
     rating_votes INTEGER DEFAULT 0,
+    rating_votes_5 INTEGER DEFAULT 0,
+    rating_votes_4 INTEGER DEFAULT 0,
+    rating_votes_3 INTEGER DEFAULT 0,
+    rating_votes_2 INTEGER DEFAULT 0,
+    rating_votes_1 INTEGER DEFAULT 0,
     reading_list_count INTEGER DEFAULT 0,
     chapters_orig INTEGER DEFAULT 0,
     chapters_trans INTEGER DEFAULT 0,
@@ -159,6 +164,14 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     with conn:
         conn.executescript(SCHEMA_SQL)
         # Lightweight forward migrations for databases created by older builds.
+        novel_cols = {
+            row["name"] for row in conn.execute("PRAGMA table_info(novels)")
+        }
+        for star in range(1, 6):
+            col = f"rating_votes_{star}"
+            if col not in novel_cols:
+                conn.execute(f"ALTER TABLE novels ADD COLUMN {col} INTEGER DEFAULT 0")
+
         existing = {
             row["name"] for row in conn.execute("PRAGMA table_info(scrape_runs)")
         }

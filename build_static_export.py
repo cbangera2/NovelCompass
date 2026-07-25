@@ -359,7 +359,8 @@ def export_static_dataset(
         novels = conn.execute(
             """SELECT id, slug, title, author, cover_url, rating, rating_votes,
                       reading_list_count, year, language, status_trans,
-                      chapters_trans, chapters_orig, synopsis, associated_names
+                      chapters_trans, chapters_orig, synopsis, associated_names,
+                      rating_votes_5, rating_votes_4, rating_votes_3, rating_votes_2, rating_votes_1
                FROM novels ORDER BY id"""
         ).fetchall()
         if catalog_limit is not None:
@@ -433,6 +434,11 @@ def export_static_dataset(
                 "genre_ids": genre_map.get(novel_id, []),
                 "tag_ids": tag_map.get(novel_id, []),
                 "original_chapters": row["chapters_orig"] or 0,
+                "rating_votes_5": row["rating_votes_5"] or 0,
+                "rating_votes_4": row["rating_votes_4"] or 0,
+                "rating_votes_3": row["rating_votes_3"] or 0,
+                "rating_votes_2": row["rating_votes_2"] or 0,
+                "rating_votes_1": row["rating_votes_1"] or 0,
                 "direct_recommendation_count": direct_counts.get(novel_id, 0),
                 "related_series_count": related_counts.get(novel_id, 0),
                 "recommendation_list_count": list_counts.get(novel_id, 0),

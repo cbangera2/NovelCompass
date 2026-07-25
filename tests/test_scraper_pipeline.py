@@ -152,6 +152,11 @@ def test_current_series_markup_discovers_relationships_and_lists():
         ),
     )
     assert parsed["id"] == 135608
+    assert parsed["rating_votes_5"] == 72
+    assert parsed["rating_votes_4"] == 17
+    assert parsed["rating_votes_3"] == 9
+    assert parsed["rating_votes_2"] == 9
+    assert parsed["rating_votes_1"] == 6
     assert parsed["direct_recs"] == [
         {
             "id": 161263,
@@ -165,6 +170,29 @@ def test_current_series_markup_discovers_relationships_and_lists():
         }
     ]
     assert 141735 in parsed["recommendation_list_ids"]
+
+
+def test_repository_stores_and_retrieves_rating_votes():
+    repo = memory_repo()
+    novel_data = {
+        "id": 4052,
+        "slug": "warlock-of-the-magus-world",
+        "title": "Warlock of the Magus World",
+        "rating": 4.0,
+        "rating_votes": 3140,
+        "rating_votes_5": 1855,
+        "rating_votes_4": 448,
+        "rating_votes_3": 271,
+        "rating_votes_2": 183,
+        "rating_votes_1": 383,
+    }
+    novel_id = repo.upsert_novel(novel_data)
+    row = repo.conn.execute(
+        "SELECT rating_votes_5, rating_votes_4, rating_votes_3, rating_votes_2, rating_votes_1 FROM novels WHERE id = ?",
+        (novel_id,),
+    ).fetchone()
+    assert tuple(row) == (1855, 448, 271, 183, 383)
+
 
 
 def test_discovery_parser_extracts_canonical_links_and_pagination():

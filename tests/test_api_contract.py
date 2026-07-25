@@ -232,3 +232,31 @@ def test_novel_insights_percentiles_and_cohorts_are_catalog_relative(monkeypatch
         "population": 2, "readership_rank": 2,
     }
     assert result["peers"][0]["title"] == "Peer"
+
+
+def test_get_novel_detail_returns_rating_distribution(monkeypatch):
+    def detail_db():
+        conn = contract_db()
+        conn.execute(
+            """UPDATE novels SET rating=4.0, rating_votes=3140,
+               rating_votes_5=1855, rating_votes_4=448, rating_votes_3=271,
+               rating_votes_2=183, rating_votes_1=383 WHERE id=38"""
+        )
+        return conn
+
+    monkeypatch.setattr(main, "get_db", detail_db)
+    result = main.get_novel_detail(38)
+
+    assert result["rating_votes_5"] == 1855
+    assert result["rating_votes_4"] == 448
+    assert result["rating_votes_3"] == 271
+    assert result["rating_votes_2"] == 183
+    assert result["rating_votes_1"] == 383
+    assert result["rating_dist"] == {
+        "5": 1855,
+        "4": 448,
+        "3": 271,
+        "2": 183,
+        "1": 383,
+    }
+

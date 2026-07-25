@@ -17,9 +17,10 @@ class Repository:
             cur.execute("""
                 INSERT INTO novels (
                     id, slug, title, associated_names, author, language, synopsis,
-                    rating, rating_votes, reading_list_count, chapters_orig,
+                    rating, rating_votes, rating_votes_5, rating_votes_4, rating_votes_3,
+                    rating_votes_2, rating_votes_1, reading_list_count, chapters_orig,
                     chapters_trans, status_trans, year, cover_url, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(id) DO UPDATE SET
                     slug=COALESCE(excluded.slug, novels.slug),
                     title=excluded.title,
@@ -29,6 +30,11 @@ class Repository:
                     synopsis=excluded.synopsis,
                     rating=excluded.rating,
                     rating_votes=excluded.rating_votes,
+                    rating_votes_5=excluded.rating_votes_5,
+                    rating_votes_4=excluded.rating_votes_4,
+                    rating_votes_3=excluded.rating_votes_3,
+                    rating_votes_2=excluded.rating_votes_2,
+                    rating_votes_1=excluded.rating_votes_1,
                     reading_list_count=excluded.reading_list_count,
                     chapters_orig=excluded.chapters_orig,
                     chapters_trans=excluded.chapters_trans,
@@ -46,6 +52,11 @@ class Repository:
                 novel_data.get('synopsis'),
                 novel_data.get('rating', 0.0),
                 novel_data.get('rating_votes', 0),
+                novel_data.get('rating_votes_5', 0),
+                novel_data.get('rating_votes_4', 0),
+                novel_data.get('rating_votes_3', 0),
+                novel_data.get('rating_votes_2', 0),
+                novel_data.get('rating_votes_1', 0),
                 novel_data.get('reading_list_count', 0),
                 novel_data.get('chapters_orig', 0),
                 novel_data.get('chapters_trans', 0),

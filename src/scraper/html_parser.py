@@ -62,6 +62,35 @@ def parse_series_page(html_content: str, url: str = "") -> Dict[str, Any]:
                 rating_val = float(m.group(1))
                 rating_votes = int(m.group(2))
 
+    # 5.1 Star Rating Breakdown (5, 4, 3, 2, 1)
+    rating_votes_5 = 0
+    rating_votes_4 = 0
+    rating_votes_3 = 0
+    rating_votes_2 = 0
+    rating_votes_1 = 0
+    rates_table = soup.find('table', id='myrates')
+    if rates_table:
+        for tr in rates_table.find_all('tr'):
+            tds = tr.find_all('td')
+            if len(tds) >= 2:
+                star_text = tds[0].text.strip()
+                vspan = tds[1].find('span', class_='votetext')
+                vtext = vspan.text.strip() if vspan else tds[1].text.strip()
+                vm = re.search(r'\((\d+)\s*votes?\)', vtext, re.I)
+                if star_text.isdigit() and vm:
+                    s_num = int(star_text)
+                    v_cnt = int(vm.group(1))
+                    if s_num == 5:
+                        rating_votes_5 = v_cnt
+                    elif s_num == 4:
+                        rating_votes_4 = v_cnt
+                    elif s_num == 3:
+                        rating_votes_3 = v_cnt
+                    elif s_num == 2:
+                        rating_votes_2 = v_cnt
+                    elif s_num == 1:
+                        rating_votes_1 = v_cnt
+
     # 6. Reading List Count
     reading_list_count = 0
     rlist_elem = soup.find('b', class_='rlist')
@@ -164,6 +193,11 @@ def parse_series_page(html_content: str, url: str = "") -> Dict[str, Any]:
         'synopsis': synopsis,
         'rating': rating_val,
         'rating_votes': rating_votes,
+        'rating_votes_5': rating_votes_5,
+        'rating_votes_4': rating_votes_4,
+        'rating_votes_3': rating_votes_3,
+        'rating_votes_2': rating_votes_2,
+        'rating_votes_1': rating_votes_1,
         'reading_list_count': reading_list_count,
         'author': author,
         'associated_names': associated_names,

@@ -214,7 +214,9 @@ export default function NovelPage(): JSX.Element {
           <Card className="novel-about">
             <h2>About this novel</h2>
             <p>{detail.synopsis || 'A synopsis is not available in this catalog snapshot.'}</p>
-            {detail.associated_names.length > 0 && <details><summary>Alternative titles</summary><ul>{detail.associated_names.map((name) => <li key={name}>{name}</li>)}</ul></details>}
+            {detail.associated_names.length > 0 && (detail.associated_names.length <= 4
+              ? <div className="novel-aliases"><strong>Alternative titles</strong><ul>{detail.associated_names.map((name) => <li key={name}>{name}</li>)}</ul></div>
+              : <details><summary>Alternative titles · {detail.associated_names.length}</summary><ul>{detail.associated_names.map((name) => <li key={name}>{name}</li>)}</ul></details>)}
           </Card>
           <Card className="novel-facets">
             <h2>Genres & themes</h2>

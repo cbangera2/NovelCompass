@@ -469,7 +469,8 @@ def get_novel_detail(novel_id: int):
     try:
         row = conn.execute("""
             SELECT id, title, slug, associated_names, author, language, synopsis,
-                   rating, rating_votes, reading_list_count, chapters_orig,
+                   rating, rating_votes, rating_votes_5, rating_votes_4, rating_votes_3,
+                   rating_votes_2, rating_votes_1, reading_list_count, chapters_orig,
                    chapters_trans, status_trans, year, cover_url
             FROM novels
             WHERE id = ?
@@ -514,6 +515,18 @@ def get_novel_detail(novel_id: int):
             "synopsis": row["synopsis"],
             "rating": row["rating"],
             "rating_votes": row["rating_votes"],
+            "rating_votes_5": row["rating_votes_5"],
+            "rating_votes_4": row["rating_votes_4"],
+            "rating_votes_3": row["rating_votes_3"],
+            "rating_votes_2": row["rating_votes_2"],
+            "rating_votes_1": row["rating_votes_1"],
+            "rating_dist": {
+                "5": row["rating_votes_5"],
+                "4": row["rating_votes_4"],
+                "3": row["rating_votes_3"],
+                "2": row["rating_votes_2"],
+                "1": row["rating_votes_1"],
+            },
             "reading_list_count": row["reading_list_count"],
             "chapters_orig": row["chapters_orig"],
             "chapters_trans": row["chapters_trans"],
