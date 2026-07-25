@@ -232,6 +232,7 @@ class Crawler:
             flush=True,
         )
 
+        consecutive_blocks = 0
         try:
             while not self.stop_requested:
                 if max_items is not None and stats.scraped + stats.cached >= max_items:
@@ -253,13 +254,17 @@ class Crawler:
                         item["id"], queue_status, f"HTTP {http_status}"
                     )
                     stats.errors += 1
-                    status = "partial"
-                    reason = (
-                        "authentication or anti-bot challenge"
-                        if http_status in {401, 403}
-                        else "server rate limit"
-                    )
-                    break
+                    consecutive_blocks += 1
+                    if consecutive_blocks >= 3:
+                        status = "partial"
+                        reason = (
+                            "authentication or anti-bot challenge"
+                            if http_status in {401, 403}
+                            else "server rate limit"
+                        )
+                        break
+                    continue
+                consecutive_blocks = 0
                 if not html_text or http_status != 200:
                     stats.errors += 1
                     if item["attempts"] < self.max_attempts:
