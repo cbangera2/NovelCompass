@@ -66,8 +66,10 @@ web/public/data/
 ```
 
 The two-character directory is derived deterministically from the novel ID,
-such as `id % 256` encoded as lowercase hexadecimal. This prevents a single
-directory from containing tens of thousands of files.
+such as `id % 256` encoded as lowercase hexadecimal and left-padded with zero.
+This prevents a single directory from containing tens of thousands of files.
+Python and TypeScript share the test vectors `1 → 01`, `15 → 0f`, `16 → 10`,
+`255 → ff`, and `256 → 00`.
 
 ### `manifest.json`
 
@@ -97,12 +99,13 @@ joins. Use compact positional arrays rather than repeating property names
 ```json
 {
   "fields": [
-    "id", "title", "author", "cover", "rating", "votes", "readers",
-    "year", "language_id", "status_id", "translated_chapters"
+    "id", "slug", "title", "author", "cover", "rating", "votes", "readers",
+    "year", "language_id", "status_id", "translated_chapters", "genre_ids"
   ],
   "rows": [
-    [38, "Stellar Transformation", "I Eat Tomatoes", "https://...", 4.2,
-     1262, 12646, 2008, 1, 2, 681]
+    [38, "stellar-transformation", "Stellar Transformation",
+     "I Eat Tomatoes", "https://...", 4.2, 1262, 12646, 2008, 1, 2, 681,
+     [0, 1]]
   ],
   "aliases": [
     [38, ["Xing Chen Bian", "星辰变"]]
@@ -111,6 +114,14 @@ joins. Use compact positional arrays rather than repeating property names
   "statuses": ["", "Ongoing", "Completed"]
 }
 ```
+
+The slug is exported rather than reconstructed from the title. Numeric IDs
+remain the source for stable external Novel Updates links; slugs support
+deterministic human-readable application routes and source compatibility.
+
+Genre IDs are stored once per novel in the shared catalog. This makes common
+genre filters immediately available without downloading `facets.json`, while
+avoiding genre duplication in every seed-candidate pair.
 
 The browser creates `Map<number, NovelCard>` once after download. Search uses a
 normalized title/alias index built in a Web Worker so typing never blocks

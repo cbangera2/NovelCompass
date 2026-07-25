@@ -216,6 +216,11 @@ Static artifacts use the normalized layout specified in
 Recommendation files contain IDs, channel ranks, and structured evidence. They
 must not duplicate complete novel metadata for every seed.
 
+The compact catalog includes `slug` and `genre_ids`. Slugs are never
+reconstructed from titles, and common genre filters work without loading the
+larger tag-facet artifact. Genre IDs are stored once per novel rather than
+repeated in every candidate pool.
+
 Generate an artifact for every catalog novel, including explicit empty pools:
 
 ```json
@@ -372,6 +377,7 @@ refactor: introduce recommendation data source contract
 
 - replace repeated metadata with compact catalog joins
 - add manifest, details, facets, and bucketed pool output
+- use identical zero-padded hexadecimal bucket helpers in Python and TypeScript
 - derive links from numeric IDs
 - add resume, fingerprint, atomic output, and verification
 
