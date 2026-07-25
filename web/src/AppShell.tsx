@@ -12,7 +12,6 @@ export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper'
 const NAV_ITEMS = [
   { view: 'discover' as const, label: 'Discover', note: 'Find related novels', icon: Sparkles },
   { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen },
-  { view: 'profile' as const, label: 'Profile', note: 'Your local library', icon: User },
   { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings },
   { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database }
 ];

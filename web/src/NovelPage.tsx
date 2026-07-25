@@ -1,5 +1,5 @@
 import {
-  ArrowDown, ArrowLeft, BookMarked, BookOpen, Check, ExternalLink, Heart, Library,
+  ArrowLeft, BookMarked, BookOpen, Check, ExternalLink, Heart, Library,
   MessageSquare, Search, Sparkles, ThumbsDown
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -174,13 +174,11 @@ export default function NovelPage(): JSX.Element {
             <CollapsibleFacetList items={detail.tags} compactCount={12} noun="tags" hrefFor={(tag) => browseFacetUrl('tag', tag)} />
           </Card>
         </div>
-        <button className="next-section" onClick={() => goToSection('insights')}>Continue to catalog insights <ArrowDown size={15} /></button>
       </section>
       <section id="insights" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>02</span><div><h2>Insights</h2><p>How this title sits within the current catalog snapshot.</p></div></header>
         <NovelInsightsPanel novelId={novelId} source={source}
           onPeer={(peerId) => { window.location.href = novelPageUrl(peerId, novelId); }} />
-        <button className="next-section" onClick={() => goToSection('relationship')}>Continue to relationships <ArrowDown size={15} /></button>
       </section>
       <section id="relationship" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>03</span><div><h2>Relationships</h2><p>Recommendation evidence and related directions to explore.</p></div></header>
