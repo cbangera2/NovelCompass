@@ -643,7 +643,9 @@ export default function App(): JSX.Element {
                           <ExternalLink size={14} aria-hidden="true" />
                         </a>
                       </h3>
-                      <div className="novel-author">{rec.author || 'Unknown author'}</div>
+                      <div className="novel-author">{rec.author
+                        ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
+                        : 'Unknown author'}</div>
 
                       <div className="novel-meta">
                         <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
@@ -656,7 +658,7 @@ export default function App(): JSX.Element {
                             {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
                           </span>
                         )}
-                        {rec.language && <span>{rec.language}</span>}
+                        {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
                         {rec.status_trans && <span>{rec.status_trans}</span>}
                       </div>
                       {rec.shared_tags.length > 0 && (
@@ -768,9 +770,13 @@ function NovelDetailDialog({
             <div className="detail-hero">
               <CoverImage src={detail.cover_url} alt={`Cover of ${displayNovelTitle(detail.title, detail.associated_names, titlePreference)}`} variant="detail" />
               <div className="detail-heading">
-                <span className="eyebrow">{detail.language || 'Web novel'}{detail.year ? ` · ${detail.year}` : ''}</span>
+                <span className="eyebrow">{detail.language
+                  ? <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a>
+                  : 'Web novel'}{detail.year ? ` · ${detail.year}` : ''}</span>
                 <h2 id="novel-detail-title">{displayNovelTitle(detail.title, detail.associated_names, titlePreference)}</h2>
-                <p className="detail-author">{detail.author || 'Unknown author'}</p>
+                <p className="detail-author">{detail.author
+                  ? <a href={browseFacetUrl('author', detail.author)}>{detail.author}</a>
+                  : 'Unknown author'}</p>
                 {profileEntry && <span className={`detail-library-badge status-${profileEntry.status}`}>
                   In your library · {profileEntry.status.replace(/_/g, ' ')}
                   {profileEntry.rating ? ` · ${profileEntry.rating}★` : ''}

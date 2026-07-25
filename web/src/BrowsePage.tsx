@@ -16,7 +16,8 @@ export default function BrowsePage(): JSX.Element {
   const [items, setItems] = useState<BrowseNovel[]>([]);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<BrowseSort>('popular');
-  const [language, setLanguage] = useState('');
+  const [language, setLanguage] = useState(initialParams.get('language') || '');
+  const [author, setAuthor] = useState(initialParams.get('author') || '');
   const [genre, setGenre] = useState(initialParams.get('genre') || '');
   const [tag, setTag] = useState(initialParams.get('tag') || '');
   const [minRating, setMinRating] = useState(0);
@@ -47,7 +48,7 @@ export default function BrowsePage(): JSX.Element {
       setError('');
       try {
         const result = await source.browseNovels({
-          query, sort, language, genre, tag, min_rating: minRating,
+          query, sort, language, author, genre, tag, min_rating: minRating,
           min_votes: minVotes, page, page_size: PAGE_SIZE
         });
         if (requestId !== requestRef.current) return;
@@ -63,7 +64,7 @@ export default function BrowsePage(): JSX.Element {
       }
     }, query ? 180 : 0);
     return () => window.clearTimeout(timer);
-  }, [source, query, sort, language, genre, tag, minRating, minVotes, page]);
+  }, [source, query, sort, language, author, genre, tag, minRating, minVotes, page]);
 
   const resetPage = (action: () => void) => {
     action();
@@ -124,6 +125,10 @@ export default function BrowsePage(): JSX.Element {
           <option value="100">100+ votes</option><option value="1000">1,000+ votes</option>
         </select>
       </section>
+      {author && <div className="browse-active-filter">
+        <span>Author: {author}</span>
+        <button onClick={() => resetPage(() => setAuthor(''))}>Clear</button>
+      </div>}
 
       {!tagSupported && <p className="browse-notice">Tag filtering is unavailable in this static snapshot, so the selected tag was not applied.</p>}
       <div className="browse-heading"><div><BookOpen /><h2>Novels</h2></div><span>{hasLoaded ? `${total.toLocaleString()} matches` : 'Catalog status unavailable'}</span></div>
@@ -140,8 +145,12 @@ export default function BrowsePage(): JSX.Element {
           <button className="browse-close" onClick={() => setDetail(null)} aria-label="Close details"><X /></button>
           {detailLoading && !detail ? <p>Loading details…</p> : detail && <>
             {detail.cover_url && <img src={detail.cover_url} alt="" />}
-            <div><p className="eyebrow">{detail.language || 'Language unknown'}{detail.year ? ` · ${detail.year}` : ''}</p>
-              <h2>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</h2><p>{detail.author || 'Unknown author'}</p>
+            <div><p className="eyebrow">{detail.language
+              ? <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a>
+              : 'Language unknown'}{detail.year ? ` · ${detail.year}` : ''}</p>
+              <h2>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</h2><p>{detail.author
+                ? <a href={browseFacetUrl('author', detail.author)}>{detail.author}</a>
+                : 'Unknown author'}</p>
               <p>{detail.synopsis || 'No synopsis is available in this dataset.'}</p>
               <div className="browse-chips">{detail.genres.map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
               <div className="browse-chips browse-tag-chips">{detail.tags.map((item) => <a key={item} href={browseFacetUrl('tag', item)}>{item}</a>)}</div>
@@ -166,7 +175,7 @@ function BrowseCard({ novel, onOpen }: { novel: BrowseNovel; onOpen: () => void 
     </button>
     <div>
       <button className="browse-title" onClick={onOpen}>{title}</button>
-      <p>{novel.author || 'Unknown author'}</p>
+      <p>{novel.author ? <a href={browseFacetUrl('author', novel.author)}>{novel.author}</a> : 'Unknown author'}</p>
       <div className="browse-meta"><span><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></span>
         <span><Users size={14} /> {novel.reading_list_count.toLocaleString()}</span></div>
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>

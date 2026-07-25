@@ -682,6 +682,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .detail-chips span, .detail-chips a { background: var(--accent-soft); border: 1px solid rgba(155,135,245,.23); border-radius: 999px; color: #d4cbff; font-size: .7rem; padding: .24rem .52rem; text-decoration: none; }
 .detail-chips a:hover, .taste-chips a:hover { border-color: var(--accent); color: var(--text); }
 .card-tag-links { margin-top: .45rem; }
+.novel-author a, .detail-author a, .detail-heading .eyebrow a, .card-badges a { color: inherit; text-decoration: none; }
+.novel-author a:hover, .detail-author a:hover, .detail-heading .eyebrow a:hover, .card-badges a:hover { text-decoration: underline; }
 .detail-tags span { background: rgba(255,255,255,.035); border-color: var(--border); color: var(--muted); }
 .detail-evidence { border-top: 0; padding-top: 0; }
 .detail-signals > div { display: grid; gap: .5rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }

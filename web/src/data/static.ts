@@ -368,6 +368,7 @@ export class StaticDataSource implements RecommendationDataSource {
     const items = [...this.cards.values()].filter((card) => {
       if (query && !normalize(`${card.title} ${card.author} ${(this.aliases.get(card.id) || []).join(' ')}`).includes(query)) return false;
       if (request.language && normalize(card.language) !== normalize(request.language)) return false;
+      if (request.author && normalize(card.author) !== normalize(request.author)) return false;
       if ((request.min_rating || 0) > card.rating || (request.min_votes || 0) > card.rating_votes) return false;
       const genreNames = card.genre_ids.map((id) => this.genres[id]).filter(Boolean).map(normalize);
       if (genre && !genreNames.includes(genre)) return false;

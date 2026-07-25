@@ -180,6 +180,7 @@ def browse_novels(
     page_size: int = Query(24, ge=1, le=100),
     sort: str = Query("popular", pattern="^(popular|rating|votes|title|newest)$"),
     language: str = "",
+    author: str = "",
     genre: str = "",
     tag: str = "",
     min_rating: float = Query(0, ge=0, le=5),
@@ -200,6 +201,9 @@ def browse_novels(
         if language:
             where.append("LOWER(n.language) = LOWER(?)")
             params.append(language)
+        if author:
+            where.append("LOWER(n.author) = LOWER(?)")
+            params.append(author)
         if genre:
             joins.append(
                 "JOIN novel_genres bg ON bg.novel_id=n.id "

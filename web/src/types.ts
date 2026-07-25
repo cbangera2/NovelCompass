@@ -122,6 +122,7 @@ export interface BrowseRequest {
   page_size?: number;
   sort?: BrowseSort;
   language?: string;
+  author?: string;
   genre?: string;
   tag?: string;
   min_rating?: number;

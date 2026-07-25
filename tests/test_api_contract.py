@@ -63,13 +63,13 @@ def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch)
         conn.executemany(
             """
             INSERT INTO novels(
-                id, slug, title, rating, rating_votes, reading_list_count,
+                id, slug, title, author, rating, rating_votes, reading_list_count,
                 language, year
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (39, "popular", "Popular", 3.5, 2000, 9000, "Chinese", 2020),
-                (40, "acclaimed", "Acclaimed", 4.9, 500, 1000, "Korean", 2024),
+                (39, "popular", "Popular", "A", 3.5, 2000, 9000, "Chinese", 2020),
+                (40, "acclaimed", "Acclaimed", "B", 4.9, 500, 1000, "Korean", 2024),
             ],
         )
         conn.execute("INSERT INTO genres(name) VALUES ('Fantasy')")
@@ -85,7 +85,7 @@ def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch)
     monkeypatch.setattr(main, "get_db", browse_db)
     result = main.browse_novels(
         query="", page=1, page_size=1, sort="popular", language="",
-        genre="", tag="", min_rating=0, min_votes=0
+        author="", genre="", tag="", min_rating=0, min_votes=0
     )
     assert result["total"] == 3
     assert result["items"][0]["title"] == "Popular"
@@ -93,7 +93,7 @@ def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch)
 
     filtered = main.browse_novels(
         query="", page=1, page_size=10, sort="rating", language="Korean",
-        genre="Fantasy", tag="", min_rating=4, min_votes=100
+        author="B", genre="Fantasy", tag="", min_rating=4, min_votes=100
     )
     assert [item["title"] for item in filtered["items"]] == ["Acclaimed"]
     assert filtered["items"][0]["genres"] == ["Fantasy"]
