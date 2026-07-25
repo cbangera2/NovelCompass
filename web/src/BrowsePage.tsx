@@ -1,31 +1,47 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, ExternalLink, Search, Shuffle, SlidersHorizontal, Star, Users, X } from 'lucide-react';
+import { ArrowDownUp, BookOpen, ExternalLink, LayoutGrid, List, Search, Shuffle, SlidersHorizontal, Star, Users, X } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from './data';
-import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
+import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { FieldGroup, Select, Tooltip } from './ui';
+import { FieldGroup, Select } from './ui';
 import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { novelPageUrl } from './novelLinks';
+import { loadLocalProfile } from './profile/store';
 
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
-  const { settings } = useDisplaySettings();
   const initialParams = new URLSearchParams(window.location.search);
+  const initialNumber = (key: string) => Number(initialParams.get(key) || 0);
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<BrowseSort>('popular');
+  const [query, setQuery] = useState(initialParams.get('q') || '');
+  const [sort, setSort] = useState<BrowseSort>((initialParams.get('sort') as BrowseSort) || 'popular');
+  const [direction, setDirection] = useState<BrowseSortDirection>((initialParams.get('direction') as BrowseSortDirection) || 'desc');
   const [language, setLanguage] = useState(initialParams.get('language') || '');
   const [author, setAuthor] = useState(initialParams.get('author') || '');
   const [genre, setGenre] = useState(initialParams.get('genre') || '');
   const [tag, setTag] = useState(initialParams.get('tag') || '');
-  const [minRating, setMinRating] = useState(0);
-  const [minVotes, setMinVotes] = useState(0);
+  const [minRating, setMinRating] = useState(initialNumber('min_rating'));
+  const [maxRating, setMaxRating] = useState(initialNumber('max_rating'));
+  const [minVotes, setMinVotes] = useState(initialNumber('min_votes'));
+  const [minYear, setMinYear] = useState(initialNumber('min_year'));
+  const [maxYear, setMaxYear] = useState(initialNumber('max_year'));
+  const [status, setStatus] = useState(initialParams.get('status') || '');
+  const [minChapters, setMinChapters] = useState(initialNumber('min_chapters'));
+  const [maxChapters, setMaxChapters] = useState(initialNumber('max_chapters'));
+  const [minReaders, setMinReaders] = useState(initialNumber('min_readers'));
+  const [maxReaders, setMaxReaders] = useState(initialNumber('max_readers'));
+  const [includeGenres, setIncludeGenres] = useState(initialParams.get('include_genres') || '');
+  const [excludeGenres, setExcludeGenres] = useState(initialParams.get('exclude_genres') || '');
+  const [includeTags, setIncludeTags] = useState(initialParams.get('include_tags') || '');
+  const [excludeTags, setExcludeTags] = useState(initialParams.get('exclude_tags') || '');
+  const [excludeLibrary, setExcludeLibrary] = useState(initialParams.get('exclude_library') === '1');
+  const [libraryIds, setLibraryIds] = useState<number[]>([]);
+  const [density, setDensity] = useState<'grid' | 'list'>((initialParams.get('density') as 'grid' | 'list') || 'grid');
   const [page, setPage] = useState(1);
   const [retryToken, setRetryToken] = useState(0);
   const [total, setTotal] = useState(0);
@@ -36,8 +52,6 @@ export default function BrowsePage(): JSX.Element {
   const [error, setError] = useState('');
   const [batchError, setBatchError] = useState('');
   const [observerSupported] = useState(() => typeof window !== 'undefined' && 'IntersectionObserver' in window);
-  const [detail, setDetail] = useState<NovelDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [luckyLoading, setLuckyLoading] = useState(false);
   const requestRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -51,6 +65,12 @@ export default function BrowsePage(): JSX.Element {
   }, []);
 
   useEffect(() => {
+    loadLocalProfile().then((profile) => setLibraryIds(
+      profile?.entries.flatMap((entry) => entry.novel_id == null ? [] : [entry.novel_id]) || []
+    )).catch(() => setLibraryIds([]));
+  }, []);
+
+  useEffect(() => {
     if (!source) return;
     const requestId = ++requestRef.current;
     const timer = window.setTimeout(async () => {
@@ -60,7 +80,13 @@ export default function BrowsePage(): JSX.Element {
       try {
         const result = await source.browseNovels({
           query, sort, language, author, genre, tag, min_rating: minRating,
-          min_votes: minVotes, page, page_size: PAGE_SIZE
+          max_rating: maxRating, min_votes: minVotes, min_year: minYear, max_year: maxYear,
+          status, min_chapters: minChapters, max_chapters: maxChapters,
+          min_readers: minReaders, max_readers: maxReaders,
+          include_genres: includeGenres, exclude_genres: excludeGenres,
+          include_tags: includeTags, exclude_tags: excludeTags,
+          exclude_ids: excludeLibrary ? libraryIds.join(',') : '', direction,
+          page, page_size: PAGE_SIZE
         });
         if (requestId !== requestRef.current) return;
         setItems((current) => page === 1 ? result.items : [...current, ...result.items]);
@@ -82,7 +108,7 @@ export default function BrowsePage(): JSX.Element {
       }
     }, query ? 180 : 0);
     return () => window.clearTimeout(timer);
-  }, [source, query, sort, language, author, genre, tag, minRating, minVotes, page, retryToken]);
+  }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, libraryIds, page, retryToken]);
 
   const resetPage = (action: () => void) => {
     action();
@@ -119,14 +145,51 @@ export default function BrowsePage(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [observerSupported, hasMore, loading, batchError, page]);
 
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('view', 'browse');
+    const values: Record<string, string | number | boolean> = {
+      q: query, sort, direction, language, author, genre, tag,
+      min_rating: minRating, max_rating: maxRating, min_votes: minVotes,
+      min_year: minYear, max_year: maxYear, status,
+      min_chapters: minChapters, max_chapters: maxChapters,
+      min_readers: minReaders, max_readers: maxReaders,
+      include_genres: includeGenres, exclude_genres: excludeGenres,
+      include_tags: includeTags, exclude_tags: excludeTags,
+      exclude_library: excludeLibrary, density
+    };
+    Object.entries(values).forEach(([key, value]) => {
+      if (value && value !== 'desc' && value !== 'grid') params.set(key, value === true ? '1' : String(value));
+    });
+    window.history.replaceState(null, '', `${window.location.pathname}?${params}`);
+  }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density]);
+
   const browseRequest = () => ({
     query, sort, language, author, genre, tag,
-    min_rating: minRating, min_votes: minVotes
+    min_rating: minRating, max_rating: maxRating, min_votes: minVotes,
+    min_year: minYear, max_year: maxYear, status,
+    min_chapters: minChapters, max_chapters: maxChapters,
+    min_readers: minReaders, max_readers: maxReaders,
+    include_genres: includeGenres, exclude_genres: excludeGenres,
+    include_tags: includeTags, exclude_tags: excludeTags,
+    exclude_ids: excludeLibrary ? libraryIds.join(',') : '', direction
   });
 
   const clearAll = () => resetPage(() => {
     setQuery(''); setLanguage(''); setAuthor(''); setGenre(''); setTag('');
-    setMinRating(0); setMinVotes(0); setSort('popular');
+    setMinRating(0); setMaxRating(0); setMinVotes(0); setMinYear(0); setMaxYear(0);
+    setStatus(''); setMinChapters(0); setMaxChapters(0); setMinReaders(0); setMaxReaders(0);
+    setIncludeGenres(''); setExcludeGenres(''); setIncludeTags(''); setExcludeTags('');
+    setExcludeLibrary(false); setSort('popular'); setDirection('desc');
+  });
+
+  const applyPreset = (preset: 'rated' | 'popular' | 'hidden' | 'newest' | 'completed') => resetPage(() => {
+    clearAll();
+    if (preset === 'rated') { setSort('rating'); setMinVotes(100); }
+    if (preset === 'popular') setSort('popular');
+    if (preset === 'hidden') { setSort('rating'); setMinRating(4.2); setMinVotes(10); setMaxReaders(2000); }
+    if (preset === 'newest') setSort('newest');
+    if (preset === 'completed') { setStatus('complete'); setSort('popular'); }
   });
 
   const feelingLucky = async () => {
@@ -135,7 +198,7 @@ export default function BrowsePage(): JSX.Element {
     setError('');
     try {
       const novel = await source.getRandomNovel(browseRequest());
-      await openDetail(novel.id);
+      window.location.href = novelPageUrl(novel.id);
     } catch (reason: any) {
       setError(reason.message || 'Could not choose a random novel.');
     } finally {
@@ -150,21 +213,21 @@ export default function BrowsePage(): JSX.Element {
     tag && { label: `Tag: ${tag}`, clear: () => setTag('') },
     language && { label: `Language: ${language}`, clear: () => setLanguage('') },
     minRating > 0 && { label: `Rating: ${minRating}★+`, clear: () => setMinRating(0) },
-    minVotes > 0 && { label: `Votes: ${minVotes.toLocaleString()}+`, clear: () => setMinVotes(0) }
+    maxRating > 0 && { label: `Rating ≤ ${maxRating}★`, clear: () => setMaxRating(0) },
+    minVotes > 0 && { label: `Votes: ${minVotes.toLocaleString()}+`, clear: () => setMinVotes(0) },
+    minYear > 0 && { label: `From ${minYear}`, clear: () => setMinYear(0) },
+    maxYear > 0 && { label: `Through ${maxYear}`, clear: () => setMaxYear(0) },
+    status && { label: `Status: ${status}`, clear: () => setStatus('') },
+    minChapters > 0 && { label: `${minChapters}+ chapters`, clear: () => setMinChapters(0) },
+    maxChapters > 0 && { label: `≤ ${maxChapters} chapters`, clear: () => setMaxChapters(0) },
+    minReaders > 0 && { label: `${minReaders.toLocaleString()}+ readers`, clear: () => setMinReaders(0) },
+    maxReaders > 0 && { label: `≤ ${maxReaders.toLocaleString()} readers`, clear: () => setMaxReaders(0) },
+    includeGenres && { label: `Genres: ${includeGenres}`, clear: () => setIncludeGenres('') },
+    excludeGenres && { label: `Without genres: ${excludeGenres}`, clear: () => setExcludeGenres('') },
+    includeTags && { label: `Tags: ${includeTags}`, clear: () => setIncludeTags('') },
+    excludeTags && { label: `Without tags: ${excludeTags}`, clear: () => setExcludeTags('') },
+    excludeLibrary && { label: 'Not in my library', clear: () => setExcludeLibrary(false) }
   ].filter(Boolean) as Array<{ label: string; clear: () => void }>;
-
-  const openDetail = async (id: number) => {
-    if (!source) return;
-    setDetail(null);
-    setDetailLoading(true);
-    try {
-      setDetail(await source.getNovel(id));
-    } catch (reason: any) {
-      setError(reason.message || 'Novel details are unavailable in this dataset.');
-    } finally {
-      setDetailLoading(false);
-    }
-  };
 
   return (
     <main className="browse-shell">
@@ -174,6 +237,13 @@ export default function BrowsePage(): JSX.Element {
         <p>Explore every title in this snapshot. Popularity uses reading-list counts; highest rated uses the published rating and vote count.</p>
       </header>
 
+      <nav className="browse-presets" aria-label="Catalog views">
+        <DSButton variant="ghost" onClick={() => applyPreset('rated')}>Top rated</DSButton>
+        <DSButton variant="ghost" onClick={() => applyPreset('popular')}>Most read</DSButton>
+        <DSButton variant="ghost" onClick={() => applyPreset('hidden')} title="Rating ≥ 4.2, 10+ votes, fewer than 2,000 readers">Hidden gems</DSButton>
+        <DSButton variant="ghost" onClick={() => applyPreset('newest')}>Newest</DSButton>
+        <DSButton variant="ghost" onClick={() => applyPreset('completed')}>Completed</DSButton>
+      </nav>
       <Card className="browse-controls" aria-label="Catalog filters">
         <label className="browse-search"><Search size={17} /><input value={query}
           onChange={(event) => resetPage(() => setQuery(event.target.value))}
@@ -185,6 +255,10 @@ export default function BrowsePage(): JSX.Element {
           <option value="newest">Newest year</option>
           <option value="title">Title A–Z</option>
         </Select>
+        <DSButton variant="ghost" className="browse-direction" onClick={() => resetPage(() => setDirection((value) => value === 'desc' ? 'asc' : 'desc'))}
+          aria-label={`Sort ${direction === 'desc' ? 'descending' : 'ascending'}`}>
+          <ArrowDownUp size={15} /> {direction === 'desc' ? 'Descending' : 'Ascending'}
+        </DSButton>
         <DSButton variant="primary" className="browse-lucky" disabled={!source || luckyLoading} onClick={feelingLucky}>
           <Shuffle size={16} /> {luckyLoading ? 'Choosing…' : 'Feeling lucky'}
         </DSButton>
@@ -206,6 +280,23 @@ export default function BrowsePage(): JSX.Element {
             <Select label="Minimum votes" value={minVotes} onChange={(event) => resetPage(() => setMinVotes(Number(event.target.value)))}>
               <option value="0">Any vote count</option><option value="10">10+ votes</option><option value="100">100+ votes</option><option value="1000">1,000+ votes</option>
             </Select>
+            <Select label="Translation status" value={status} onChange={(event) => resetPage(() => setStatus(event.target.value))}>
+              <option value="">Any status</option><option value="complete">Completed</option><option value="ongoing">Ongoing</option><option value="hiatus">Hiatus</option>
+            </Select>
+            <NumberFilter label="Earliest year" value={minYear} onChange={(value) => resetPage(() => setMinYear(value))} />
+            <NumberFilter label="Latest year" value={maxYear} onChange={(value) => resetPage(() => setMaxYear(value))} />
+            <NumberFilter label="Maximum rating" value={maxRating} max={5} step={0.1} onChange={(value) => resetPage(() => setMaxRating(value))} />
+            <NumberFilter label="Minimum chapters" value={minChapters} onChange={(value) => resetPage(() => setMinChapters(value))} />
+            <NumberFilter label="Maximum chapters" value={maxChapters} onChange={(value) => resetPage(() => setMaxChapters(value))} />
+            <NumberFilter label="Minimum readers" value={minReaders} onChange={(value) => resetPage(() => setMinReaders(value))} />
+            <NumberFilter label="Maximum readers" value={maxReaders} onChange={(value) => resetPage(() => setMaxReaders(value))} />
+          </FieldGroup>
+          <FieldGroup label="Exact comma-separated facets">
+            <label className="browse-text-filter"><span>Include genres</span><input value={includeGenres} onChange={(event) => resetPage(() => setIncludeGenres(event.target.value))} placeholder="Fantasy, Adventure" /></label>
+            <label className="browse-text-filter"><span>Exclude genres</span><input value={excludeGenres} onChange={(event) => resetPage(() => setExcludeGenres(event.target.value))} placeholder="Harem" /></label>
+            <label className="browse-text-filter"><span>Include tags</span><input value={includeTags} onChange={(event) => resetPage(() => setIncludeTags(event.target.value))} placeholder="Time Loop" /></label>
+            <label className="browse-text-filter"><span>Exclude tags</span><input value={excludeTags} onChange={(event) => resetPage(() => setExcludeTags(event.target.value))} placeholder="Netorare" /></label>
+            <label className="browse-library-filter"><input type="checkbox" checked={excludeLibrary} disabled={!libraryIds.length} onChange={(event) => resetPage(() => setExcludeLibrary(event.target.checked))} /> Hide titles in my local library</label>
           </FieldGroup>
         </details>
       </Card>
@@ -216,11 +307,15 @@ export default function BrowsePage(): JSX.Element {
 
       {!tagSupported && <p className="browse-notice">Tag filtering is unavailable in this static snapshot, so the selected tag was not applied.</p>}
       <div className="browse-results-header">
-        <CardHeader title="Novels" eyebrow="Catalog results" description={hasLoaded ? `${total.toLocaleString()} matches in this snapshot` : 'Loading catalog status'} />
+        <CardHeader title="Novels" eyebrow="Catalog results" description={hasLoaded ? `${total.toLocaleString()} matches in this snapshot` : 'Loading catalog status'}
+          action={<div className="browse-density" aria-label="Result density">
+            <DSButton variant={density === 'grid' ? 'primary' : 'ghost'} onClick={() => setDensity('grid')} aria-label="Grid view"><LayoutGrid size={16} /></DSButton>
+            <DSButton variant={density === 'list' ? 'primary' : 'ghost'} onClick={() => setDensity('list')} aria-label="List view"><List size={16} /></DSButton>
+          </div>} />
       </div>
       {error && <p className="browse-error">{error}</p>}
-      <section className="browse-grid" aria-busy={loading && page === 1}>
-        {items.map((novel) => <BrowseCard key={novel.id} novel={novel} onQuickLook={() => openDetail(novel.id)} />)}
+      <section className={`browse-grid density-${density}`} aria-busy={loading && page === 1}>
+        {items.map((novel) => <BrowseCard key={novel.id} novel={novel} />)}
         {loading && page === 1 && Array.from({ length: 6 }, (_, index) => <Card className="browse-card browse-card-skeleton" key={index}><Skeleton /><div><Skeleton /><Skeleton /><Skeleton /></div></Card>)}
       </section>
       {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
@@ -235,37 +330,19 @@ export default function BrowsePage(): JSX.Element {
         {hasLoaded && !hasMore && items.length > 0 && <p className="browse-end">End of results · {items.length.toLocaleString()} novels shown</p>}
       </div>
 
-      {(detailLoading || detail) && <div className="browse-modal-backdrop" onMouseDown={() => setDetail(null)}>
-        <article className="browse-modal" onMouseDown={(event) => event.stopPropagation()}>
-          <button className="browse-close" onClick={() => setDetail(null)} aria-label="Close details"><X /></button>
-          {detailLoading && !detail ? <p>Loading details…</p> : detail && <>
-            {detail.cover_url && <img src={detail.cover_url} alt="" />}
-            <div><p className="eyebrow">{detail.language
-              ? <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a>
-              : 'Language unknown'}{detail.year ? ` · ${detail.year}` : ''}</p>
-              <h2>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</h2><p>{detail.author
-                ? <a href={browseFacetUrl('author', detail.author)}>{detail.author}</a>
-                : 'Unknown author'}</p>
-              <p>{detail.synopsis || 'No synopsis is available in this dataset.'}</p>
-              <div className="browse-chips">{detail.genres.map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
-              <div className="browse-chips browse-tag-chips">{detail.tags.map((item) => <a key={item} href={browseFacetUrl('tag', item)}>{item}</a>)}</div>
-              {source && <NovelInsightsPanel novelId={detail.id} source={source} onPeer={openDetail} />}
-              <footer>
-                <a href={`${import.meta.env.BASE_URL}?seed=${detail.id}`}>Find similar</a>
-                <a href={detail.novelupdates_url} target="_blank" rel="noopener noreferrer">Novel Updates <ExternalLink size={14} /></a>
-              </footer>
-            </div>
-          </>}
-        </article>
-      </div>}
     </main>
   );
 }
 
-function BrowseCard({ novel, onQuickLook }: { novel: BrowseNovel; onQuickLook: () => void }) {
+function BrowseCard({ novel }: { novel: BrowseNovel }) {
   const { settings } = useDisplaySettings();
   const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
-  return <Card className="browse-card">
+  const open = () => { window.location.href = novelPageUrl(novel.id); };
+  return <Card className="browse-card" role="link" tabIndex={0} onClick={(event) => {
+    if (!(event.target as HTMLElement).closest('a, button')) open();
+  }} onKeyDown={(event) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); }
+  }}>
     <a className="browse-cover" href={novelPageUrl(novel.id)}>
       {novel.cover_url ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
     </a>
@@ -276,20 +353,22 @@ function BrowseCard({ novel, onQuickLook }: { novel: BrowseNovel; onQuickLook: (
         <Badge><Users size={14} /> {novel.reading_list_count.toLocaleString()}</Badge></div>
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
       <footer className="browse-card-actions">
-        <DSButton variant="ghost" className="browse-quick-look" onClick={onQuickLook}>
-          <Search size={14} aria-hidden="true" /> Quick look
+        <span>{novel.year || 'Year unknown'}{novel.chapters_trans ? ` · ${novel.chapters_trans} ch.` : ''}</span>
+        <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} on Novel Updates`} title="Open on Novel Updates">
+          <ExternalLink size={16} aria-hidden="true" />
         </DSButton>
-        <Tooltip content="Open the full novel page">
-          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novelPageUrl(novel.id)} aria-label={`Open the full page for ${title}`}>
-            <BookOpen size={16} aria-hidden="true" />
-          </DSButton>
-        </Tooltip>
-        <Tooltip content="Open on Novel Updates">
-          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} on Novel Updates`}>
-            <ExternalLink size={16} aria-hidden="true" />
-          </DSButton>
-        </Tooltip>
       </footer>
     </div>
   </Card>;
+}
+
+function NumberFilter({ label, value, onChange, max, step = 1 }: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  max?: number;
+  step?: number;
+}) {
+  return <label className="browse-number-filter"><span>{label}</span><input type="number" min="0" max={max} step={step}
+    value={value || ''} placeholder="Any" onChange={(event) => onChange(Number(event.target.value) || 0)} /></label>;
 }

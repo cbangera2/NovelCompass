@@ -230,14 +230,71 @@ def browse_novels(
     genre: str = "",
     tag: str = "",
     min_rating: float = Query(0, ge=0, le=5),
+    max_rating: float = Query(0, ge=0, le=5),
     min_votes: int = Query(0, ge=0),
+    min_year: int = Query(0, ge=0),
+    max_year: int = Query(0, ge=0),
+    status: str = "",
+    min_chapters: int = Query(0, ge=0),
+    max_chapters: int = Query(0, ge=0),
+    min_readers: int = Query(0, ge=0),
+    max_readers: int = Query(0, ge=0),
+    include_genres: str = "",
+    exclude_genres: str = "",
+    include_tags: str = "",
+    exclude_tags: str = "",
+    exclude_ids: str = "",
+    direction: str = Query("desc", pattern="^(asc|desc)$"),
 ):
     """Browse the complete SQLite catalog with stable, honest metadata sorts."""
+    max_rating = max_rating if isinstance(max_rating, (int, float)) else 0
+    min_year = min_year if isinstance(min_year, int) else 0
+    max_year = max_year if isinstance(max_year, int) else 0
+    status = status if isinstance(status, str) else ""
+    min_chapters = min_chapters if isinstance(min_chapters, int) else 0
+    max_chapters = max_chapters if isinstance(max_chapters, int) else 0
+    min_readers = min_readers if isinstance(min_readers, int) else 0
+    max_readers = max_readers if isinstance(max_readers, int) else 0
+    include_genres = include_genres if isinstance(include_genres, str) else ""
+    exclude_genres = exclude_genres if isinstance(exclude_genres, str) else ""
+    include_tags = include_tags if isinstance(include_tags, str) else ""
+    exclude_tags = exclude_tags if isinstance(exclude_tags, str) else ""
+    exclude_ids = exclude_ids if isinstance(exclude_ids, str) else ""
+    direction = direction if direction in ("asc", "desc") else "desc"
     conn = get_db()
     try:
         joins = []
         where = ["n.rating >= ?", "n.rating_votes >= ?"]
         params: list[Any] = [min_rating, min_votes]
+        if max_rating:
+            where.append("n.rating <= ?")
+            params.append(max_rating)
+        if min_year:
+            where.append("n.year >= ?")
+            params.append(min_year)
+        if max_year:
+            where.append("n.year <= ?")
+            params.append(max_year)
+        if status:
+            where.append("LOWER(COALESCE(n.status_trans, '')) LIKE LOWER(?)")
+            params.append(f"%{status}%")
+        if min_chapters:
+            where.append("n.chapters_trans >= ?")
+            params.append(min_chapters)
+        if max_chapters:
+            where.append("n.chapters_trans <= ?")
+            params.append(max_chapters)
+        if min_readers:
+            where.append("n.reading_list_count >= ?")
+            params.append(min_readers)
+        if max_readers:
+            where.append("n.reading_list_count <= ?")
+            params.append(max_readers)
+        excluded_ids = [int(value) for value in exclude_ids.split(",") if value.strip().isdigit()]
+        if excluded_ids:
+            placeholders = ",".join("?" for _ in excluded_ids)
+            where.append(f"n.id NOT IN ({placeholders})")
+            params.extend(excluded_ids)
         if query.strip():
             needle = f"%{query.strip()}%"
             where.append(
@@ -264,20 +321,39 @@ def browse_novels(
             )
             where.append("LOWER(t.name) = LOWER(?)")
             params.append(tag)
-        order = {
-            "popular": "n.reading_list_count DESC, n.rating_votes DESC",
-            "rating": "n.rating DESC, n.rating_votes DESC",
-            "votes": "n.rating_votes DESC, n.rating DESC",
-            "title": "n.title COLLATE NOCASE ASC",
-            "newest": "COALESCE(n.year, 0) DESC, n.reading_list_count DESC",
+        for facet, values, excluded in (
+            ("genre", include_genres, False), ("genre", exclude_genres, True),
+            ("tag", include_tags, False), ("tag", exclude_tags, True),
+        ):
+            names = [value.strip() for value in values.split(",") if value.strip()]
+            for name in names:
+                table, link, foreign = (
+                    ("genres", "novel_genres", "genre_id")
+                    if facet == "genre" else ("tags", "novel_tags", "tag_id")
+                )
+                where.append(
+                    f"{'NOT ' if excluded else ''}EXISTS ("
+                    f"SELECT 1 FROM {link} bf JOIN {table} bv ON bv.id=bf.{foreign} "
+                    "WHERE bf.novel_id=n.id AND LOWER(bv.name)=LOWER(?))"
+                )
+                params.append(name)
+        primary = {
+            "popular": "n.reading_list_count",
+            "rating": "n.rating",
+            "votes": "n.rating_votes",
+            "title": "n.title COLLATE NOCASE",
+            "newest": "COALESCE(n.year, 0)",
         }[sort]
+        order = f"{primary} {direction.upper()}"
+        if sort != "title":
+            order += f", n.rating_votes {direction.upper()}"
         from_sql = f"FROM novels n {' '.join(joins)} WHERE {' AND '.join(where)}"
         total = conn.execute(f"SELECT COUNT(DISTINCT n.id) {from_sql}", params).fetchone()[0]
         rows = conn.execute(
             f"""
             SELECT DISTINCT n.id, n.title, n.slug, n.author, n.cover_url,
                    n.rating, n.rating_votes, n.reading_list_count,
-                   n.language, n.year
+                   n.language, n.year, n.status_trans, n.chapters_trans
             {from_sql}
             ORDER BY {order}, n.id ASC
             LIMIT ? OFFSET ?
@@ -311,6 +387,8 @@ def browse_novels(
                 "reading_list_count": row["reading_list_count"] or 0,
                 "language": row["language"] or "",
                 "year": row["year"],
+                "status_trans": row["status_trans"] or "",
+                "chapters_trans": row["chapters_trans"] or 0,
                 "genres": genre_map[row["id"]],
             }
             for row in rows
@@ -340,13 +418,38 @@ def random_browse_novel(
     genre: str = "",
     tag: str = "",
     min_rating: float = Query(0, ge=0, le=5),
+    max_rating: float = Query(0, ge=0, le=5),
     min_votes: int = Query(0, ge=0),
+    min_year: int = Query(0, ge=0),
+    max_year: int = Query(0, ge=0),
+    status: str = "",
+    min_chapters: int = Query(0, ge=0),
+    max_chapters: int = Query(0, ge=0),
+    min_readers: int = Query(0, ge=0),
+    max_readers: int = Query(0, ge=0),
+    include_genres: str = "",
+    exclude_genres: str = "",
+    include_tags: str = "",
+    exclude_tags: str = "",
+    exclude_ids: str = "",
+    direction: str = Query("desc", pattern="^(asc|desc)$"),
     seed: Optional[int] = None,
 ):
     """Select uniformly from eligible rows without returning the full catalog."""
+    def value_or(value, fallback):
+        return value if isinstance(value, type(fallback)) else fallback
+
     filters = dict(
         query=query, sort=sort, language=language, author=author, genre=genre,
-        tag=tag, min_rating=min_rating, min_votes=min_votes
+        tag=tag, min_rating=min_rating,
+        max_rating=value_or(max_rating, 0.0), min_votes=min_votes,
+        min_year=value_or(min_year, 0), max_year=value_or(max_year, 0),
+        status=value_or(status, ""),
+        min_chapters=value_or(min_chapters, 0), max_chapters=value_or(max_chapters, 0),
+        min_readers=value_or(min_readers, 0), max_readers=value_or(max_readers, 0),
+        include_genres=value_or(include_genres, ""), exclude_genres=value_or(exclude_genres, ""),
+        include_tags=value_or(include_tags, ""), exclude_tags=value_or(exclude_tags, ""),
+        exclude_ids=value_or(exclude_ids, ""), direction=value_or(direction, "desc")
     )
     first = browse_novels(page=1, page_size=1, **filters)
     if first["total"] == 0:

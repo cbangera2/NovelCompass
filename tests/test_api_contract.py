@@ -119,6 +119,38 @@ def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch)
     assert filtered["items"][0]["genres"] == ["Fantasy"]
 
 
+def test_browse_supports_honest_hidden_gem_and_catalog_range_filters(monkeypatch):
+    def filtered_db():
+        conn = contract_db()
+        conn.executemany(
+            """INSERT INTO novels(
+                id, slug, title, rating, rating_votes, reading_list_count,
+                year, chapters_trans, status_trans
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (39, "hidden", "Hidden", 4.4, 40, 900, 2024, 120, "Completed"),
+                (40, "popular", "Popular", 4.5, 500, 9000, 2025, 300, "Ongoing"),
+            ],
+        )
+        return conn
+
+    monkeypatch.setattr(main, "get_db", filtered_db)
+    result = main.browse_novels(
+        query="", page=1, page_size=24, sort="rating", direction="desc",
+        language="", author="", genre="", tag="",
+        min_rating=4.2, max_rating=0, min_votes=10,
+        min_year=2020, max_year=2024, status="complete",
+        min_chapters=100, max_chapters=200,
+        min_readers=0, max_readers=2000,
+        include_genres="", exclude_genres="", include_tags="", exclude_tags="",
+        exclude_ids="",
+    )
+
+    assert [item["slug"] for item in result["items"]] == ["hidden"]
+    assert result["items"][0]["status_trans"] == "Completed"
+    assert result["items"][0]["chapters_trans"] == 120
+
+
 def test_evidence_uses_real_list_titles_and_labels_missing_titles_honestly():
     conn = contract_db()
     conn.execute(

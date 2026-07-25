@@ -425,9 +425,14 @@ export class StaticDataSource implements RecommendationDataSource {
     const query = normalize(request.query || '');
     const genre = normalize(request.genre || '');
     const tag = normalize(request.tag || '');
+    const includeGenres = (request.include_genres || '').split(',').map(normalize).filter(Boolean);
+    const excludeGenres = (request.exclude_genres || '').split(',').map(normalize).filter(Boolean);
+    const includeTags = (request.include_tags || '').split(',').map(normalize).filter(Boolean);
+    const excludeTags = (request.exclude_tags || '').split(',').map(normalize).filter(Boolean);
+    const excludedIds = new Set((request.exclude_ids || '').split(',').map(Number).filter(Number.isFinite));
     let facets: FacetsFile | undefined;
     let tagSupported = true;
-    if (tag) {
+    if (tag || includeTags.length || excludeTags.length) {
       try {
         facets = await this.loadFacets();
       } catch {
@@ -439,21 +444,35 @@ export class StaticDataSource implements RecommendationDataSource {
       if (request.language && normalize(card.language) !== normalize(request.language)) return false;
       if (request.author && normalize(card.author) !== normalize(request.author)) return false;
       if ((request.min_rating || 0) > card.rating || (request.min_votes || 0) > card.rating_votes) return false;
+      if (request.max_rating && card.rating > request.max_rating) return false;
+      if (request.min_year && (!card.year || card.year < request.min_year)) return false;
+      if (request.max_year && (!card.year || card.year > request.max_year)) return false;
+      if (request.status && !normalize(card.status_trans).includes(normalize(request.status))) return false;
+      if (request.min_chapters && card.chapters_trans < request.min_chapters) return false;
+      if (request.max_chapters && card.chapters_trans > request.max_chapters) return false;
+      if (request.min_readers && card.reading_list_count < request.min_readers) return false;
+      if (request.max_readers && card.reading_list_count > request.max_readers) return false;
+      if (excludedIds.has(card.id)) return false;
       const genreNames = card.genre_ids.map((id) => this.genres[id]).filter(Boolean).map(normalize);
       if (genre && !genreNames.includes(genre)) return false;
-      if (tag && tagSupported) {
+      if (includeGenres.some((item) => !genreNames.includes(item))) return false;
+      if (excludeGenres.some((item) => genreNames.includes(item))) return false;
+      if ((tag || includeTags.length || excludeTags.length) && tagSupported) {
         const tagNames = (facets?.novels?.[String(card.id)]?.t || []).map((id) => this.tags[id]).filter(Boolean).map(normalize);
-        if (!tagNames.includes(tag)) return false;
+        if (tag && !tagNames.includes(tag)) return false;
+        if (includeTags.some((item) => !tagNames.includes(item))) return false;
+        if (excludeTags.some((item) => tagNames.includes(item))) return false;
       }
       return true;
     });
     const sort = request.sort || 'popular';
     items.sort((a, b) => {
-      if (sort === 'rating') return b.rating - a.rating || b.rating_votes - a.rating_votes;
-      if (sort === 'votes') return b.rating_votes - a.rating_votes || b.rating - a.rating;
-      if (sort === 'title') return a.title.localeCompare(b.title);
-      if (sort === 'newest') return (b.year || 0) - (a.year || 0) || b.reading_list_count - a.reading_list_count;
-      return b.reading_list_count - a.reading_list_count || b.rating_votes - a.rating_votes;
+      const direction = request.direction === 'asc' ? 1 : -1;
+      if (sort === 'rating') return direction * (a.rating - b.rating || a.rating_votes - b.rating_votes);
+      if (sort === 'votes') return direction * (a.rating_votes - b.rating_votes || a.rating - b.rating);
+      if (sort === 'title') return direction * a.title.localeCompare(b.title);
+      if (sort === 'newest') return direction * ((a.year || 0) - (b.year || 0) || a.reading_list_count - b.reading_list_count);
+      return direction * (a.reading_list_count - b.reading_list_count || a.rating_votes - b.rating_votes);
     });
     const page = Math.max(1, request.page || 1);
     const pageSize = Math.max(1, Math.min(100, request.page_size || 24));

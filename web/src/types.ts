@@ -116,6 +116,7 @@ export interface NovelDetail {
 }
 
 export type BrowseSort = 'popular' | 'rating' | 'votes' | 'title' | 'newest';
+export type BrowseSortDirection = 'asc' | 'desc';
 
 export interface BrowseRequest {
   query?: string;
@@ -127,13 +128,29 @@ export interface BrowseRequest {
   genre?: string;
   tag?: string;
   min_rating?: number;
+  max_rating?: number;
   min_votes?: number;
+  min_year?: number;
+  max_year?: number;
+  status?: string;
+  min_chapters?: number;
+  max_chapters?: number;
+  min_readers?: number;
+  max_readers?: number;
+  include_genres?: string;
+  exclude_genres?: string;
+  include_tags?: string;
+  exclude_tags?: string;
+  exclude_ids?: string;
+  direction?: BrowseSortDirection;
 }
 
 export interface BrowseNovel extends NovelSearchResult {
   language?: string;
   reading_list_count: number;
   year?: number;
+  status_trans?: string;
+  chapters_trans?: number;
   genres?: string[];
   tags?: string[];
 }
