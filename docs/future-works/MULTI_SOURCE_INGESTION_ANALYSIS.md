@@ -390,6 +390,57 @@ Allowed decisions include `pending`, `accepted`, and `rejected`. A separate reso
 
 Entity resolution must favor false negatives over false positives. Separate records can be joined later; an incorrect merge contaminates library state, recommendations, and analytics.
 
+### Cross-source collision classes
+
+Every apparent collision must be classified before records are combined:
+
+1. **Same work, different source records** — the same novel listed on NovelUpdates, NovelFire, AniList, or MyAnimeList. These records resolve to one work and produce one recommendation result with multiple source links.
+2. **Same story, different edition or format** — for example, a web novel and its revised light-novel publication. These remain separate works connected by `alternative_version_of`, `based_on`, or another explicit relation.
+3. **Cross-media adaptation** — novel, manga, manhwa, manhua, and anime versions remain separate works connected by `adaptation_of`.
+4. **Unrelated title collision** — different works happen to share a title or translated alias. They remain separate with a rejected entity-match record.
+5. **Insufficient evidence** — records remain unresolved and separate until reviewed.
+
+The resolver must never assume that matching normalized titles imply class 1.
+
+### Collision-resolution workflow
+
+For each new source record:
+
+1. Check authoritative external cross-references.
+2. Generate candidate works from original titles, structured aliases, creators, language, year, medium, and format.
+3. Reject candidates with incompatible medium, format, edition, season, year, or creator evidence.
+4. Record each viable candidate in `entity_matches` with evidence and confidence.
+5. Auto-accept only matches satisfying the strict authoritative policy below.
+6. Leave all other candidates pending for review.
+7. Create a new work when no safe match exists.
+
+An accepted collision changes only the source record’s `work_id`. It does not overwrite source facts. Projected work metadata is recomputed using precedence rules.
+
+### Recommendation deduplication
+
+Before ranking output:
+
+- Candidate evidence is collected by source record.
+- Source records are resolved to work IDs.
+- Signals for records belonging to the same work are aggregated with source-contribution caps.
+- The seed work and all of its source records are excluded.
+- Only one result card is emitted per work.
+- The result retains all contributing sources and destination links for explanation.
+
+If two source records are unresolved, they may temporarily appear as separate provisional works. The UI and export contract should expose a resolution status so provisional identity is not presented as certain.
+
+### Durable overrides
+
+Manual decisions must survive future imports:
+
+- `accepted` binds a source record to a work.
+- `rejected` blocks the same proposed pairing unless materially new evidence appears.
+- `split` moves one or more records from an incorrectly merged work.
+- `remapped` records a corrected destination work.
+- `locked` prevents automated remapping of a reviewed record.
+
+Resolution events store the previous and new work IDs, actor, reason, evidence version, and timestamp. Work merges should use redirects or tombstones rather than reusing deleted IDs, keeping profile entries, URLs, and static artifacts recoverable.
+
 ### Evidence levels
 
 **Authoritative**
@@ -813,9 +864,12 @@ These require real source samples, policy review, and measured behavior.
 ### Resolution
 
 - Same-title different works remain separate.
+- The same novel listed on multiple sources resolves to one work and one recommendation result.
 - Web-novel and light-novel variants remain separate by default.
 - Adaptations create relations rather than merges.
 - Accepted, rejected, split, and remapped decisions persist.
+- Reviewed records can be locked against automated remapping.
+- Work merges preserve redirects so saved profile and route IDs remain recoverable.
 
 ### Ranking
 
