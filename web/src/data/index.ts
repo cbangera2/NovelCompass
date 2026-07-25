@@ -4,8 +4,15 @@ import { RecommendationDataSource } from './source';
 
 export type DataMode = 'api' | 'static' | 'auto';
 
+export function configuredDataMode(): DataMode {
+  const configured = import.meta.env.VITE_DATA_MODE;
+  return configured === 'api' || configured === 'static' || configured === 'auto'
+    ? configured
+    : 'auto';
+}
+
 export async function createDataSource(
-  mode: DataMode = (import.meta.env.VITE_DATA_MODE as DataMode) || 'auto'
+  mode: DataMode = configuredDataMode()
 ): Promise<RecommendationDataSource> {
   if (mode === 'api') return new ApiDataSource();
   if (mode === 'static') {

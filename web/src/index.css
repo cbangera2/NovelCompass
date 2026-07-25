@@ -72,14 +72,39 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 .dataset-badge {
   display: inline-flex;
-  margin-top: 0.85rem;
   padding: 0.3rem 0.6rem;
   border: 1px solid rgba(155, 126, 255, 0.3);
   border-radius: 999px;
-  color: var(--text-muted);
+  color: var(--muted);
   background: rgba(119, 77, 220, 0.08);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
+}
+
+.dataset-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+  margin-top: .85rem;
+}
+
+.data-mode-select {
+  align-items: center;
+  color: var(--dim);
+  display: inline-flex;
+  font-size: .68rem;
+  gap: .4rem;
+}
+
+.data-mode-select select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .72rem;
+  padding: .28rem 1.65rem .28rem .6rem;
 }
 
 .header h1 {

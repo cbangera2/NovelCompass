@@ -18,7 +18,12 @@ import {
   NovelDetail,
   NovelSearchResult
 } from './types';
-import { createDataSource, RecommendationDataSource } from './data';
+import {
+  configuredDataMode,
+  createDataSource,
+  DataMode,
+  RecommendationDataSource
+} from './data';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -35,6 +40,7 @@ export default function App(): JSX.Element {
   const detailRequestRef = useRef(0);
   const dataSourceRef = useRef<RecommendationDataSource | null>(null);
   const [dataSource, setDataSource] = useState<RecommendationDataSource | null>(null);
+  const [dataMode, setDataMode] = useState<DataMode>(configuredDataMode());
   const [dataset, setDataset] = useState<DatasetManifest | null>(null);
   const [query, setQuery] = useState(DEFAULT_NOVEL.title);
   const [selectedNovel, setSelectedNovel] = useState<NovelSearchResult | null>(DEFAULT_NOVEL);
@@ -75,7 +81,12 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    createDataSource()
+    dataSourceRef.current = null;
+    setDataSource(null);
+    setDataset(null);
+    setData(null);
+    setError(null);
+    createDataSource(dataMode)
       .then(async (source) => {
         const [manifest, options] = await Promise.all([source.getManifest(), source.getOptions()]);
         if (cancelled) return;
@@ -88,7 +99,7 @@ export default function App(): JSX.Element {
         if (!cancelled) setError(initializationError.message || 'Could not load a recommendation dataset.');
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [dataMode]);
 
   useEffect(() => {
     if (!dataSource) return;
@@ -279,12 +290,26 @@ export default function App(): JSX.Element {
           <div className="eyebrow">Relationship-first discovery</div>
           <h1>Find your next obsession.</h1>
           <p>Start with a novel you loved. We trace shared tropes, reader recommendations, and curated lists to find what belongs beside it.</p>
-          {dataSource && (
-            <span className="dataset-badge" title={dataset?.dataset_version}>
-              {dataSource.mode === 'api' ? 'Live database' : 'Static snapshot'}
-              {dataset?.generated_at ? ` · ${new Date(dataset.generated_at).toLocaleDateString()}` : ''}
-            </span>
-          )}
+          <div className="dataset-controls">
+            {dataSource && (
+              <span className="dataset-badge" title={dataset?.dataset_version}>
+                {dataSource.mode === 'api' ? 'Live database' : 'Static snapshot'}
+                {dataset?.generated_at ? ` · ${new Date(dataset.generated_at).toLocaleDateString()}` : ''}
+              </span>
+            )}
+            <label className="data-mode-select">
+              <span>Data source</span>
+              <select
+                value={dataMode}
+                onChange={(event) => setDataMode(event.target.value as DataMode)}
+                aria-label="Recommendation data source"
+              >
+                <option value="auto">Automatic</option>
+                <option value="api">Live API</option>
+                <option value="static">Static snapshot</option>
+              </select>
+            </label>
+          </div>
         </div>
       </header>
 
