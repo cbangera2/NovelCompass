@@ -57,6 +57,7 @@ jobs:
       - name: Generate and validate normalized static data
         env:
           STATIC_MAX_NOVELS: ${{ vars.STATIC_MAX_NOVELS }}
+          STATIC_CATALOG_LIMIT: ${{ vars.STATIC_CATALOG_LIMIT }}
         run: |
           export_args=()
           if [[ -n "${STATIC_MAX_NOVELS}" ]]; then
@@ -65,6 +66,13 @@ jobs:
               exit 1
             fi
             export_args+=(--max-novels "${STATIC_MAX_NOVELS}")
+          fi
+          if [[ -n "${STATIC_CATALOG_LIMIT}" ]]; then
+            if [[ ! "${STATIC_CATALOG_LIMIT}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::STATIC_CATALOG_LIMIT must be a positive integer when set."
+              exit 1
+            fi
+            export_args+=(--catalog-limit "${STATIC_CATALOG_LIMIT}")
           fi
           python build_static_export.py \
             --db "${RUNNER_TEMP}/recommender.sqlite" \

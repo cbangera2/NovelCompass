@@ -26,7 +26,10 @@ __pycache__/
 # JavaScript
 node_modules/
 dist/
-web/public/data/
+# The bounded, normalized Pages snapshot is intentionally versioned. Local
+# full-catalog exports should use another output directory.
+!web/public/data/
+!web/public/data/**
 
 # macOS
 .DS_Store

@@ -56,9 +56,12 @@ export interface DatasetManifest {
   dataset_version: string;
   generated_at?: string;
   novel_count: number;
+  source_novel_count?: number;
+  snapshot_scope?: string;
   recommendable_seed_count?: number;
   catalog_url?: string;
   facets_url?: string;
+  options_url?: string;
 }
 
 export interface FilterOptions {

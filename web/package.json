@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:static": "tsc && VITE_DATA_MODE=static vite build",
+    "build:pages": "tsc && VITE_DATA_MODE=static vite build --base=/novelupdatesrecommender/",
+    "smoke:static": "node ../scripts/smoke_static_preview.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

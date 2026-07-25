@@ -179,15 +179,31 @@ def export_static_dataset(
     max_novels: int | None = None,
     db_path: str = DEFAULT_DB_PATH,
     candidate_limit: int = 200,
+    catalog_limit: int | None = None,
+    reuse_recommendations: bool = False,
 ) -> dict[str, Any]:
     conn = get_connection(db_path)
     try:
-        novels = conn.execute(
+        source_novel_count = conn.execute("SELECT COUNT(*) FROM novels").fetchone()[0]
+        if catalog_limit is not None:
+            novels = conn.execute(
+                """SELECT id, slug, title, author, cover_url, rating, rating_votes,
+                          reading_list_count, year, language, status_trans,
+                          chapters_trans, chapters_orig, synopsis, associated_names
+                   FROM novels
+                   ORDER BY reading_list_count DESC, rating_votes DESC, id ASC
+                   LIMIT ?""",
+                (catalog_limit,),
+            ).fetchall()
+            novels = sorted(novels, key=lambda row: row["id"])
+        else:
+            novels = conn.execute(
             """SELECT id, slug, title, author, cover_url, rating, rating_votes,
                       reading_list_count, year, language, status_trans,
                       chapters_trans, chapters_orig, synopsis, associated_names
                FROM novels ORDER BY id"""
-        ).fetchall()
+            ).fetchall()
+        exported_ids = {row["id"] for row in novels}
         languages, language_ids = _indexed_values(row["language"] for row in novels)
         statuses, status_ids = _indexed_values(row["status_trans"] for row in novels)
         genre_rows = conn.execute("SELECT id, name FROM genres ORDER BY id").fetchall()
@@ -259,6 +275,12 @@ def export_static_dataset(
             "novels": {str(row["id"]): {"g": genre_map.get(row["id"], []), "t": tag_map.get(row["id"], [])}
                        for row in novels},
         })
+        _atomic_json(output / "options.json", {
+            "genres": genres,
+            "tags": tags,
+            "languages": [value for value in languages if value],
+            "statuses": [value for value in statuses if value],
+        })
 
         ordered_seeds = conn.execute(
             """SELECT id FROM novels
@@ -271,18 +293,36 @@ def export_static_dataset(
         recommendable = 0
         for index, row in enumerate(novels, 1):
             novel_id = row["id"]
-            if novel_id in selected:
+            pool_path = output / "recs" / bucket_for_id(novel_id) / f"{novel_id}.json"
+            if reuse_recommendations and pool_path.is_file():
+                pool = json.loads(pool_path.read_text())
+                if pool.get("seed") != novel_id:
+                    raise ValueError(f"invalid reusable recommendation pool for {novel_id}")
+            elif novel_id in selected:
                 pool = _export_pool(
                     conn, generator, novel_id, candidate_limit,
                     tag_indices, list_titles
                 )
-                recommendable += bool(pool["candidates"])
+                pool["candidates"] = [
+                    candidate for candidate in pool["candidates"]
+                    if candidate["id"] in exported_ids
+                ]
+                if not pool["candidates"]:
+                    pool["reason"] = "no_candidates_in_snapshot"
             else:
                 pool = {"seed": novel_id, "algorithm_version": ALGORITHM_VERSION,
                         "channels": list(CHANNELS), "candidates": [], "reason": "not_precomputed"}
-            _atomic_json(output / "recs" / bucket_for_id(novel_id) / f"{novel_id}.json", pool)
+            recommendable += bool(pool["candidates"])
+            _atomic_json(pool_path, pool)
             if index % 100 == 0:
                 print(f"Exported recommendation pools: {index}/{len(novels)}")
+
+        # Re-running a bounded export into the same directory must not leave
+        # addressable detail/pool files from a different catalog scope.
+        for group in ("details", "recs"):
+            for path in (output / group).glob("*/*.json"):
+                if path.stem.isdigit() and int(path.stem) not in exported_ids:
+                    path.unlink()
 
         generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         manifest = {
@@ -291,9 +331,15 @@ def export_static_dataset(
             "dataset_version": _dataset_version(conn),
             "generated_at": generated_at,
             "novel_count": len(novels),
+            "source_novel_count": source_novel_count,
+            "snapshot_scope": (
+                f"top_{len(novels)}_by_reading_list_count"
+                if catalog_limit is not None else "complete_catalog"
+            ),
             "recommendable_seed_count": recommendable,
             "catalog_url": "catalog.json",
             "facets_url": "facets.json",
+            "options_url": "options.json",
             "bucket_count": 256,
         }
         _atomic_json(output / "manifest.json", manifest)
@@ -312,6 +358,9 @@ def verify_export(output: Path, expected_novels: int | None = None) -> None:
         raise ValueError("catalog novel count is incomplete")
     if manifest["novel_count"] != len(catalog["rows"]):
         raise ValueError("manifest and catalog novel counts differ")
+    options = json.loads((output / manifest.get("options_url", "options.json")).read_text())
+    if options.get("genres") != catalog.get("genres") or options.get("tags") != catalog.get("tags"):
+        raise ValueError("options and catalog facet dictionaries differ")
     for row in catalog["rows"]:
         novel_id = row[0]
         for group in ("details", "recs"):
@@ -328,12 +377,24 @@ def main() -> None:
     parser.add_argument("--db", default=DEFAULT_DB_PATH)
     parser.add_argument("--max-novels", type=int, help="Precompute only the N most popular seed pools")
     parser.add_argument("--candidate-limit", type=int, default=200)
+    parser.add_argument(
+        "--catalog-limit", type=int,
+        help="Export only the N most-read catalog titles (explicitly recorded in the manifest)",
+    )
+    parser.add_argument(
+        "--reuse-recommendations", action="store_true",
+        help="Reuse already generated, ID-validated pool files while refreshing metadata",
+    )
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     if args.verify_only:
         verify_export(args.output)
     else:
-        manifest = export_static_dataset(args.output, args.max_novels, args.db, args.candidate_limit)
+        manifest = export_static_dataset(
+            args.output, args.max_novels, args.db, args.candidate_limit,
+            args.catalog_limit,
+            args.reuse_recommendations,
+        )
         print(json.dumps(manifest, indent=2))
 
 

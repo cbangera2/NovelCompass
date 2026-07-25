@@ -79,6 +79,11 @@ class StaticExportTest(unittest.TestCase):
             detail = json.loads((root / "out/details/01/1.json").read_text())
             self.assertEqual(detail["novelupdates_url"], "https://www.novelupdates.com/?p=1")
             self.assertEqual(manifest["novel_count"], 2)
+            self.assertEqual(manifest["source_novel_count"], 2)
+            self.assertEqual(manifest["snapshot_scope"], "complete_catalog")
+            options = json.loads((root / "out/options.json").read_text())
+            self.assertEqual(options["genres"], ["Fantasy"])
+            self.assertEqual(options["tags"], ["Academy"])
 
 
 if __name__ == "__main__":

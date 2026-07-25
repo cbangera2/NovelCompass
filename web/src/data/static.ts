@@ -44,6 +44,12 @@ type FacetsFile = {
   novels?: Record<string, { g?: number[]; t?: number[] }>;
 };
 
+type OptionsFile = {
+  genres?: string[];
+  tags?: string[];
+  languages?: string[];
+};
+
 type StaticCandidate = {
   id: number;
   r?: Array<number | null>;
@@ -200,7 +206,24 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async getOptions(): Promise<FilterOptions> {
-    await this.loadCatalog();
+    try {
+      const manifest = await this.getManifest();
+      const options = await jsonFetch<OptionsFile>(
+        joinUrl(this.baseUrl, manifest.options_url || 'options.json')
+      );
+      this.genres = options.genres || [];
+      this.tags = options.tags || [];
+      this.languages = options.languages || [];
+      return {
+        genres: this.genres,
+        tags: this.tags,
+        languages: this.languages.filter(Boolean)
+      };
+    } catch {
+      // Compatibility path for normalized snapshots that predate options.json.
+      // New snapshots avoid downloading the full catalog during app startup.
+      await this.loadCatalog();
+    }
     if ((!this.genres.length || !this.tags.length)) {
       try {
         const facets = await this.loadFacets();
