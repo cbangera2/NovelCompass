@@ -1,13 +1,37 @@
-import { ReactNode, useEffect, useState } from 'react';
-import { BookMarked, BookOpen, Database, Settings, Sparkles, User } from 'lucide-react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  ArrowRight,
+  BookMarked,
+  BookOpen,
+  Clock3,
+  Database,
+  Search,
+  Settings,
+  Sparkles,
+  User,
+  X,
+} from 'lucide-react';
 import type { LocalUserProfile } from './profile/types';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
+import { createDataSource } from './data';
+import type { NovelSearchResult } from './types';
+import { novelPageUrl } from './novelLinks';
 import {
-  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader,
-  SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail,
-  SidebarTrigger
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
 } from './components/ui/sidebar';
 import './app-shell.css';
 import { useDataModePreference } from './dataModePreference';
@@ -18,7 +42,7 @@ const NAV_ITEMS = [
   { view: 'discover' as const, label: 'Discover', note: 'Find related novels', icon: Sparkles },
   { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen },
   { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings },
-  { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database }
+  { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database },
 ];
 
 function viewUrl(view: AppView): string {
@@ -26,7 +50,13 @@ function viewUrl(view: AppView): string {
   return view === 'discover' ? `${base}?view=discover` : `${base}?view=${view}`;
 }
 
-export default function AppShell({ activeView, children }: { activeView: AppView; children: ReactNode }): JSX.Element {
+export default function AppShell({
+  activeView,
+  children,
+}: {
+  activeView: AppView;
+  children: ReactNode;
+}): JSX.Element {
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [homeUrl, setHomeUrl] = useState(defaultHomeUrl);
@@ -35,11 +65,21 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
 
   useEffect(() => {
-    const refreshProfile = () => loadLocalProfile().then(setProfile).catch(() => setProfile(null)).finally(() => setProfileLoaded(true));
+    const refreshProfile = () =>
+      loadLocalProfile()
+        .then(setProfile)
+        .catch(() => setProfile(null))
+        .finally(() => setProfileLoaded(true));
     refreshProfile();
-    const unsubscribe = subscribeLocalProfile((next) => { setProfile(next); setProfileLoaded(true); });
+    const unsubscribe = subscribeLocalProfile((next) => {
+      setProfile(next);
+      setProfileLoaded(true);
+    });
     window.addEventListener('focus', refreshProfile);
-    return () => { unsubscribe(); window.removeEventListener('focus', refreshProfile); };
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', refreshProfile);
+    };
   }, []);
 
   useEffect(() => {
@@ -52,67 +92,315 @@ export default function AppShell({ activeView, children }: { activeView: AppView
     };
   }, []);
 
-  const profileLabel = !profileLoaded ? 'Loading local library…'
-    : profile ? `${profile.entries.length.toLocaleString()} saved title${profile.entries.length === 1 ? '' : 's'}`
+  const profileLabel = !profileLoaded
+    ? 'Loading local library…'
+    : profile
+      ? `${profile.entries.length.toLocaleString()} saved title${profile.entries.length === 1 ? '' : 's'}`
       : 'Private to this browser';
 
-  return <SidebarProvider>
-    <header className="shell-mobile-header">
-      <a className="shell-brand compact" href={homeUrl} aria-label="Novel Compass home">
-        <span><BookMarked size={18} /></span><strong>Novel Compass</strong>
-      </a>
-      <div className="shell-mobile-actions">
-        <a className="shell-mobile-account" href={viewUrl('profile')}
-          aria-label={profile ? `Open local profile for ${profile.username || 'reader'}` : 'Open local profile'}>
-          <User size={17} />{profile && <Badge tone="violet">{profile.entries.length}</Badge>}
+  return (
+    <SidebarProvider>
+      <header className="shell-mobile-header">
+        <a className="shell-brand compact" href={homeUrl} aria-label="Novel Compass home">
+          <span>
+            <BookMarked size={18} />
+          </span>
+          <strong>Novel Compass</strong>
         </a>
-        <SidebarTrigger />
-      </div>
-    </header>
-    <Sidebar>
-      <SidebarHeader>
-        <a className="shell-brand" href={homeUrl}>
-          <span><BookMarked size={21} /></span>
-          <div className="sidebar-brand-copy"><strong>Novel Compass</strong><small>Relationship-first discovery</small></div>
-        </a>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Explore</SidebarGroupLabel>
+        <div className="shell-mobile-actions">
+          <GlobalNovelSearch mobile />
+          <AccountMenu profile={profile} profileLabel={profileLabel} mobile />
+          <SidebarTrigger />
+        </div>
+      </header>
+      <Sidebar>
+        <SidebarHeader>
+          <a className="shell-brand" href={homeUrl}>
+            <span>
+              <BookMarked size={21} />
+            </span>
+            <div className="sidebar-brand-copy">
+              <strong>Novel Compass</strong>
+              <small>Relationship-first discovery</small>
+            </div>
+          </a>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Explore</SidebarGroupLabel>
+            <SidebarMenu>
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.view}>
+                    <SidebarMenuButton
+                      asChild
+                      active={activeView === item.view}
+                      tooltip={item.label}
+                    >
+                      <a href={viewUrl(item.view)}>
+                        <Icon size={18} />
+                        <span>
+                          <strong>{item.label}</strong>
+                          <small>{item.note}</small>
+                        </span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
           <SidebarMenu>
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return <SidebarMenuItem key={item.view}>
-                <SidebarMenuButton asChild active={activeView === item.view} tooltip={item.label}>
-                  <a href={viewUrl(item.view)}><Icon size={18} /><span><strong>{item.label}</strong><small>{item.note}</small></span></a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>;
-            })}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                active={activeView === 'profile'}
+                tooltip="Local profile"
+                className="shell-account"
+              >
+                <a href={viewUrl('profile')}>
+                  <span className="shell-avatar">
+                    <User size={16} />
+                  </span>
+                  <span>
+                    <strong>{profile?.username || 'Local profile'}</strong>
+                    <small>{profileLabel}</small>
+                  </span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild active={activeView === 'profile'} tooltip="Local profile" className="shell-account">
-              <a href={viewUrl('profile')}><span className="shell-avatar"><User size={16} /></span>
-                <span><strong>{profile?.username || 'Local profile'}</strong><small>{profileLabel}</small></span></a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
-    <SidebarInset>
-      <div className="shell-content">{children}</div>
-      <footer className="shell-footer">
-        <span>Novel Compass · personal discovery workspace</span>
-        <nav aria-label="Footer links">
-          <a href={viewUrl('profile')}>Local data</a>
-          {!staticDeployment && <a href={viewUrl('scraper')}>Catalog tools</a>}
-          <a href="https://github.com/shaido987/novel-dataset" target="_blank" rel="noopener noreferrer">Source dataset</a>
-        </nav>
-      </footer>
-    </SidebarInset>
-  </SidebarProvider>;
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+      <SidebarInset>
+        <header className="shell-desktop-header">
+          <GlobalNovelSearch />
+          <AccountMenu profile={profile} profileLabel={profileLabel} />
+        </header>
+        <div className="shell-content">{children}</div>
+        <footer className="shell-footer">
+          <span>Novel Compass · personal discovery workspace</span>
+          <nav aria-label="Footer links">
+            <a href={viewUrl('profile')}>Local data</a>
+            {!staticDeployment && <a href={viewUrl('scraper')}>Catalog tools</a>}
+            <a
+              href="https://github.com/shaido987/novel-dataset"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Source dataset
+            </a>
+          </nav>
+        </footer>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+const RECENT_SEARCH_KEY = 'novel-compass:recent-searches:v1';
+
+function GlobalNovelSearch({ mobile = false }: { mobile?: boolean }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<NovelSearchResult[]>([]);
+  const [recent, setRecent] = useState<NovelSearchResult[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(RECENT_SEARCH_KEY) || '[]').slice(0, 5);
+    } catch {
+      return [];
+    }
+  });
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      if (
+        event.key === '/' ||
+        ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k')
+      ) {
+        event.preventDefault();
+        setOpen(true);
+        window.setTimeout(() => inputRef.current?.focus(), 0);
+      }
+    };
+    window.addEventListener('keydown', onShortcut);
+    return () => window.removeEventListener('keydown', onShortcut);
+  }, []);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      createDataSource()
+        .then((source) => source.searchNovels(trimmed, 7, controller.signal))
+        .then(setResults)
+        .catch((error) => {
+          if (error?.name !== 'AbortError') setResults([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  const choose = (novel: NovelSearchResult) => {
+    const next = [novel, ...recent.filter((item) => item.id !== novel.id)].slice(0, 5);
+    setRecent(next);
+    localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(next));
+  };
+
+  const browseUrl = `${import.meta.env.BASE_URL}?view=browse&q=${encodeURIComponent(query.trim())}`;
+  const searchPanel = (
+    <div className="shell-search-panel">
+      <label>
+        <Search size={17} aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="search"
+          value={query}
+          placeholder="Search novels…"
+          aria-label="Search the novel catalog"
+          aria-expanded={open}
+          onFocus={() => setOpen(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setOpen(false);
+          }}
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => {
+              setQuery('');
+              inputRef.current?.focus();
+            }}
+          >
+            <X size={15} />
+          </button>
+        )}
+        {!mobile && <kbd>/</kbd>}
+      </label>
+      {open && (
+        <div className="shell-search-results">
+          <div className="shell-search-result-list">
+            {loading && <p className="shell-search-state">Searching catalog…</p>}
+            {!loading && query.trim().length >= 2 && results.length === 0 && (
+              <p className="shell-search-state">No matching novels</p>
+            )}
+            {!loading && query.trim().length < 2 && recent.length > 0 && (
+              <p className="shell-search-heading">
+                <Clock3 size={13} /> Recent novels
+              </p>
+            )}
+            {(query.trim().length >= 2 ? results : recent).map((novel) => (
+              <a key={novel.id} href={novelPageUrl(novel.id)} onClick={() => choose(novel)}>
+                {novel.cover_url ? (
+                  <img src={novel.cover_url} alt="" loading="lazy" />
+                ) : (
+                  <span>
+                    <BookOpen size={16} />
+                  </span>
+                )}
+                <span>
+                  <strong>{novel.title}</strong>
+                  <small>{novel.author || 'Catalog novel'}</small>
+                </span>
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            ))}
+          </div>
+          {query.trim().length >= 2 && (
+            <a className="shell-search-all" href={browseUrl}>
+              View all Browse results <ArrowRight size={14} />
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  if (!mobile) return searchPanel;
+  return (
+    <>
+      <button
+        className="shell-mobile-search-trigger"
+        type="button"
+        aria-label="Search novels"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((value) => !value);
+          window.setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+      >
+        <Search size={17} />
+      </button>
+      {open && <div className="shell-mobile-search">{searchPanel}</div>}
+    </>
+  );
+}
+
+function AccountMenu({
+  profile,
+  profileLabel,
+  mobile = false,
+}: {
+  profile: LocalUserProfile | null;
+  profileLabel: string;
+  mobile?: boolean;
+}) {
+  return (
+    <details className={`shell-account-menu${mobile ? ' mobile' : ''}`}>
+      <summary aria-label={`Open account menu for ${profile?.username || 'local profile'}`}>
+        <span className="shell-avatar">
+          <User size={16} />
+        </span>
+        {!mobile && (
+          <span>
+            <strong>{profile?.username || 'Local profile'}</strong>
+            <small>{profileLabel}</small>
+          </span>
+        )}
+        {mobile && profile && <Badge tone="violet">{profile.entries.length}</Badge>}
+      </summary>
+      <nav aria-label="Account">
+        <header>
+          <strong>{profile?.username || 'Local profile'}</strong>
+          <small>{profileLabel}</small>
+        </header>
+        <a href={viewUrl('profile')}>
+          <User size={16} />
+          <span>
+            Profile<small>Library and analytics</small>
+          </span>
+        </a>
+        <a href={viewUrl('settings')}>
+          <Settings size={16} />
+          <span>
+            Settings<small>Appearance and defaults</small>
+          </span>
+        </a>
+      </nav>
+    </details>
+  );
 }
