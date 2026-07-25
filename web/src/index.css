@@ -222,7 +222,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .scatter-card { margin-top: .7rem; }
 .scatter-card .analytics-chart { background: var(--surface-soft); border-radius: 9px; }
 .analytics-table-wrap { max-height: 260px; overflow: auto; }
-.analytics-table-wrap button { background: transparent; border: 0; color: var(--accent-bright); cursor: pointer; padding: 0; text-align: left; }
+.analytics-table-wrap button,.analytics-table-wrap a { background: transparent; border: 0; color: var(--accent-bright); cursor: pointer; padding: 0; text-align: left; text-decoration:none }
 .profile-loading-indicator{animation:profile-pulse 1.2s ease-in-out infinite;background:var(--accent);border-radius:999px;height:8px;width:38px}.profile-storage-error,.profile-storage-warning{border-radius:8px;font-size:.72rem!important;margin-top:.75rem!important;padding:.65rem}.profile-storage-error{background:color-mix(in srgb,var(--red) 10%,transparent);color:var(--red)!important}.profile-storage-warning{background:var(--accent-soft);color:var(--muted)!important}@keyframes profile-pulse{50%{opacity:.35;transform:scaleX(.7)}}@media(prefers-reduced-motion:reduce){.profile-loading-indicator{animation:none}}
 .display-settings { align-items: end; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; display: grid; gap: .8rem; grid-template-columns: minmax(280px, 1fr) auto auto; margin-bottom: 1rem; padding: 1rem; }
 .display-settings h2 { font-size: 1.15rem; margin: .2rem 0; }

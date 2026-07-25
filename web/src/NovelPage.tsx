@@ -196,8 +196,7 @@ export default function NovelPage(): JSX.Element {
       </section>
       <section id="insights" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>02</span><div><h2>Insights</h2><p>How this title sits within the current catalog snapshot.</p></div></header>
-        <NovelInsightsPanel novelId={novelId} source={source} providedInsights={insights} currentNovel={detail}
-          onPeer={(peerId) => { window.location.href = novelPageUrl(peerId, novelId); }} />
+        <NovelInsightsPanel novelId={novelId} source={source} providedInsights={insights} currentNovel={detail} />
       </section>
       <section id="relationship" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>03</span><div><h2>Relationships</h2><p>Recommendation evidence and related directions to explore.</p></div></header>
@@ -235,7 +234,7 @@ function RelationshipPanel({ relationship, origin, current }: {
   const ranks = Object.entries(relationship.channel_ranks).filter(([, rank]) => Number.isFinite(rank));
   const maxRank = Math.max(1, ...ranks.map(([, rank]) => rank));
   return <Card className="relationship-card">
-    <div className="relationship-heading"><div><span>Recommendation evidence</span><h2>{origin.title} <span>→</span> {current.title}</h2></div><strong>{relationship.match_score_percent.toFixed(0)}%<small>match</small></strong></div>
+    <div className="relationship-heading"><div><span>Recommendation evidence</span><h2><a href={novelPageUrl(origin.id)}>{origin.title}</a> <span>→</span> <a href={novelPageUrl(current.id, origin.id)}>{current.title}</a></h2></div><strong>{relationship.match_score_percent.toFixed(0)}%<small>match</small></strong></div>
     <div className="relationship-layout">
       <div><h3>Why it surfaced</h3><ul>{relationship.evidence_bullets.map((item) => <li key={item}><Check size={15} />{item}</li>)}</ul>
         {relationship.shared_tags.length > 0 && <div className="shared-facets">{relationship.shared_tags.slice(0, 12).map((tag) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>)}</div>}</div>

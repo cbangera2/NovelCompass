@@ -1,5 +1,6 @@
 import { Cell, CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { NovelDetail, NovelInsights } from './types';
+import { novelPageUrl } from './novelLinks';
 
 export default function NovelCohortChart({ novel, insights }: { novel: NovelDetail; insights: NovelInsights }) {
   const points = [
@@ -47,12 +48,15 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
           <YAxis type="number" dataKey="rating" domain={ratingDomain} allowDataOverflow tickCount={5}
             width={34} tick={{ fill: 'var(--muted)', fontSize: 10 }} tickFormatter={(value) => Number(value).toFixed(1)} />
           <Tooltip cursor={{ stroke: 'var(--border-strong)', strokeDasharray: '3 3' }}
-            content={({ active, payload }) => active && payload?.[0] ? <div className="cohort-tooltip"><strong>{payload[0].payload.title}</strong><span>{payload[0].payload.rating} rating</span><span>{payload[0].payload.readers.toLocaleString()} readers</span></div> : null} />
-          <Scatter name="Closest peers" data={peerPoints} isAnimationActive={false}>
+            content={({ active, payload }) => active && payload?.[0] ? <div className="cohort-tooltip"><strong>{payload[0].payload.title}</strong><span>{payload[0].payload.rating} rating</span><span>{payload[0].payload.readers.toLocaleString()} readers</span><span>Click to open novel</span></div> : null} />
+          <Scatter name="Closest peers" data={peerPoints} isAnimationActive={false} onClick={(point: any) => {
+            const id = Number(point?.id ?? point?.payload?.id);
+            if (Number.isInteger(id) && id > 0) window.location.href = novelPageUrl(id, novel.id);
+          }}>
             {peerPoints.map((point) => <Cell key={point.id} fill="var(--accent)" fillOpacity={.72}
               stroke="var(--surface)" strokeWidth={2} />)}
           </Scatter>
-          <Scatter name="Current novel" data={currentPoint} isAnimationActive={false}>
+          <Scatter name="Current novel" data={currentPoint} isAnimationActive={false} onClick={() => { window.location.href = novelPageUrl(novel.id); }}>
             {currentPoint.map((point) => <Cell key={point.id} fill="var(--green)"
               stroke="var(--text)" strokeWidth={3} />)}
           </Scatter>
@@ -60,7 +64,7 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
       </ResponsiveContainer>
     </div>
     <table><caption>Rating and readership cohort data</caption><thead><tr><th>Novel</th><th>Rating</th><th>Readers</th></tr></thead><tbody>
-      {points.map((point) => <tr key={point.id}><th>{point.title}{point.current ? ' (current)' : ''}</th><td>{point.rating}</td><td>{point.readers.toLocaleString()}</td></tr>)}
+      {points.map((point) => <tr key={point.id}><th><a href={novelPageUrl(point.id, point.current ? undefined : novel.id)}>{point.title}{point.current ? ' (current)' : ''}</a></th><td>{point.rating}</td><td>{point.readers.toLocaleString()}</td></tr>)}
     </tbody></table>
   </section>;
 }

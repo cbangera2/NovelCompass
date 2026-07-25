@@ -10,8 +10,8 @@ import './novel-insights.css';
 const LABELS = { rating: 'Rating', rating_votes: 'Rating votes', readers: 'Readers' };
 const NovelCohortChart = lazy(() => import('./NovelCohortChart'));
 
-export function NovelInsightsPanel({ novelId, source, onPeer, providedInsights, currentNovel }: {
-  novelId: number; source: RecommendationDataSource; onPeer?: (id: number) => void;
+export function NovelInsightsPanel({ novelId, source, providedInsights, currentNovel }: {
+  novelId: number; source: RecommendationDataSource;
   providedInsights?: NovelInsights | null; currentNovel?: NovelDetail;
 }) {
   const [insights, setInsights] = useState<NovelInsights | null>(providedInsights || null);
@@ -42,8 +42,7 @@ export function NovelInsightsPanel({ novelId, source, onPeer, providedInsights, 
     )}</div></Card>}
     {insights.peers.length > 0 && <div className="insight-peers"><div className="insight-section-heading"><div><h4>Top catalog cohort</h4><p>{insights.cohort_definition} Showing up to 10 closest peers by shared catalog metadata.</p></div><Badge tone="green">{Math.min(10, insights.peers.length)} peers</Badge></div><div>{insights.peers.slice(0, 10).map((peer) =>
       <Card key={peer.id} className="insight-peer-card">{peer.cover_url ? <img src={peer.cover_url} alt="" loading="lazy" /> : <span className="peer-cover-fallback"><BookOpen /></span>}
-        <div>{onPeer ? <button onClick={() => onPeer(peer.id)}>{peer.title}</button>
-          : <a href={novelPageUrl(peer.id, novelId)}>{peer.title}</a>}
+        <div><a href={novelPageUrl(peer.id, novelId)}>{peer.title}</a>
           <span><Badge>{peer.shared_tag_count} tags</Badge><Badge>{peer.shared_genre_count} genres</Badge></span></div></Card>
     )}</div></div>}
     {!insights.capabilities.relationships && <p className="insights-note">Detailed relationship-edge analytics are unavailable; no relationship strength is inferred.</p>}

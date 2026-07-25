@@ -17,6 +17,7 @@ import {
 import { NovelDetail } from '../types';
 import { RecommendationDataSource } from '../data';
 import { LocalUserProfile } from './types';
+import { novelPageUrl } from '../novelLinks';
 
 const SAMPLE_LIMIT = 40;
 
@@ -29,6 +30,7 @@ function AnalyticsTooltip({ active, payload, label }: any) {
     {item.rating != null && <span>Rating {item.rating}</span>}
     {item.readers != null && <span>{Number(item.readers).toLocaleString()} readers</span>}
     {item.hidden && <span>Potential hidden gem</span>}
+    {item.id != null && <span>Click to open novel</span>}
   </div>;
 }
 
@@ -169,14 +171,17 @@ export default function ProfileAnalytics({
                 <YAxis type="number" dataKey="rating" name="Rating" domain={[0, 5]} tick={{ fill: 'var(--muted)', fontSize: 10 }} width={34} />
                 <ChartTooltip content={<AnalyticsTooltip />} cursor={{ strokeDasharray: '3 3', stroke: 'var(--border-strong)' }} />
                 <Legend verticalAlign="top" height={28} formatter={() => 'Sampled profile titles · gold indicates potential hidden gem'} wrapperStyle={{ color: 'var(--muted)', fontSize: 11 }} />
-                <Scatter name="Titles" data={scatterData} isAnimationActive={!reducedMotion} onClick={(point: any) => onOpenNovel(point.id)}>
+                <Scatter name="Titles" data={scatterData} isAnimationActive={!reducedMotion} onClick={(point: any) => {
+                  const id = Number(point?.id ?? point?.payload?.id);
+                  if (Number.isInteger(id) && id > 0) onOpenNovel(id);
+                }}>
                   {scatterData.map((point) => <Cell key={point.id} fill={point.hidden ? '#d89113' : 'var(--accent)'} stroke="var(--surface)" strokeWidth={2} />)}
                 </Scatter>
               </ScatterChart>
             </ResponsiveContainer>
           </div>
           <div className="analytics-table-wrap"><table><caption>Plotted novel data</caption><thead><tr><th>Novel</th><th>Rating</th><th>Readers</th><th>Classification</th></tr></thead><tbody>
-            {scatter.map((detail) => <tr key={detail.id}><th><button onClick={() => onOpenNovel(detail.id)}>{detail.title}</button></th><td>{detail.rating}</td><td>{detail.reading_list_count.toLocaleString()}</td><td>{hiddenGem(detail) ? 'Potential hidden gem' : 'Other sample title'}</td></tr>)}
+            {scatter.map((detail) => <tr key={detail.id}><th><a href={novelPageUrl(detail.id)}>{detail.title}</a></th><td>{detail.rating}</td><td>{detail.reading_list_count.toLocaleString()}</td><td>{hiddenGem(detail) ? 'Potential hidden gem' : 'Other sample title'}</td></tr>)}
           </tbody></table></div>
         </article>
       </>}
