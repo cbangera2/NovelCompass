@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownUp, BookOpen, ExternalLink, LayoutGrid, List, Search, Shuffle, SlidersHorizontal, Star, Users, X } from 'lucide-react';
+import { ArrowDownUp, BookOpen, ExternalLink, LayoutGrid, List, Search, Shuffle, SlidersHorizontal, Sparkles, Star, Users, X } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from './data';
 import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { FieldGroup, Select } from './ui';
+import { FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { novelPageUrl } from './novelLinks';
 import { loadLocalProfile } from './profile/store';
@@ -354,9 +354,16 @@ function BrowseCard({ novel }: { novel: BrowseNovel }) {
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
       <footer className="browse-card-actions">
         <span>{novel.year || 'Year unknown'}{novel.chapters_trans ? ` · ${novel.chapters_trans} ch.` : ''}</span>
-        <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} on Novel Updates`} title="Open on Novel Updates">
-          <ExternalLink size={16} aria-hidden="true" />
-        </DSButton>
+        <Tooltip content="Find similar novels">
+          <DSButton as="a" variant="ghost" className="browse-icon-action" href={`${import.meta.env.BASE_URL}?seed=${novel.id}`} aria-label={`Find novels similar to ${title}`}>
+            <Sparkles size={16} aria-hidden="true" />
+          </DSButton>
+        </Tooltip>
+        <Tooltip content="Open on Novel Updates">
+          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} on Novel Updates`}>
+            <ExternalLink size={16} aria-hidden="true" />
+          </DSButton>
+        </Tooltip>
       </footer>
     </div>
   </Card>;

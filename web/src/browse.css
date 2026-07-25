@@ -11,9 +11,17 @@
 
 /* Keep catalog cards dense: navigation lives on the cover/title, while the
    footer exposes one text action and two compact destinations. */
-.browse-grid{align-items:start}
+.browse-grid{align-items:stretch}
+.browse-card{align-self:stretch;height:100%}
+.browse-card>div{height:100%}
+.browse-title{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;line-height:1.25;min-height:2.5em;overflow:hidden}
+.browse-card>div>p{min-height:1.15em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.browse-meta{min-height:24px}
+.browse-card>.browse-cover{height:100%;min-height:175px}
+.browse-card>div>.browse-chips{align-content:flex-start;height:1.65rem;overflow:hidden}
 .browse-card-actions{align-items:center;border-top:1px solid var(--border);display:flex;gap:.25rem;margin-top:.7rem;padding-top:.55rem}
 .browse-card-actions>span{color:var(--dim);flex:1;font-size:.68rem}
+.browse-card-actions .ui-tooltip{flex:0 0 auto}
 .browse-card-actions .browse-icon-action{align-items:center;display:inline-flex;flex:0 0 36px;height:36px;justify-content:center;padding:0;width:36px}
 
 @media(max-width:680px){
@@ -34,6 +42,8 @@
 .browse-density .ds-button{height:36px;padding:0;width:36px}
 .browse-grid.density-list{grid-template-columns:1fr}
 .browse-grid.density-list .browse-card{grid-template-columns:88px minmax(0,1fr);min-height:132px}
+.browse-grid.density-list .browse-card>.browse-cover{min-height:132px}
+.browse-grid.density-list .browse-title{min-height:auto}
 .browse-grid.density-list .browse-cover img{max-height:180px}
 .browse-card:focus-visible{border-color:var(--accent);outline:2px solid var(--accent-soft);outline-offset:2px}
 
