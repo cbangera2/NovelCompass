@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:static": "tsc && VITE_DATA_MODE=static vite build",
-    "build:pages": "tsc && VITE_DATA_MODE=static vite build --base=/novelupdatesrecommender/",
+    "build:pages": "tsc && VITE_DATA_MODE=static vite build --base=/NovelCompass/",
     "check": "pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm run test && pnpm run build",
     "format": "prettier --write --ignore-path ../.prettierignore package.json ../README.md ../DEPLOYMENT.md '../.github/workflows/*.yml'",
     "format:check": "prettier --check --ignore-path ../.prettierignore package.json ../README.md ../DEPLOYMENT.md '../.github/workflows/*.yml'",

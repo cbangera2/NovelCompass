@@ -68,11 +68,14 @@ jobs:
         env:
           VITE_DATA_MODE: static
         run: |
+          PAGES_BASE="/${GITHUB_REPOSITORY#*/}/"
           pnpm --dir web exec tsc
-          pnpm --dir web exec vite build --base=/novelupdatesrecommender/
+          pnpm --dir web exec vite build --base="${PAGES_BASE}"
 
       - name: Verify Pages base path and static payload
         run: |
+          PAGES_BASE="/${GITHUB_REPOSITORY#*/}/"
           test -s web/dist/data/manifest.json
           test -s web/dist/data/catalog.json
-          grep -q '/novelupdatesrecommender/assets/' web/dist/index.html
+          grep -q "${PAGES_BASE}assets/" web/dist/index.html
+          grep -q "${PAGES_BASE}favicon.svg" web/dist/index.html

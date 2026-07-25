@@ -2,6 +2,7 @@
 *.har
 /*\ _\ Novel\ Updates.html
 /*\ _\ Novel\ Updates_files/
+/localhost_*.png
 
 # Local data and derived snapshots
 *.db

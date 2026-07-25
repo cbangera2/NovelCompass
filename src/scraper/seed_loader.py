@@ -1,11 +1,17 @@
 import os
 import json
+import gzip
 import sqlite3
 import re
 import unicodedata
 from typing import List, Dict, Any
 
-DATASET_JSON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "supporting", "novel-dataset", "novels_0.1.5.json")
+DATASET_JSON_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "supporting",
+    "seed",
+    "novels_0.1.5.json.gz",
+)
 
 # Core seed lists from problem statement
 SEED_LIST_IDS = [83544, 94083, 83473, 115510]
@@ -40,7 +46,7 @@ def seed_database_from_dataset(
         return 0
 
     print(f"Loading seed dataset from {DATASET_JSON_PATH}...")
-    with open(DATASET_JSON_PATH, 'r', encoding='utf-8') as f:
+    with gzip.open(DATASET_JSON_PATH, "rt", encoding="utf-8") as f:
         novels_data = json.load(f)
 
     # Convert dictionary or list

@@ -3,7 +3,8 @@
 `CI` runs on pushes and pull requests. It compiles the Python sources, runs the
 pytest suite, creates a deterministic two-novel SQLite fixture, validates the
 normalized static export contract, installs the locked pnpm dependencies, and
-builds the site in static mode at `/novelupdatesrecommender/`.
+builds the site in static mode at a base path derived from the GitHub repository
+name.
 
 The Pages workflow deploys the normalized snapshot committed under
 `web/public/data` by default. No repository variables are required for that
