@@ -1,7 +1,6 @@
 import { ChangeEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
-  BookMarked,
   BookOpen,
   Clock3,
   Database,
@@ -27,6 +26,7 @@ import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
 import type { NovelSearchResult } from './types';
 import { novelPageUrl } from './novelLinks';
+import { NovelCompassMark } from './NovelCompassMark';
 import {
   Sidebar,
   SidebarCollapseButton,
@@ -112,9 +112,7 @@ export default function AppShell({
     <SidebarProvider>
       <header className="shell-mobile-header">
         <a className="shell-brand compact" href={homeUrl} aria-label="Novel Compass home">
-          <span>
-            <BookMarked size={18} />
-          </span>
+          <NovelCompassMark />
           <strong>Novel Compass</strong>
         </a>
         <div className="shell-mobile-actions">
@@ -127,9 +125,7 @@ export default function AppShell({
         <SidebarHeader>
           <div className="shell-sidebar-heading">
             <a className="shell-brand" href={homeUrl}>
-              <span>
-                <BookMarked size={21} />
-              </span>
+              <NovelCompassMark />
               <div className="sidebar-brand-copy">
                 <strong>Novel Compass</strong>
                 <small>Relationship-first discovery</small>
