@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Database, FileUp, Pause, Play, Radar, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Database, FileUp, Globe2, Pause, Play, Radar, RefreshCw } from 'lucide-react';
 import './scraper-dashboard.css';
 
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
@@ -15,7 +15,19 @@ type Status = {
     pending_novels: { new_or_unresolved: number; refresh: number };
   };
   latest_run: null | Record<string, string | number | null>;
+  last_worker_result: null | {
+    status?: string;
+    reason?: string;
+    errors?: number;
+  };
   recent_errors: Array<Record<string, string | number | null>>;
+  browser_session: {
+    setup_running: boolean;
+    ready: boolean;
+    prepared: boolean;
+    error: string | null;
+    profile: string;
+  };
   safety: {
     batch_limit_max: number;
     request_delay_seconds: string;
@@ -38,6 +50,7 @@ async function post(path: string, body?: object) {
 export default function ScraperDashboard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [maxItems, setMaxItems] = useState(10);
+  const [transport, setTransport] = useState<'urllib' | 'browser'>('urllib');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -132,15 +145,62 @@ export default function ScraperDashboard() {
             <input type="number" min="1" max="100" value={maxItems}
               onChange={(event) => setMaxItems(Math.max(1, Math.min(100, Number(event.target.value))))} />
           </label>
+          <label>Request transport
+            <select value={transport} disabled={busy || status?.running}
+              onChange={(event) => setTransport(event.target.value as 'urllib' | 'browser')}>
+              <option value="urllib">Standard HTTP (default)</option>
+              <option value="browser">Saved browser session</option>
+            </select>
+          </label>
+          {transport === 'browser' && <div className="browser-session">
+            <div className="browser-session-copy">
+              <Globe2 size={18} />
+              <div>
+                <strong>Manual browser session</strong>
+                <p>
+                  {status?.browser_session.error
+                    ? status.browser_session.error
+                    : status?.browser_session.setup_running
+                      ? 'A headed browser is open. Handle login or the challenge yourself.'
+                      : status?.browser_session.prepared
+                        ? 'A saved local browser profile is available. Reopen setup whenever the session expires.'
+                        : 'Open the browser once to prepare its private local session.'}
+                </p>
+              </div>
+            </div>
+            <div className="button-row">
+              <button className="secondary" disabled={busy || status?.running || status?.browser_session.setup_running}
+                onClick={() => act(
+                  () => post('/api/scraper/browser-session/open'),
+                  'Browser setup is launching. Complete the site steps manually.'
+                )}>
+                <Globe2 size={17} /> Open setup browser
+              </button>
+              <button className="secondary" disabled={busy || !status?.browser_session.setup_running}
+                onClick={() => act(
+                  () => post('/api/scraper/browser-session/finish'),
+                  'Session save requested. Wait for the browser to close.'
+                )}>
+                Finish session setup
+              </button>
+            </div>
+            <small>Private profile: {status?.browser_session.profile || 'Loading…'}</small>
+          </div>}
           <div className="button-row">
-            <button disabled={busy || status?.running} onClick={() =>
-              act(() => post('/api/scraper/run', { max_items: maxItems }), `Started a batch of up to ${maxItems} pages.`)
+            <button disabled={busy || status?.running || status?.browser_session.setup_running} onClick={() =>
+              act(
+                () => post('/api/scraper/run', { max_items: maxItems, transport }),
+                `Started a ${transport === 'browser' ? 'browser-session' : 'standard HTTP'} batch of up to ${maxItems} pages.`
+              )
             }><Play size={17} /> Run batch</button>
             <button className="danger" disabled={busy || !status?.running} onClick={() =>
               act(() => post('/api/scraper/pause'), 'Stop requested; the current request will finish safely.')
             }><Pause size={17} /> Stop safely</button>
           </div>
           {message && <p className="dashboard-message">{message}</p>}
+          {status?.last_worker_result?.status === 'failed' && <p className="dashboard-error">
+            {status.last_worker_result.reason || 'The scraper worker could not start.'}
+          </p>}
           {status?.safety && <p className="safety-note"><AlertTriangle size={16} />
             Requests retain a {status.safety.request_delay_seconds}s delay and stop automatically on HTTP {status.safety.stops_on_http.join(', ')}.
           </p>}
@@ -190,6 +250,16 @@ export default function ScraperDashboard() {
 
       <section className="scraper-panel error-panel">
         <div className="panel-heading"><AlertTriangle /><div><h2>Recent queue issues</h2><p>No credentials or raw pages are shown here.</p></div></div>
+        {(counts.blocked || 0) > 0 && <button className="secondary retry-blocked" disabled={busy || status?.running}
+          onClick={() => {
+            if (!window.confirm(`Retry ${counts.blocked} blocked queue item(s)? Use this only after preparing a working browser session or otherwise resolving the block.`)) return;
+            void act(
+              () => post('/api/scraper/retry-blocked'),
+              `${counts.blocked} blocked queue item(s) returned to pending.`
+            );
+          }}>
+          <RefreshCw size={17} /> Retry blocked items
+        </button>}
         {status?.recent_errors.length ? <div className="error-list">{status.recent_errors.map((item, index) =>
           <div key={`${item.url}-${index}`}><span>{item.status}</span><strong>{item.type}</strong><code>{item.last_error}</code><small>{item.updated_at}</small></div>
         )}</div> : <p className="empty">No recorded queue errors.</p>}

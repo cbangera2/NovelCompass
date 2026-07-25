@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Request
@@ -18,6 +18,11 @@ from pydantic import BaseModel, Field
 from src.db.repository import Repository
 from src.db.schema import init_db
 from src.scraper.crawler import Crawler
+from src.scraper.client import (
+    DEFAULT_BROWSER_PROFILE,
+    BrowserSessionTransport,
+    ScraperClient,
+)
 from src.scraper.refresh import DEFAULT_ARTIFACT
 from src.scraper.offline_import import MAX_UPLOAD_BYTES, import_har, import_html
 
@@ -33,6 +38,10 @@ _lock = threading.Lock()
 _worker: Optional[threading.Thread] = None
 _crawler: Optional[Crawler] = None
 _last_result: Optional[dict] = None
+_browser_setup_thread: Optional[threading.Thread] = None
+_browser_setup_stop = threading.Event()
+_browser_setup_ready = threading.Event()
+_browser_setup_error: Optional[str] = None
 
 
 def _dashboard_db_path() -> Path:
@@ -55,6 +64,13 @@ def _dashboard_db():
 
 class BatchRequest(BaseModel):
     max_items: int = Field(default=10, ge=1, le=100)
+    transport: Literal["urllib", "browser"] = "urllib"
+
+
+def _browser_profile_path() -> Path:
+    return Path(
+        os.environ.get("NOVEL_SCRAPER_BROWSER_PROFILE", str(DEFAULT_BROWSER_PROFILE))
+    )
 
 
 async def _bounded_body(request: Request) -> bytes:
@@ -127,17 +143,26 @@ def _queue_breakdown(conn) -> dict:
     }
 
 
-def _run_batch(max_items: int) -> None:
+def _run_batch(max_items: int, transport_name: str) -> None:
     global _crawler, _last_result
     conn = _dashboard_db()
-    crawler = Crawler(conn)
+    transport = None
+    client = None
     with _lock:
-        _crawler = crawler
+        _crawler = None
     try:
+        if transport_name == "browser":
+            transport = BrowserSessionTransport(_browser_profile_path())
+        client = ScraperClient(transport=transport)
+        crawler = Crawler(conn, client=client)
+        with _lock:
+            _crawler = crawler
         result = crawler.run_queue(max_items=max_items)
     except Exception as exc:  # Keep worker failures visible in the local UI.
         result = {"status": "failed", "reason": str(exc), "errors": 1}
     finally:
+        if client:
+            client.close()
         conn.close()
         with _lock:
             _last_result = result
@@ -170,6 +195,9 @@ def scraper_status():
         with _lock:
             running = bool(_worker and _worker.is_alive())
             result = _last_result
+            setup_running = bool(
+                _browser_setup_thread and _browser_setup_thread.is_alive()
+            )
         return {
             "database": str(_dashboard_db_path().resolve()),
             "artifact": dict(
@@ -180,6 +208,16 @@ def scraper_status():
             "latest_run": dict(latest) if latest else None,
             "recent_errors": recent_errors,
             "last_worker_result": result,
+            "browser_session": {
+                "setup_running": setup_running,
+                "ready": _browser_setup_ready.is_set(),
+                "prepared": (
+                    _browser_profile_path().exists()
+                    and any(_browser_profile_path().iterdir())
+                ),
+                "error": _browser_setup_error,
+                "profile": str(_browser_profile_path().resolve()),
+            },
             "safety": {
                 "batch_limit_max": 100,
                 "request_delay_seconds": "3–6",
@@ -224,14 +262,115 @@ def run_batch(batch: BatchRequest, request: Request):
     with _lock:
         if _worker and _worker.is_alive():
             raise HTTPException(status_code=409, detail="A scraper batch is already running.")
+        if _browser_setup_thread and _browser_setup_thread.is_alive():
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Finish the browser setup session before starting a batch."
+                ),
+            )
         _worker = threading.Thread(
             target=_run_batch,
-            args=(batch.max_items,),
+            args=(batch.max_items, batch.transport),
             name="bounded-novel-scraper",
             daemon=True,
         )
         _worker.start()
-    return {"started": True, "max_items": batch.max_items}
+    return {
+        "started": True,
+        "max_items": batch.max_items,
+        "transport": batch.transport,
+    }
+
+
+def _browser_setup_worker() -> None:
+    global _browser_setup_error
+    transport = None
+    try:
+        transport = BrowserSessionTransport(_browser_profile_path())
+        transport.open_for_manual_setup()
+        _browser_setup_ready.set()
+        _browser_setup_stop.wait()
+    except Exception as exc:
+        _browser_setup_error = str(exc)
+    finally:
+        if transport:
+            transport.close()
+        _browser_setup_ready.clear()
+        _browser_setup_stop.clear()
+
+
+@router.post("/browser-session/open")
+def open_browser_session(request: Request):
+    global _browser_setup_thread, _browser_setup_error
+    _require_local(request)
+    with _lock:
+        if _worker and _worker.is_alive():
+            raise HTTPException(
+                status_code=409, detail="Stop the scraper batch before browser setup."
+            )
+        if _browser_setup_thread and _browser_setup_thread.is_alive():
+            return {"started": False, "message": "Browser setup is already open."}
+        _browser_setup_error = None
+        _browser_setup_ready.clear()
+        _browser_setup_stop.clear()
+        _browser_setup_thread = threading.Thread(
+            target=_browser_setup_worker,
+            name="novel-scraper-browser-setup",
+            daemon=True,
+        )
+        _browser_setup_thread.start()
+    return {
+        "started": True,
+        "message": (
+            "Browser setup is launching. Complete any login or challenge manually, "
+            "then click Finish session setup."
+        ),
+    }
+
+
+@router.post("/browser-session/finish")
+def finish_browser_session(request: Request):
+    _require_local(request)
+    with _lock:
+        running = bool(
+            _browser_setup_thread and _browser_setup_thread.is_alive()
+        )
+        if running:
+            _browser_setup_stop.set()
+    return {
+        "requested": running,
+        "message": (
+            "Browser session saved. Wait for setup to close before running a batch."
+            if running
+            else "No browser setup session is open."
+        ),
+    }
+
+
+@router.post("/retry-blocked")
+def retry_blocked(request: Request):
+    """Retry blocked items only after an explicit local user action."""
+    _require_local(request)
+    with _lock:
+        if _worker and _worker.is_alive():
+            raise HTTPException(
+                status_code=409, detail="Stop the scraper before retrying items."
+            )
+    conn = _dashboard_db()
+    try:
+        with conn:
+            cursor = conn.execute(
+                """
+                UPDATE crawl_queue
+                SET status = 'pending', attempts = 0, last_error = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'blocked'
+                """
+            )
+        return {"retried": cursor.rowcount, "queue": _queue_breakdown(conn)}
+    finally:
+        conn.close()
 
 
 @router.post("/pause")
