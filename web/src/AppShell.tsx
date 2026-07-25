@@ -1,11 +1,10 @@
-import { ChangeEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
   Clock3,
   Database,
   Download,
-  FileUp,
   LogOut,
   Search,
   Settings,
@@ -17,10 +16,10 @@ import type { LocalUserProfile } from './profile/types';
 import {
   clearLocalProfile,
   loadLocalProfile,
-  saveLocalProfile,
   subscribeLocalProfile,
 } from './profile/store';
-import { downloadProfileBackup, parseProfileBackup } from './profile/transfer';
+import { downloadProfileBackup } from './profile/transfer';
+import { ProfileImportDialog } from './profile/ProfileImportDialog';
 import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
@@ -398,29 +397,6 @@ function AccountMenu({
   mobile?: boolean;
 }) {
   const [message, setMessage] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    try {
-      const next = parseProfileBackup(JSON.parse(await file.text()));
-      if (
-        !window.confirm(
-          `Import ${file.name} and ${profile ? 'replace your current local profile' : 'restore this local profile'}?`,
-        )
-      )
-        return;
-      await saveLocalProfile(next);
-      setMessage(`Imported ${next.entries.length.toLocaleString()} saved titles.`);
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : 'This profile backup could not be imported.',
-      );
-    }
-  };
-
   const clearSession = async () => {
     if (
       !window.confirm(
@@ -465,19 +441,7 @@ function AccountMenu({
           </span>
         </a>
         <div className="shell-account-divider" />
-        <button type="button" onClick={() => inputRef.current?.click()}>
-          <FileUp size={16} />
-          <span>
-            Import profile<small>Restore a JSON backup</small>
-          </span>
-        </button>
-        <input
-          ref={inputRef}
-          className="shell-account-file"
-          type="file"
-          accept=".json,application/json"
-          onChange={importBackup}
-        />
+        <ProfileImportDialog profile={profile} onImported={setMessage} />
         <button
           type="button"
           disabled={!profile}
