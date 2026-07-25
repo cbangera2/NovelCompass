@@ -1,4 +1,6 @@
 import {
+  BrowseRequest,
+  BrowseResponse,
   DatasetManifest,
   FilterOptions,
   NovelDetail,
@@ -53,8 +55,9 @@ export class ApiDataSource implements RecommendationDataSource {
     return body.results || [];
   }
 
-  getOptions(): Promise<FilterOptions> {
-    return apiFetch('/api/options');
+  async getOptions(): Promise<FilterOptions> {
+    const options = await apiFetch<FilterOptions & { popular_tags?: string[] }>('/api/options');
+    return { ...options, tags: options.tags || options.popular_tags || [] };
   }
 
   async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {
@@ -82,5 +85,13 @@ export class ApiDataSource implements RecommendationDataSource {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
     });
+  }
+
+  browseNovels(request: BrowseRequest): Promise<BrowseResponse> {
+    const params = new URLSearchParams();
+    Object.entries(request).forEach(([key, value]) => {
+      if (value !== '' && value != null) params.set(key, String(value));
+    });
+    return apiFetch(`/api/browse?${params}`);
   }
 }

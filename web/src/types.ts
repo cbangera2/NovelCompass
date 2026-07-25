@@ -112,3 +112,38 @@ export interface NovelDetail {
   related_series_count: number;
   recommendation_list_count: number;
 }
+
+export type BrowseSort = 'popular' | 'rating' | 'votes' | 'title' | 'newest';
+
+export interface BrowseRequest {
+  query?: string;
+  page?: number;
+  page_size?: number;
+  sort?: BrowseSort;
+  language?: string;
+  genre?: string;
+  tag?: string;
+  min_rating?: number;
+  min_votes?: number;
+}
+
+export interface BrowseNovel extends NovelSearchResult {
+  language?: string;
+  reading_list_count: number;
+  year?: number;
+  genres?: string[];
+  tags?: string[];
+}
+
+export interface BrowseResponse {
+  items: BrowseNovel[];
+  page: number;
+  page_size: number;
+  total: number;
+  has_more: boolean;
+  capabilities: {
+    genres: boolean;
+    tags: boolean;
+    total_is_exact: boolean;
+  };
+}

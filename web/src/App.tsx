@@ -328,6 +328,7 @@ export default function App(): JSX.Element {
     <div className="app-container">
       <nav className="primary-nav" aria-label="Primary navigation">
         <a className="active" href={import.meta.env.BASE_URL}>Discover</a>
+        <a href={`${import.meta.env.BASE_URL}?view=browse`}>Browse</a>
         <a href={`${import.meta.env.BASE_URL}?view=profile`}>
           Profile
           {profile && <span>{profile.username || 'Private local'} · {profile.entries.length.toLocaleString()}</span>}

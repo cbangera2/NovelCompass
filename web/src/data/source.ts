@@ -1,4 +1,6 @@
 import {
+  BrowseRequest,
+  BrowseResponse,
   DatasetManifest,
   FilterOptions,
   NovelDetail,
@@ -15,6 +17,7 @@ export interface RecommendationDataSource {
   resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>>;
   getNovel(id: number): Promise<NovelDetail>;
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse>;
+  browseNovels(request: BrowseRequest): Promise<BrowseResponse>;
 }
 
 export class DataSourceError extends Error {

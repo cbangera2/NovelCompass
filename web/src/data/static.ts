@@ -1,4 +1,7 @@
 import {
+  BrowseNovel,
+  BrowseRequest,
+  BrowseResponse,
   DatasetManifest,
   FilterOptions,
   NovelDetail,
@@ -196,6 +199,16 @@ export class StaticDataSource implements RecommendationDataSource {
 
   async getOptions(): Promise<FilterOptions> {
     await this.loadCatalog();
+    if ((!this.genres.length || !this.tags.length)) {
+      try {
+        const facets = await this.loadFacets();
+        if (!this.genres.length) this.genres = facets.genres || [];
+        if (!this.tags.length) this.tags = facets.tags || [];
+      } catch {
+        // Older static exports may contain only the compact catalog. Browse
+        // remains usable and the UI hides unsupported facet controls.
+      }
+    }
     return {
       genres: this.genres,
       tags: this.tags,
@@ -332,6 +345,57 @@ export class StaticDataSource implements RecommendationDataSource {
       novelupdates_url: novelUpdatesUrl(seedCard.id)
     };
     return { seed_novel: seed, count: recommendations.length, recommendations };
+  }
+
+  async browseNovels(request: BrowseRequest): Promise<BrowseResponse> {
+    await this.loadCatalog();
+    const query = normalize(request.query || '');
+    const genre = normalize(request.genre || '');
+    const tag = normalize(request.tag || '');
+    let facets: FacetsFile | undefined;
+    let tagSupported = true;
+    if (tag) {
+      try {
+        facets = await this.loadFacets();
+      } catch {
+        tagSupported = false;
+      }
+    }
+    const items = [...this.cards.values()].filter((card) => {
+      if (query && !normalize(`${card.title} ${card.author} ${(this.aliases.get(card.id) || []).join(' ')}`).includes(query)) return false;
+      if (request.language && normalize(card.language) !== normalize(request.language)) return false;
+      if ((request.min_rating || 0) > card.rating || (request.min_votes || 0) > card.rating_votes) return false;
+      const genreNames = card.genre_ids.map((id) => this.genres[id]).filter(Boolean).map(normalize);
+      if (genre && !genreNames.includes(genre)) return false;
+      if (tag && tagSupported) {
+        const tagNames = (facets?.novels?.[String(card.id)]?.t || []).map((id) => this.tags[id]).filter(Boolean).map(normalize);
+        if (!tagNames.includes(tag)) return false;
+      }
+      return true;
+    });
+    const sort = request.sort || 'popular';
+    items.sort((a, b) => {
+      if (sort === 'rating') return b.rating - a.rating || b.rating_votes - a.rating_votes;
+      if (sort === 'votes') return b.rating_votes - a.rating_votes || b.rating - a.rating;
+      if (sort === 'title') return a.title.localeCompare(b.title);
+      if (sort === 'newest') return (b.year || 0) - (a.year || 0) || b.reading_list_count - a.reading_list_count;
+      return b.reading_list_count - a.reading_list_count || b.rating_votes - a.rating_votes;
+    });
+    const page = Math.max(1, request.page || 1);
+    const pageSize = Math.max(1, Math.min(100, request.page_size || 24));
+    const start = (page - 1) * pageSize;
+    const selected: BrowseNovel[] = items.slice(start, start + pageSize).map((card) => ({
+      ...card,
+      genres: card.genre_ids.map((id) => this.genres[id]).filter(Boolean)
+    }));
+    return {
+      items: selected,
+      page,
+      page_size: pageSize,
+      total: items.length,
+      has_more: start + selected.length < items.length,
+      capabilities: { genres: this.genres.length > 0, tags: !tag || tagSupported, total_is_exact: true }
+    };
   }
 }
 

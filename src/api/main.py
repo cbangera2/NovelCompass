@@ -173,6 +173,114 @@ def search_novels(q: str = Query(..., min_length=1), limit: int = 10):
         conn.close()
 
 
+@app.get("/api/browse")
+def browse_novels(
+    query: str = "",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=100),
+    sort: str = Query("popular", pattern="^(popular|rating|votes|title|newest)$"),
+    language: str = "",
+    genre: str = "",
+    tag: str = "",
+    min_rating: float = Query(0, ge=0, le=5),
+    min_votes: int = Query(0, ge=0),
+):
+    """Browse the complete SQLite catalog with stable, honest metadata sorts."""
+    conn = get_db()
+    try:
+        joins = []
+        where = ["n.rating >= ?", "n.rating_votes >= ?"]
+        params: list[Any] = [min_rating, min_votes]
+        if query.strip():
+            needle = f"%{query.strip()}%"
+            where.append(
+                "(n.title LIKE ? OR n.author LIKE ? OR n.associated_names LIKE ?)"
+            )
+            params.extend([needle, needle, needle])
+        if language:
+            where.append("LOWER(n.language) = LOWER(?)")
+            params.append(language)
+        if genre:
+            joins.append(
+                "JOIN novel_genres bg ON bg.novel_id=n.id "
+                "JOIN genres g ON g.id=bg.genre_id"
+            )
+            where.append("LOWER(g.name) = LOWER(?)")
+            params.append(genre)
+        if tag:
+            joins.append(
+                "JOIN novel_tags bt ON bt.novel_id=n.id "
+                "JOIN tags t ON t.id=bt.tag_id"
+            )
+            where.append("LOWER(t.name) = LOWER(?)")
+            params.append(tag)
+        order = {
+            "popular": "n.reading_list_count DESC, n.rating_votes DESC",
+            "rating": "n.rating DESC, n.rating_votes DESC",
+            "votes": "n.rating_votes DESC, n.rating DESC",
+            "title": "n.title COLLATE NOCASE ASC",
+            "newest": "COALESCE(n.year, 0) DESC, n.reading_list_count DESC",
+        }[sort]
+        from_sql = f"FROM novels n {' '.join(joins)} WHERE {' AND '.join(where)}"
+        total = conn.execute(f"SELECT COUNT(DISTINCT n.id) {from_sql}", params).fetchone()[0]
+        rows = conn.execute(
+            f"""
+            SELECT DISTINCT n.id, n.title, n.slug, n.author, n.cover_url,
+                   n.rating, n.rating_votes, n.reading_list_count,
+                   n.language, n.year
+            {from_sql}
+            ORDER BY {order}, n.id ASC
+            LIMIT ? OFFSET ?
+            """,
+            [*params, page_size, (page - 1) * page_size],
+        ).fetchall()
+        ids = [row["id"] for row in rows]
+        genre_map: dict[int, list[str]] = {novel_id: [] for novel_id in ids}
+        if ids:
+            placeholders = ",".join("?" for _ in ids)
+            for row in conn.execute(
+                f"""
+                SELECT ng.novel_id, g.name FROM novel_genres ng
+                JOIN genres g ON g.id=ng.genre_id
+                WHERE ng.novel_id IN ({placeholders})
+                ORDER BY g.name
+                """,
+                ids,
+            ):
+                genre_map[row["novel_id"]].append(row["name"])
+        items = [
+            {
+                "id": row["id"],
+                "title": row["title"],
+                "slug": row["slug"] or "",
+                "novelupdates_url": novelupdates_url(row["id"], row["slug"]),
+                "author": row["author"] or "",
+                "cover_url": row["cover_url"],
+                "rating": row["rating"] or 0,
+                "rating_votes": row["rating_votes"] or 0,
+                "reading_list_count": row["reading_list_count"] or 0,
+                "language": row["language"] or "",
+                "year": row["year"],
+                "genres": genre_map[row["id"]],
+            }
+            for row in rows
+        ]
+        return {
+            "items": items,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "has_more": page * page_size < total,
+            "capabilities": {
+                "genres": True,
+                "tags": True,
+                "total_is_exact": True,
+            },
+        }
+    finally:
+        conn.close()
+
+
 @app.get("/api/novels/{novel_id}")
 def get_novel_detail(novel_id: int):
     conn = get_db()
