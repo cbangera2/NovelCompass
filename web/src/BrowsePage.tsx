@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDownUp, BookOpen, ExternalLink, LayoutGrid, List, Search, Shuffle, SlidersHorizontal, Sparkles, Star, Users, X } from 'lucide-react';
-import { configuredDataMode, createDataSource, RecommendationDataSource } from './data';
+import { createDataSource, RecommendationDataSource } from './data';
+import { useDataModePreference } from './dataModePreference';
 import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
@@ -14,6 +15,7 @@ import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
+  const { mode: dataMode } = useDataModePreference();
   const initialParams = new URLSearchParams(window.location.search);
   const saved = loadFilterSnapshot('browse', {
     query: '', sort: 'popular', direction: 'desc', language: '', author: '', genre: '', tag: '',
@@ -70,11 +72,17 @@ export default function BrowsePage(): JSX.Element {
   const loadRequestedRef = useRef(false);
 
   useEffect(() => {
-    createDataSource(configuredDataMode()).then(async (next) => {
+    let cancelled = false;
+    setSource(null);
+    setError('');
+    createDataSource(dataMode).then(async (next) => {
+      const nextOptions = await next.getOptions();
+      if (cancelled) return;
       setSource(next);
-      setOptions(await next.getOptions());
-    }).catch((reason) => setError(reason.message || 'Could not load the catalog.'));
-  }, []);
+      setOptions(nextOptions);
+    }).catch((reason) => !cancelled && setError(reason.message || `Could not load the ${dataMode} data source.`));
+    return () => { cancelled = true; };
+  }, [dataMode]);
 
   useEffect(() => {
     saveFilterSnapshot('browse', { query, sort, direction, language, author, genre, tag, minRating, maxRating,

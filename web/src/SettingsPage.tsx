@@ -3,12 +3,15 @@ import { useDisplaySettings } from './settings';
 import { Badge, Card, CardHeader } from './design-system';
 import { loadFilterControlPreferences, loadNavigationPreferences, resetSavedFilters, saveFilterControlPreferences, saveNavigationPreferences } from './preferences';
 import { useState } from 'react';
+import { DataMode } from './data';
+import { useDataModePreference } from './dataModePreference';
 
 export default function SettingsPage(): JSX.Element {
   const { settings, updateSettings } = useDisplaySettings();
   const [homeView, setHomeView] = useState(() => loadNavigationPreferences().homeView);
   const [rememberFilters, setRememberFilters] = useState(() => loadFilterControlPreferences().rememberFilters);
   const [resetMessage, setResetMessage] = useState('');
+  const { mode: dataMode, forcedMode, setMode: setDataMode } = useDataModePreference();
   return (
     <main className="settings-page">
       <header>
@@ -56,6 +59,18 @@ export default function SettingsPage(): JSX.Element {
           </button>
         </div>
         <p className="settings-disclosure">Associated names are unordered. The dataset does not prove which title is English, original-language, official, or fan-translated, so this setting deliberately makes none of those claims. Catalog search and compact recommendation records may not include alternates and will fall back consistently.</p>
+      </Card>
+      <Card className="settings-card">
+        <CardHeader title="Data source" description="Choose how this browser loads catalog and recommendation data." />
+        <label className="settings-data-mode"><span>Catalog source</span><select value={dataMode}
+          disabled={Boolean(forcedMode)} onChange={(event) => setDataMode(event.target.value as DataMode)}>
+          <option value="auto">Automatic (live API, then static fallback)</option>
+          <option value="api">Live database</option>
+          <option value="static">Static snapshot</option>
+        </select></label>
+        <p className="settings-disclosure">{forcedMode
+          ? `This deployment forces the ${forcedMode === 'static' ? 'static snapshot' : 'live API'} source, so a browser preference cannot override it.`
+          : 'Saved locally and synchronized across tabs. If Live database is unavailable, the app shows an error and keeps your choice so you can retry; only Automatic falls back.'}</p>
       </Card>
       <Card className="settings-storage-note">
         <Badge tone="green">Private local setting</Badge>

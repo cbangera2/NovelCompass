@@ -21,11 +21,11 @@ import {
   NovelSearchResult
 } from './types';
 import {
-  configuredDataMode,
   createDataSource,
   DataMode,
   RecommendationDataSource
 } from './data';
+import { useDataModePreference } from './dataModePreference';
 import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile/types';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
@@ -66,7 +66,7 @@ export default function App(): JSX.Element {
   const detailRequestRef = useRef(0);
   const dataSourceRef = useRef<RecommendationDataSource | null>(null);
   const [dataSource, setDataSource] = useState<RecommendationDataSource | null>(null);
-  const [dataMode, setDataMode] = useState<DataMode>(configuredDataMode());
+  const { mode: dataMode, forcedMode, setMode: setDataMode } = useDataModePreference();
   const [dataset, setDataset] = useState<DatasetManifest | null>(null);
   const [query, setQuery] = useState(DEFAULT_NOVEL.title);
   const [selectedNovel, setSelectedNovel] = useState<NovelSearchResult | null>(DEFAULT_NOVEL);
@@ -533,11 +533,13 @@ export default function App(): JSX.Element {
                 value={dataMode}
                 onChange={(event) => setDataMode(event.target.value as DataMode)}
                 aria-label="Recommendation data source"
+                disabled={Boolean(forcedMode)}
               >
                 <option value="auto">Automatic</option>
                 <option value="api">Live API</option>
                 <option value="static">Static snapshot</option>
               </select>
+              {forcedMode && <small>Forced by this deployment</small>}
             </label>
           </div>
         </div>

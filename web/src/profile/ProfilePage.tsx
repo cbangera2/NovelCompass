@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
-import { configuredDataMode, createDataSource, RecommendationDataSource } from '../data';
+import { createDataSource, RecommendationDataSource } from '../data';
+import { useDataModePreference } from '../dataModePreference';
 import { DatasetManifest, NovelDetail, NovelSearchResult } from '../types';
 import { ProfilePanel } from './ProfilePanel';
 import { loadLocalProfile } from './store';
@@ -22,6 +23,7 @@ function appUrl(params = ''): string {
 }
 
 export default function ProfilePage(): JSX.Element {
+  const { mode: dataMode } = useDataModePreference();
   const { settings } = useDisplaySettings();
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -43,15 +45,19 @@ export default function ProfilePage(): JSX.Element {
   const [tasteLoading, setTasteLoading] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     loadLocalProfile()
-      .then(setProfile)
-      .catch(() => setProfileLoadError('Local profile storage could not be opened in this browser.'))
-      .finally(() => setProfileLoaded(true));
-    createDataSource(configuredDataMode()).then(async (next) => {
+      .then((value) => !cancelled && setProfile(value))
+      .catch(() => !cancelled && setProfileLoadError('Local profile storage could not be opened in this browser.'))
+      .finally(() => !cancelled && setProfileLoaded(true));
+    createDataSource(dataMode).then(async (next) => {
+      const manifest = await next.getManifest();
+      if (cancelled) return;
       setSource(next);
-      setDataset(await next.getManifest());
-    }).catch(() => undefined);
-  }, []);
+      setDataset(manifest);
+    }).catch(() => { if (!cancelled) { setSource(null); setDataset(null); } });
+    return () => { cancelled = true; };
+  }, [dataMode]);
 
   useEffect(() => {
     if (!profile || !source) {

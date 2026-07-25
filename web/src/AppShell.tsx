@@ -1,6 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { BookMarked, BookOpen, Database, Settings, Sparkles, User } from 'lucide-react';
-import { configuredDataMode } from './data';
 import type { LocalUserProfile } from './profile/types';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { Badge } from './design-system';
@@ -11,6 +10,7 @@ import {
   SidebarTrigger
 } from './components/ui/sidebar';
 import './app-shell.css';
+import { useDataModePreference } from './dataModePreference';
 
 export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
 
@@ -30,7 +30,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [homeUrl, setHomeUrl] = useState(defaultHomeUrl);
-  const dataMode = configuredDataMode();
+  const { mode: dataMode } = useDataModePreference();
   const staticDeployment = dataMode === 'static' || window.location.hostname.endsWith('.github.io');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
 

@@ -14,6 +14,7 @@ import { NovelDetail, NovelInsights, Recommendation } from './types';
 import { novelPageUrl } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import './novel-page.css';
+import { useDataModePreference } from './dataModePreference';
 
 const CHANNEL_LABELS: Record<string, string> = {
   vector_rank: 'Meaning', tag_rank: 'Tags', direct_rec_rank: 'Reader recs',
@@ -21,6 +22,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 export default function NovelPage(): JSX.Element {
+  const { mode: dataMode } = useDataModePreference();
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const novelId = Number(params.get('id'));
   const fromId = Number(params.get('from')) || undefined;
@@ -41,7 +43,7 @@ export default function NovelPage(): JSX.Element {
       setError('This novel link is missing a valid catalog ID.');
       return;
     }
-    Promise.all([createDataSource(), loadLocalProfile().catch(() => null)])
+    Promise.all([createDataSource(dataMode), loadLocalProfile().catch(() => null)])
       .then(async ([dataSource, localProfile]) => {
         if (cancelled) return;
         setSource(dataSource);
@@ -69,7 +71,7 @@ export default function NovelPage(): JSX.Element {
       })
       .catch((reason) => !cancelled && setError(reason.message || 'Could not load this novel.'));
     return () => { cancelled = true; };
-  }, [fromId, novelId]);
+  }, [dataMode, fromId, novelId]);
 
   const currentFeedback = profile?.feedback?.find((item) => item.novel_id === novelId)?.signal;
   const title = detail ? displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference) : '';

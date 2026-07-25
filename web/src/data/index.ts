@@ -4,12 +4,29 @@ import { RecommendationDataSource } from './source';
 
 export type DataMode = 'api' | 'static' | 'auto';
 const sourcePromises = new Map<DataMode, Promise<RecommendationDataSource>>();
+const DATA_MODE_KEY = 'novel-compass:data-mode:v1';
+
+export function forcedDataMode(): Exclude<DataMode, 'auto'> | null {
+  if (typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io')) return 'static';
+  const configured = import.meta.env.VITE_DATA_MODE;
+  return configured === 'api' || configured === 'static' ? configured : null;
+}
+
+export function loadDataModePreference(): DataMode {
+  try {
+    const saved = JSON.parse(localStorage.getItem(DATA_MODE_KEY) || '{}');
+    return saved?.version === 1 && ['api', 'static', 'auto'].includes(saved.mode) ? saved.mode : 'auto';
+  } catch { return 'auto'; }
+}
+
+export function saveDataModePreference(mode: DataMode): void {
+  if (forcedDataMode()) return;
+  localStorage.setItem(DATA_MODE_KEY, JSON.stringify({ version: 1, mode }));
+  window.dispatchEvent(new Event('novel-data-mode'));
+}
 
 export function configuredDataMode(): DataMode {
-  const configured = import.meta.env.VITE_DATA_MODE;
-  return configured === 'api' || configured === 'static' || configured === 'auto'
-    ? configured
-    : 'auto';
+  return forcedDataMode() || loadDataModePreference();
 }
 
 async function initializeDataSource(
