@@ -3,6 +3,7 @@ import { BookMarked, BookOpen, ChevronLeft, ChevronRight, Database, ExternalLink
 import { configuredDataMode } from './data';
 import { LocalUserProfile } from './profile';
 import { loadLocalProfile } from './profile/store';
+import { Tooltip } from './ui';
 import './app-shell.css';
 
 export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper';
@@ -80,11 +81,13 @@ export default function AppShell({ activeView, children }: { activeView: AppView
           <span><BookMarked size={21} /></span>
           <div><strong>Novel Compass</strong><small>Relationship-first discovery</small></div>
         </a>
-        <button className="shell-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!collapsed} title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Alt+\\)`} onClick={toggleSidebar}>
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          <span>Collapse sidebar</span>
-        </button>
+        <Tooltip content={`${collapsed ? 'Expand' : 'Collapse'} sidebar · Alt+\\`}>
+          <button className="shell-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!collapsed} onClick={toggleSidebar}>
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            <span>Collapse sidebar</span>
+          </button>
+        </Tooltip>
         <nav className="shell-nav" aria-label="Application navigation">
           <p>Explore</p>
           {navItems.map((item) => {

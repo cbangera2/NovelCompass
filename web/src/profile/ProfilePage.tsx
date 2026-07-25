@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
+import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from '../data';
 import { DatasetManifest, NovelDetail, NovelSearchResult } from '../types';
 import { ProfilePanel } from './ProfilePanel';
@@ -28,6 +28,9 @@ export default function ProfilePage(): JSX.Element {
   const [rating, setRating] = useState(0);
   const [visibleLibraryCount, setVisibleLibraryCount] = useState(60);
   const [libraryCatalog, setLibraryCatalog] = useState<Map<string, NovelSearchResult>>(new Map());
+  const [activeDetail, setActiveDetail] = useState<NovelDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [taste, setTaste] = useState<{
     details: NovelDetail[];
     requested: number;
@@ -126,6 +129,32 @@ export default function ProfilePage(): JSX.Element {
     if (entry.novel_id == null) return;
     window.location.href = appUrl(`?seed=${entry.novel_id}`);
   };
+
+  const openLibraryDetail = async (entry: ProfileEntry) => {
+    if (!source || entry.novel_id == null) return;
+    setDetailLoading(true);
+    setDetailError('');
+    setActiveDetail(null);
+    try {
+      setActiveDetail(await source.getNovel(entry.novel_id));
+    } catch (error: any) {
+      setDetailError(error.message || 'Details are unavailable in this dataset.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeDetail && !detailLoading && !detailError) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveDetail(null);
+        setDetailError('');
+      }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [activeDetail, detailError, detailLoading]);
 
   return (
     <div className="profile-page">
@@ -246,7 +275,8 @@ export default function ProfilePage(): JSX.Element {
               {visibleEntries.map((entry) => {
                 const catalog = libraryCatalog.get(entry.slug);
                 return (
-                <article key={entry.slug} className="profile-entry">
+                <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`}>
+                  {entry.novel_id != null ? <button className="profile-entry-open" onClick={() => openLibraryDetail(entry)} aria-label={`Open details for ${entry.imported_title}`}>
                   <div className="profile-entry-cover">
                     {catalog?.cover_url
                       ? <img src={catalog.cover_url} alt="" loading="lazy" />
@@ -260,8 +290,12 @@ export default function ProfilePage(): JSX.Element {
                       {entry.progress ? ` · ${entry.progress}` : ''}
                     </p>
                   </div>
+                  </button> : <div className="profile-entry-open">
+                    <div className="profile-entry-cover"><BookOpen size={18} aria-hidden="true" /></div>
+                    <div><span className={`profile-status status-${entry.status}`}>{STATUS_LABELS[entry.status]}</span><h3>{entry.imported_title}</h3><p>{entry.rating ? `${entry.rating}★` : 'No personal rating'}{entry.progress ? ` · ${entry.progress}` : ''}</p></div>
+                  </div>}
                   {entry.novel_id != null ? (
-                    <a href={appUrl(`?seed=${entry.novel_id}`)}><Sparkles size={14} /> Use as seed</a>
+                    <a href={appUrl(`?seed=${entry.novel_id}`)}><Sparkles size={14} /> Find similar</a>
                   ) : <span className="profile-unmatched">Not in this snapshot</span>}
                 </article>
               )})}
@@ -290,6 +324,31 @@ export default function ProfilePage(): JSX.Element {
             </div>
           </section>
         </>
+      )}
+      {(detailLoading || activeDetail || detailError) && (
+        <div className="profile-detail-backdrop" onMouseDown={(event) => event.target === event.currentTarget && (setActiveDetail(null), setDetailError(''))}>
+          <article className="profile-detail-dialog" role="dialog" aria-modal="true" aria-label="Novel details">
+            <button className="detail-close" onClick={() => { setActiveDetail(null); setDetailError(''); }} aria-label="Close details"><X size={18} /></button>
+            {detailLoading && <p className="detail-state">Loading details…</p>}
+            {detailError && <p className="detail-state detail-error">{detailError}</p>}
+            {activeDetail && <>
+              <div className="profile-detail-hero">
+                {activeDetail.cover_url ? <img src={activeDetail.cover_url} alt="" /> : <span className="profile-detail-cover-fallback"><BookOpen /></span>}
+                <div>
+                  <span className="eyebrow">{activeDetail.language || 'Web novel'}{activeDetail.year ? ` · ${activeDetail.year}` : ''}</span>
+                  <h2>{displayNovelTitle(activeDetail.title, activeDetail.associated_names, settings.titlePreference)}</h2>
+                  <p>{activeDetail.author || 'Unknown author'}</p>
+                  <div className="detail-actions">
+                    <a className="detail-recommend-button" href={appUrl(`?seed=${activeDetail.id}`)}><Sparkles size={15} /> Find similar</a>
+                    <a href={activeDetail.novelupdates_url} target="_blank" rel="noopener noreferrer">Novel Updates <ExternalLink size={14} /></a>
+                  </div>
+                </div>
+              </div>
+              {activeDetail.synopsis && <p className="profile-detail-synopsis">{activeDetail.synopsis}</p>}
+              <div className="detail-chips">{activeDetail.genres.map((genre) => <a key={genre} href={browseFacetUrl('genre', genre)}>{genre}</a>)}</div>
+            </>}
+          </article>
+        </div>
       )}
     </div>
   );

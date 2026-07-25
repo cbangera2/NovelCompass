@@ -244,7 +244,7 @@ export function ProfilePanel({
 
             {profile && profile.entries.length > 0 && (
               <div className="profile-library">
-                <h3>Quick seed picker</h3>
+                <h3>Find similar from your library</h3>
                 <div>{profile.entries.filter((entry) => entry.novel_id).slice(0, 60).map((entry) => (
                   <button type="button" key={entry.slug} onClick={() => { onUseSeed(entry); setOpen(false); }}>
                     <span>{entry.imported_title}</span><small>{STATUS_LABELS[entry.status]}{entry.rating ? ` · ${entry.rating}★` : ''}</small>

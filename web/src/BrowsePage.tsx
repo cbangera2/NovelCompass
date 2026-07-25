@@ -193,7 +193,7 @@ export default function BrowsePage(): JSX.Element {
               <div className="browse-chips">{detail.genres.map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
               <div className="browse-chips browse-tag-chips">{detail.tags.map((item) => <a key={item} href={browseFacetUrl('tag', item)}>{item}</a>)}</div>
               <footer>
-                <a href={`${import.meta.env.BASE_URL}?seed=${detail.id}`}>Show recommendations</a>
+                <a href={`${import.meta.env.BASE_URL}?seed=${detail.id}`}>Find similar</a>
                 <a href={detail.novelupdates_url} target="_blank" rel="noopener noreferrer">Novel Updates <ExternalLink size={14} /></a>
               </footer>
             </div>

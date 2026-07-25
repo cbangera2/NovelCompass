@@ -208,6 +208,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .profile-entry-grid { display: grid; gap: .55rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .profile-entry { align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; display: flex; gap: .7rem; justify-content: space-between; min-width: 0; overflow: hidden; padding: .55rem; }
 .profile-entry > div { min-width: 0; }
+.profile-entry-open { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: flex; flex: 1; gap: .7rem; min-width: 0; padding: 0; text-align: left; }
+.profile-entry-open:hover h3 { color: var(--accent-bright); }
+.profile-entry.unmatched .profile-entry-open { cursor: default; opacity: .72; }
 .profile-entry .profile-entry-cover { align-items: center; align-self: stretch; background: var(--surface-soft); border-radius: 7px; color: var(--dim); display: flex; flex: 0 0 46px; justify-content: center; min-height: 65px; overflow: hidden; }
 .profile-entry-cover img { height: 100%; object-fit: cover; width: 100%; }
 .profile-entry h3 { font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -227,6 +230,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .profile-list-grid footer { align-items: center; display: flex; font-size: .67rem; justify-content: space-between; margin-top: auto; }
 .profile-list-grid footer span { color: var(--dim); }
 .profile-list-grid footer a { align-items: center; color: var(--accent-bright); display: inline-flex; gap: .25rem; text-decoration: none; }
+.profile-detail-backdrop { align-items: center; background: rgba(3,5,10,.8); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 70; }
+.profile-detail-dialog { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 16px; max-height: 90vh; max-width: 760px; overflow: auto; padding: 1.2rem; position: relative; width: 100%; }
+.profile-detail-hero { display: grid; gap: 1rem; grid-template-columns: 130px minmax(0,1fr); padding-right: 2rem; }
+.profile-detail-hero > img,.profile-detail-cover-fallback { align-items: center; background: var(--surface-soft); border-radius: 9px; display: flex; height: 182px; justify-content: center; object-fit: cover; width: 130px; }
+.profile-detail-hero h2 { font-size: 1.7rem; line-height: 1.1; margin: .3rem 0; }
+.profile-detail-hero p,.profile-detail-synopsis { color: var(--muted); }
+.profile-detail-synopsis { border-top: 1px solid var(--border); font-size: .8rem; line-height: 1.65; margin-top: 1rem; padding-top: 1rem; white-space: pre-line; }
+.profile-detail-dialog .detail-chips { margin-top: .8rem; }
+.profile-detail-dialog .detail-recommend-button { text-decoration: none; }
 .settings-page { margin: 0 auto; max-width: 900px; padding: 2.5rem clamp(1rem,4vw,3rem) 5rem; }
 .settings-page > header { margin-bottom: 2rem; }
 .settings-page > header h1 { font-size: clamp(2.5rem,7vw,4.8rem); letter-spacing: -.055em; line-height: 1; margin: .35rem 0 .7rem; }
@@ -520,6 +532,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .ui-button-ghost { background: transparent; color: var(--muted); }
 .ui-button-ghost:hover { background: var(--surface-raised); color: var(--text); }
 .ui-button-primary { background: var(--accent); border-color: transparent; color: white; }
+.ui-tooltip { display: inline-flex; position: relative; }
+.ui-tooltip-content { background: #080a10; border: 1px solid rgba(255,255,255,.15); border-radius: 7px; bottom: calc(100% + 7px); color: #f7f5ff; font-size: .64rem; left: 50%; max-width: 220px; opacity: 0; padding: .35rem .48rem; pointer-events: none; position: absolute; transform: translate(-50%,4px); transition: opacity .15s,transform .15s; visibility: hidden; white-space: nowrap; z-index: 80; }
+.ui-tooltip:hover .ui-tooltip-content,.ui-tooltip:focus-within .ui-tooltip-content { opacity: 1; transform: translate(-50%,0); visibility: visible; }
 .active-filter-chips { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .65rem; padding-top: .55rem; }
 .active-filter-chips span { background: var(--accent-soft); border: 1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius: 999px; color: var(--accent-bright); font-size: .62rem; padding: .18rem .4rem; }
 

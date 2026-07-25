@@ -24,11 +24,11 @@ import {
   DataMode,
   RecommendationDataSource
 } from './data';
-import { LocalUserProfile, ProfileEntry, ProfilePanel } from './profile';
-import { saveLocalProfile } from './profile/store';
+import { LocalUserProfile, ProfileEntry } from './profile';
+import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
-import { Button, Checkbox, FieldGroup, Select } from './ui';
+import { Button, Checkbox, FieldGroup, Select, Tooltip } from './ui';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -86,6 +86,10 @@ export default function App(): JSX.Element {
   const [detailEvidence, setDetailEvidence] = useState<string[]>([]);
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [hideLibraryTitles, setHideLibraryTitles] = useState(false);
+
+  useEffect(() => {
+    loadLocalProfile().then(setProfile).catch(() => setProfile(null));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -230,7 +234,7 @@ export default function App(): JSX.Element {
       window.requestAnimationFrame(() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
       await fetchRecommendations(novel);
     } catch (profileError: any) {
-      setError(profileError.message || 'Could not use that profile title as a seed.');
+      setError(profileError.message || 'Could not find similar novels for that profile title.');
       setLoading(false);
     }
   };
@@ -414,13 +418,6 @@ export default function App(): JSX.Element {
                 <option value="static">Static snapshot</option>
               </select>
             </label>
-            <ProfilePanel
-              source={dataSource}
-              dataset={dataset}
-              profile={profile}
-              onProfileChange={setProfile}
-              onUseSeed={useProfileEntryAsSeed}
-            />
           </div>
         </div>
       </header>
@@ -429,7 +426,7 @@ export default function App(): JSX.Element {
         <form onSubmit={handleSearch} className="search-input-wrapper">
           <Search className="search-icon" size={20} aria-hidden="true" />
           <div className="search-field">
-            <label htmlFor="novel-search">Seed novel</label>
+            <label htmlFor="novel-search">Starting novel</label>
             <input
               id="novel-search"
               type="text"
@@ -462,7 +459,7 @@ export default function App(): JSX.Element {
                   <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
                   <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
                 </span>
-                <span className="select-label">Use this</span>
+                <span className="select-label">Select</span>
               </button>
             ))}
           </div>
@@ -603,7 +600,7 @@ export default function App(): JSX.Element {
           <div className="results-heading">
             <CoverImage src={data.seed_novel.cover_url} alt="" variant="seed" />
             <div className="results-heading-copy">
-              <span className="eyebrow">Based on your seed novel</span>
+              <span className="eyebrow">Based on your starting novel</span>
               <h2>
                 <a href={data.seed_novel.novelupdates_url} target="_blank" rel="noopener noreferrer">
                   {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}<ExternalLink size={15} aria-hidden="true" />
@@ -638,16 +635,17 @@ export default function App(): JSX.Element {
                         <button type="button" onClick={() => openNovelDetail(rec)}>
                           {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
                         </button>
+                        <Tooltip content="Open this title on Novel Updates">
                         <a
                           className="card-external-link"
                           href={rec.novelupdates_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Open ${rec.title} on Novel Updates`}
-                          title="Open on Novel Updates"
                         >
                           <ExternalLink size={14} aria-hidden="true" />
                         </a>
+                        </Tooltip>
                       </h3>
                       <div className="novel-author">{rec.author
                         ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
@@ -694,7 +692,7 @@ export default function App(): JSX.Element {
                       imported_title: rec.title,
                       status: profileEntries.get(rec.target_id)?.status || 'reading',
                       source_file: 'recommendation'
-                    })}><Sparkles size={14} aria-hidden="true" /> Use as seed</button>
+                    })}><Sparkles size={14} aria-hidden="true" /> More like this</button>
                     <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'} onClick={() => setNovelFeedback(rec, 'love')}><Heart size={14} aria-hidden="true" /> Love</button>
                     <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'read' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'read'} onClick={() => setNovelFeedback(rec, 'read')}><BookOpen size={14} aria-hidden="true" /> Read</button>
                     <button className="btn-feedback" onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={14} aria-hidden="true" /> Not for me</button>
@@ -825,7 +823,7 @@ function NovelDetailDialog({
               )}
               {evidence.length > 0 && (
                 <section className="detail-section">
-                  <h3>Why it matched your seed</h3>
+                  <h3>Why it matched your starting novel</h3>
                   <ul className="evidence-list detail-evidence">
                     {evidence.map((item, index) => (
                       <li key={index} className="evidence-item">
