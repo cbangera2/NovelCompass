@@ -10,7 +10,7 @@ The supplied HTML was inspected on July 25, 2026. It contains:
 
 - profile identity and profile statistics
 - 20 created-list summaries and their viewlist IDs
-- 456 unique novels from the currently rendered **Reading** tab
+- 443 unique novels from the currently rendered **Reading** table
 - per-row reading progress and optional user rating
 
 It does not contain:
@@ -188,7 +188,7 @@ artifact or must omit the badge.
 Test:
 
 - each saved category independently and as a multi-file merge
-- the supplied file importing exactly 456 unique Reading slugs
+- the supplied file importing exactly 443 unique Reading slugs
 - truncated titles, Unicode/mojibake, duplicate slugs, and missing ratings
 - wrong page types, unsupported markup, oversized files, and hostile HTML
 - no script execution, remote requests, raw-file persistence, or HTML rendering
@@ -324,7 +324,7 @@ export interface LocalUserProfile {
 │  [ 📂 Drag & Drop Profile HTML File (e.g. cbboss_profile.html) ]        │
 │                                                                         │
 │  ✅ Loaded Profile: cbboss (2,915 List Followers)                       │
-│  • 456 Reading List Novels Tagged (📖 Reading · ✅ Completed · 🚫 Dropped)│
+│  • 443 Reading titles imported · Completed and Planned not yet imported │
 │  • 20 Curated Lists Connected (Peak Hidden Gems, Peak Yanderes, etc.)   │
 │                                                                         │
 │  ⚡ Quick Seed Picker from Your List:                                   │
