@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, ExternalLink, Search, Star, Users, X } from 'lucide-react';
+import { BookOpen, ExternalLink, Search, Star, Users, X } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from './data';
 import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
 import './browse.css';
@@ -79,10 +79,6 @@ export default function BrowsePage(): JSX.Element {
 
   return (
     <main className="browse-shell">
-      <nav className="browse-nav">
-        <a href={import.meta.env.BASE_URL}><ArrowLeft size={16} /> Recommendations</a>
-        <a href={`${import.meta.env.BASE_URL}?view=profile`}>My library</a>
-      </nav>
       <header className="browse-hero">
         <p className="eyebrow">The complete catalog</p>
         <h1>Browse your next world.</h1>

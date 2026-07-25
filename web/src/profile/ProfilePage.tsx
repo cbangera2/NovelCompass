@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
+import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from '../data';
 import { DatasetManifest, NovelDetail } from '../types';
 import { ProfilePanel } from './ProfilePanel';
@@ -102,11 +102,6 @@ export default function ProfilePage(): JSX.Element {
 
   return (
     <div className="profile-page">
-      <nav className="profile-page-nav">
-        <a href={appUrl()}><ArrowLeft size={16} /> Back to discovery</a>
-        <span><ShieldCheck size={15} /> Private local profile</span>
-      </nav>
-
       <header className="profile-page-hero">
         <div>
           <span className="eyebrow">Your reading world</span>

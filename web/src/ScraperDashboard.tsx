@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Database, FileUp, Globe2, Pause, Play, Radar, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Database, FileUp, Globe2, Pause, Play, Radar, RefreshCw } from 'lucide-react';
 import './scraper-dashboard.css';
 
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
@@ -112,7 +112,6 @@ export default function ScraperDashboard() {
 
   return (
     <main className="scraper-shell">
-      <nav><a href="/"><ArrowLeft size={16} /> Recommender</a></nav>
       <header className="scraper-hero">
         <span className="scraper-icon"><Radar /></span>
         <div>
