@@ -230,7 +230,7 @@ export default function NovelPage(): JSX.Element {
       </section>
       <section id="relationship" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>03</span><div><h2>Relationships</h2><p>Recommendation evidence and related directions to explore.</p></div></header>
-        <RelationshipPanel relationship={relationship} origin={origin} current={detail} />
+        {origin && <RelationshipPanel relationship={relationship} origin={origin} current={detail} />}
         {related.length > 0 && <section className="novel-related">
           <div className="section-heading"><div><span>Continue exploring</span><h2>Related novels</h2></div><a href={`${import.meta.env.BASE_URL}?seed=${novelId}`}>See full recommendations <Search size={15} /></a></div>
           <p className="related-definition">Ranked from the current recommendation candidate pool. Percent match is normalized within this seed’s result set; signal ranks show which evidence channels surfaced each title.</p>
@@ -243,6 +243,7 @@ export default function NovelPage(): JSX.Element {
               </span>
             </a>)}</div>
         </section>}
+        {!origin && <RelationshipPanel relationship={relationship} origin={origin} current={detail} />}
       </section>
     </div>
   </main>;
