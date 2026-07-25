@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 import sqlite3
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, Query, HTTPException
@@ -15,6 +16,11 @@ from src.engine.rrf_ranker import (
     apply_hidden_gem_boost,
 )
 from src.engine.explainer import EvidenceExplainer
+from src.engine.ranking_contract import (
+    ALGORITHM_VERSION,
+    SCHEMA_VERSION,
+    calculate_match_percent,
+)
 from src.scraper.seed_loader import seed_database_from_dataset
 
 app = FastAPI(title="Novel Updates Recommender API", version="1.0.0")
@@ -56,6 +62,36 @@ def parse_associated_names(value: Optional[str]) -> List[str]:
     ]
 
 
+def get_dataset_version(conn: sqlite3.Connection) -> str:
+    """Return a stable content version, with an explicit build override.
+
+    Static builds can set ``NOVEL_DATASET_VERSION`` so their manifest and the
+    API advertise the same snapshot identifier. The fallback fingerprint is
+    deterministic for the current catalog and relationship-table dimensions.
+    """
+    override = os.getenv("NOVEL_DATASET_VERSION", "").strip()
+    if override:
+        return override
+
+    novel_stats = conn.execute(
+        "SELECT COUNT(*), COALESCE(MAX(updated_at), ''), COALESCE(MAX(id), 0) FROM novels"
+    ).fetchone()
+    dimensions = [str(value) for value in novel_stats]
+    for table in (
+        "tags",
+        "novel_tags",
+        "genres",
+        "novel_genres",
+        "direct_recs",
+        "related_series",
+        "rec_lists",
+        "rec_list_items",
+    ):
+        dimensions.append(str(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]))
+    digest = hashlib.sha256("|".join(dimensions).encode("utf-8")).hexdigest()[:12]
+    return f"db-{digest}"
+
+
 @app.on_event("startup")
 def bootstrap_catalog():
     conn = get_db()
@@ -72,7 +108,13 @@ def health():
     conn = get_db()
     try:
         novel_count = conn.execute("SELECT COUNT(*) FROM novels").fetchone()[0]
-        return {"status": "ok" if novel_count else "empty", "novel_count": novel_count}
+        return {
+            "status": "ok" if novel_count else "empty",
+            "schema_version": SCHEMA_VERSION,
+            "algorithm_version": ALGORITHM_VERSION,
+            "dataset_version": get_dataset_version(conn),
+            "novel_count": novel_count,
+        }
     finally:
         conn.close()
 
@@ -308,11 +350,11 @@ def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
         channel_weights=channel_weights or None,
     )
     effective_weights = channel_weights or DEFAULT_CHANNEL_WEIGHTS
-    theoretical_max = sum(
-        effective_weights.get(channel_name, 1.0) / 61
+    active_channels = [
+        channel_name
         for channel_name, candidates in filtered_channels.items()
         if candidates
-    )
+    ]
 
     # Apply Hidden Gem Boost if enabled
     final_scores = {}
@@ -344,10 +386,10 @@ def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
 
         exp = explainer.explain_recommendation(seed_id, nid, score, ch_ranks)
         unboosted_score = rrf_scores.get(nid, 0.0)
-        exp["match_score_percent"] = round(
-            max(0.0, min(100.0, (unboosted_score / theoretical_max) * 100))
-            if theoretical_max
-            else 0.0
+        exp["match_score_percent"] = calculate_match_percent(
+            unboosted_score,
+            active_channels,
+            effective_weights,
         )
         recommendations.append(exp)
 
