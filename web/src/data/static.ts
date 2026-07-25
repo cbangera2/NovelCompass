@@ -30,6 +30,8 @@ type CatalogFile = {
   aliases?: Array<[number, string[]]>;
   languages?: string[];
   statuses?: string[];
+  genres?: string[];
+  tags?: string[];
 };
 
 type FacetsFile = {
@@ -60,6 +62,7 @@ type RecommendationPool = {
 };
 
 const SUPPORTED_SCHEMA = 1;
+const SUPPORTED_ALGORITHM = 1;
 const DEFAULT_CHANNELS = ['tag', 'direct_rec', 'rec_list', 'structural', 'vector'];
 const DEFAULT_WEIGHTS: Record<string, number> = {
   tag: 0.8,
@@ -92,6 +95,8 @@ export class StaticDataSource implements RecommendationDataSource {
   private aliases = new Map<number, string[]>();
   private languages: string[] = [];
   private statuses: string[] = [];
+  private genres: string[] = [];
+  private tags: string[] = [];
 
   constructor(private readonly baseUrl = `${import.meta.env.BASE_URL}data`) {}
 
@@ -102,6 +107,14 @@ export class StaticDataSource implements RecommendationDataSource {
           if (manifest.schema_version !== SUPPORTED_SCHEMA) {
             throw new DataSourceError(
               `Static dataset schema ${manifest.schema_version} is unsupported (expected ${SUPPORTED_SCHEMA}).`
+            );
+          }
+          if (
+            manifest.algorithm_version != null &&
+            manifest.algorithm_version !== SUPPORTED_ALGORITHM
+          ) {
+            throw new DataSourceError(
+              `Static algorithm ${manifest.algorithm_version} is unsupported (expected ${SUPPORTED_ALGORITHM}).`
             );
           }
           return manifest;
@@ -119,6 +132,8 @@ export class StaticDataSource implements RecommendationDataSource {
         const at = (row: unknown[], field: string): any => row[indexes.get(field) ?? -1];
         this.languages = catalog.languages || [];
         this.statuses = catalog.statuses || [];
+        this.genres = catalog.genres || [];
+        this.tags = catalog.tags || [];
         for (const row of catalog.rows) {
           const id = Number(at(row, 'id'));
           const languageValue = at(row, 'language') ?? this.languages[Number(at(row, 'language_id'))] ?? '';
@@ -180,11 +195,10 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async getOptions(): Promise<FilterOptions> {
-    const facets = await this.loadFacets();
     await this.loadCatalog();
     return {
-      genres: facets.genres || [],
-      tags: facets.tags || [],
+      genres: this.genres,
+      tags: this.tags,
       languages: this.languages.filter(Boolean)
     };
   }
@@ -193,12 +207,11 @@ export class StaticDataSource implements RecommendationDataSource {
     await this.loadCatalog();
     const card = this.cards.get(id);
     if (!card) throw new DataSourceError(`Novel ${id} is not in this static snapshot.`);
-    const [detail, facets] = await Promise.all([
-      jsonFetch<any>(joinUrl(this.baseUrl, `details/${bucketForNovel(id)}/${id}.json`)),
-      this.loadFacets()
-    ]);
+    const detail = await jsonFetch<any>(
+      joinUrl(this.baseUrl, `details/${bucketForNovel(id)}/${id}.json`)
+    );
     const genreIds: number[] = detail.genre_ids || card.genre_ids || [];
-    const tagIds: number[] = detail.tag_ids || facets.novels?.[String(id)]?.t || [];
+    const tagIds: number[] = detail.tag_ids || [];
     return {
       id,
       title: card.title,
@@ -216,8 +229,8 @@ export class StaticDataSource implements RecommendationDataSource {
       status_trans: card.status_trans,
       year: card.year,
       cover_url: card.cover_url,
-      genres: genreIds.map((genreId) => facets.genres?.[genreId]).filter(Boolean) as string[],
-      tags: tagIds.map((tagId) => facets.tags?.[tagId]).filter(Boolean) as string[],
+      genres: genreIds.map((genreId) => this.genres[genreId]).filter(Boolean),
+      tags: tagIds.map((tagId) => this.tags[tagId]).filter(Boolean),
       direct_recommendation_count: Number(detail.direct_recommendation_count || 0),
       related_series_count: Number(detail.related_series_count || 0),
       recommendation_list_count: Number(detail.recommendation_list_count || 0)
@@ -232,19 +245,20 @@ export class StaticDataSource implements RecommendationDataSource {
     const pool = await jsonFetch<RecommendationPool>(
       joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
     );
-    // Options initialization normally warms this request. It is also required
-    // for turning compact genre/tag IDs into filters and readable evidence.
-    const facets = await this.loadFacets();
-    const genreNames = facets.genres || [];
-    const tagNames = facets.tags || [];
+    const needsTagTraits = Boolean(
+      request.exclude_harem || request.exclude_bl || request.exclude_yuri ||
+      request.include_tags?.length || request.exclude_tags?.length
+    );
+    const facets = needsTagTraits ? await this.loadFacets() : undefined;
+    const genreNames = this.genres;
+    const tagNames = this.tags;
     const channels = pool.channels || DEFAULT_CHANNELS;
     const weights = { ...DEFAULT_WEIGHTS, ...(request.channel_weights || {}) };
-    const maximum = channels.reduce((sum, channel) => sum + Math.max(0, weights[channel] || 0) / 61, 0);
 
-    const results = pool.candidates.flatMap((candidate): Array<Recommendation & { adjusted: number }> => {
+    const scored = pool.candidates.flatMap((candidate): Array<Recommendation & { adjusted: number }> => {
       const card = this.cards.get(candidate.id);
       if (!card) return [];
-      const novelFacet = facets.novels?.[String(candidate.id)];
+      const novelFacet = facets?.novels?.[String(candidate.id)];
       const genreIds = card.genre_ids.length ? card.genre_ids : novelFacet?.g || [];
       const genres = genreIds.map((id) => genreNames[id]).filter(Boolean).map(normalize);
       const tags = (novelFacet?.t || []).map((id) => tagNames[id]).filter(Boolean).map(normalize);
@@ -257,7 +271,8 @@ export class StaticDataSource implements RecommendationDataSource {
       const score = Object.entries(ranks).reduce((sum, [channel, rank]) =>
         sum + Math.max(0, weights[channel] || 0) / (60 + rank), 0);
       const hiddenGemMultiplier = request.hidden_gem_mode
-        ? 1 + Math.max(0, request.hidden_gem_strength ?? 0.3) / Math.max(1, Math.log10(card.reading_list_count + 10))
+        ? 1 + Math.max(0, request.hidden_gem_strength ?? 0.3) *
+          Math.log10(10010 / (Math.max(0, card.reading_list_count) + 10))
         : 1;
       const sharedTags = candidate.shared_tags ||
         (candidate.shared_tag_ids || []).map((id) => tagNames[id]).filter(Boolean) as string[];
@@ -275,13 +290,27 @@ export class StaticDataSource implements RecommendationDataSource {
         status_trans: card.status_trans,
         chapters_trans: card.chapters_trans,
         rrf_score: score,
-        match_score_percent: maximum > 0 ? Math.max(0, Math.min(100, Math.round(100 * score / maximum))) : 0,
+        match_score_percent: 0,
         channel_ranks: ranks,
         shared_tags: sharedTags,
         evidence_bullets: candidate.evidence_bullets || buildEvidence(candidate, sharedTags),
         adjusted: score * hiddenGemMultiplier
       }];
-    }).sort((a, b) => b.adjusted - a.adjusted || a.target_id - b.target_id);
+    });
+
+    const activeChannels = new Set(scored.flatMap((candidate) => Object.keys(candidate.channel_ranks)));
+    const maximum = [...activeChannels].reduce(
+      (sum, channel) => sum + Math.max(0, weights[channel] || 0) / 61,
+      0
+    );
+    const results = scored
+      .map((candidate) => ({
+        ...candidate,
+        match_score_percent: maximum > 0
+          ? Math.max(0, Math.min(100, Math.round(100 * candidate.rrf_score / maximum)))
+          : 0
+      }))
+      .sort((a, b) => b.adjusted - a.adjusted || a.target_id - b.target_id);
 
     const recommendations = results.slice(0, request.limit || 30).map(({ adjusted: _, ...result }) => result);
     const seed: SeedNovel = {

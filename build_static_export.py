@@ -224,6 +224,7 @@ def export_static_dataset(
         _atomic_json(output / "catalog.json", {
             "fields": list(CATALOG_FIELDS), "rows": rows, "aliases": aliases,
             "languages": languages, "statuses": statuses,
+            "genres": genres, "tags": tags,
         })
         _atomic_json(output / "facets.json", {
             "genres": genres, "tags": tags,

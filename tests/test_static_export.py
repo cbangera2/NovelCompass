@@ -56,6 +56,8 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(catalog["rows"][0][1], "one")
             self.assertEqual(catalog["rows"][0][-1], [0])
             self.assertEqual(catalog["aliases"], [[1, ["Uno"]]])
+            self.assertEqual(catalog["genres"], ["Fantasy"])
+            self.assertEqual(catalog["tags"], ["Academy"])
             pool = json.loads((root / "out/recs/01/1.json").read_text())
             self.assertEqual(pool["candidates"][0]["r"], [1, 1, None, None, None])
             self.assertEqual(pool["candidates"][0]["shared_tag_ids"], [0])

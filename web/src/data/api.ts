@@ -8,6 +8,9 @@ import {
 } from '../types';
 import { DataSourceError, RecommendationDataSource } from './source';
 
+const SUPPORTED_SCHEMA = 1;
+const SUPPORTED_ALGORITHM = 1;
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
@@ -22,13 +25,24 @@ export class ApiDataSource implements RecommendationDataSource {
 
   async getManifest(): Promise<DatasetManifest> {
     const health = await apiFetch<any>('/api/health');
-    return {
+    const manifest = {
       schema_version: health.schema_version ?? 1,
       algorithm_version: health.algorithm_version,
       dataset_version: health.dataset_version ?? 'live',
       generated_at: health.generated_at,
       novel_count: health.novel_count ?? 0
     };
+    if (manifest.schema_version !== SUPPORTED_SCHEMA) {
+      throw new DataSourceError(
+        `API schema ${manifest.schema_version} is unsupported (expected ${SUPPORTED_SCHEMA}).`
+      );
+    }
+    if (manifest.algorithm_version != null && manifest.algorithm_version !== SUPPORTED_ALGORITHM) {
+      throw new DataSourceError(
+        `API algorithm ${manifest.algorithm_version} is unsupported (expected ${SUPPORTED_ALGORITHM}).`
+      );
+    }
+    return manifest;
   }
 
   async searchNovels(query: string, limit: number, signal?: AbortSignal): Promise<NovelSearchResult[]> {
