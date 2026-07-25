@@ -352,6 +352,7 @@ def export_static_dataset(
     candidate_limit: int = 200,
     catalog_limit: int | None = None,
     reuse_recommendations: bool = False,
+    compact_candidate_limit: int = 50,
 ) -> dict[str, Any]:
     conn = get_connection(db_path)
     try:
@@ -516,7 +517,7 @@ def export_static_dataset(
         compact_buckets: dict[str, dict[str, list[list[Any]]]] = defaultdict(dict)
         recommendable = 0
         for index, novel_id in enumerate(sorted(catalog_ids), 1):
-            compact_pool = compact_index.pool(novel_id, candidate_limit)
+            compact_pool = compact_index.pool(novel_id, compact_candidate_limit)
             compact_buckets[bucket_for_id(novel_id)][str(novel_id)] = compact_pool
             recommendable += bool(compact_pool)
             if index % 1000 == 0:
@@ -555,7 +556,7 @@ def export_static_dataset(
             "rich_recommendable_seed_count": rich_recommendable,
             "recommendation_index_url": "recommendation-index/{bucket}.json",
             "recommendation_index_seed_count": len(catalog_ids),
-            "recommendation_index_candidate_limit": candidate_limit,
+            "recommendation_index_candidate_limit": compact_candidate_limit,
             "catalog_url": "catalog.json",
             "bootstrap_catalog_url": (
                 "bootstrap-catalog.json" if catalog_limit is not None else "catalog.json"
@@ -632,6 +633,12 @@ def main() -> None:
     parser.add_argument("--max-novels", type=int, help="Precompute only the N most popular seed pools")
     parser.add_argument("--candidate-limit", type=int, default=200)
     parser.add_argument(
+        "--compact-candidate-limit",
+        type=int,
+        default=50,
+        help="Candidates retained per title in the all-catalog compact fallback",
+    )
+    parser.add_argument(
         "--bootstrap-limit", "--catalog-limit", dest="catalog_limit", type=int,
         help=(
             "Put the N most-read titles in the fast bootstrap and bound detail/"
@@ -651,6 +658,7 @@ def main() -> None:
             args.output, args.max_novels, args.db, args.candidate_limit,
             args.catalog_limit,
             args.reuse_recommendations,
+            args.compact_candidate_limit,
         )
         print(json.dumps(manifest, indent=2))
 

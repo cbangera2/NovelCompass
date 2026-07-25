@@ -86,6 +86,7 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(manifest["novel_count"], 2)
             self.assertEqual(manifest["source_novel_count"], 2)
             self.assertEqual(manifest["snapshot_scope"], "complete_catalog")
+            self.assertEqual(manifest["recommendation_index_candidate_limit"], 50)
             options = json.loads((root / "out/options.json").read_text())
             self.assertEqual(options["genres"], ["Fantasy"])
             self.assertEqual(options["tags"], ["Academy"])
