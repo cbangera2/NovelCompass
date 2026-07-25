@@ -26,27 +26,33 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 export class ApiDataSource implements RecommendationDataSource {
   readonly mode = 'api' as const;
+  private manifestPromise?: Promise<DatasetManifest>;
+  private optionsPromise?: Promise<FilterOptions>;
 
   async getManifest(): Promise<DatasetManifest> {
-    const health = await apiFetch<any>('/api/health');
-    const manifest = {
-      schema_version: health.schema_version ?? 1,
-      algorithm_version: health.algorithm_version,
-      dataset_version: health.dataset_version ?? 'live',
-      generated_at: health.generated_at,
-      novel_count: health.novel_count ?? 0
-    };
-    if (manifest.schema_version !== SUPPORTED_SCHEMA) {
-      throw new DataSourceError(
-        `API schema ${manifest.schema_version} is unsupported (expected ${SUPPORTED_SCHEMA}).`
-      );
+    if (!this.manifestPromise) {
+      this.manifestPromise = apiFetch<any>('/api/health').then((health) => {
+        const manifest = {
+          schema_version: health.schema_version ?? 1,
+          algorithm_version: health.algorithm_version,
+          dataset_version: health.dataset_version ?? 'live',
+          generated_at: health.generated_at,
+          novel_count: health.novel_count ?? 0
+        };
+        if (manifest.schema_version !== SUPPORTED_SCHEMA) {
+          throw new DataSourceError(
+            `API schema ${manifest.schema_version} is unsupported (expected ${SUPPORTED_SCHEMA}).`
+          );
+        }
+        if (manifest.algorithm_version != null && manifest.algorithm_version !== SUPPORTED_ALGORITHM) {
+          throw new DataSourceError(
+            `API algorithm ${manifest.algorithm_version} is unsupported (expected ${SUPPORTED_ALGORITHM}).`
+          );
+        }
+        return manifest;
+      });
     }
-    if (manifest.algorithm_version != null && manifest.algorithm_version !== SUPPORTED_ALGORITHM) {
-      throw new DataSourceError(
-        `API algorithm ${manifest.algorithm_version} is unsupported (expected ${SUPPORTED_ALGORITHM}).`
-      );
-    }
-    return manifest;
+    return this.manifestPromise;
   }
 
   async searchNovels(query: string, limit: number, signal?: AbortSignal): Promise<NovelSearchResult[]> {
@@ -58,8 +64,11 @@ export class ApiDataSource implements RecommendationDataSource {
   }
 
   async getOptions(): Promise<FilterOptions> {
-    const options = await apiFetch<FilterOptions & { popular_tags?: string[] }>('/api/options');
-    return { ...options, tags: options.tags || options.popular_tags || [] };
+    if (!this.optionsPromise) {
+      this.optionsPromise = apiFetch<FilterOptions & { popular_tags?: string[] }>('/api/options')
+        .then((options) => ({ ...options, tags: options.tags || options.popular_tags || [] }));
+    }
+    return this.optionsPromise;
   }
 
   async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {

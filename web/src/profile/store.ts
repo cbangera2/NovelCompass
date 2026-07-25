@@ -4,6 +4,7 @@ const DB_NAME = 'novel-recommender-local-profile';
 const STORE = 'profiles';
 const KEY = 'active';
 export const LOCAL_PROFILE_CHANGED_EVENT = 'novel-recommender:local-profile-changed';
+let pendingProfileLoad: Promise<LocalUserProfile | null> | undefined;
 
 function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -28,7 +29,12 @@ async function transact<T>(mode: IDBTransactionMode, action: (store: IDBObjectSt
 }
 
 export async function loadLocalProfile(): Promise<LocalUserProfile | null> {
-  return (await transact('readonly', (store) => store.get(KEY))) || null;
+  if (!pendingProfileLoad) {
+    pendingProfileLoad = transact('readonly', (store) => store.get(KEY))
+      .then((profile) => profile || null)
+      .finally(() => { pendingProfileLoad = undefined; });
+  }
+  return pendingProfileLoad;
 }
 
 export async function saveLocalProfile(profile: LocalUserProfile): Promise<void> {

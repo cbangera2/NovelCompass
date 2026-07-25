@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import ScraperDashboard from './ScraperDashboard';
-import { ProfilePage } from './profile';
-import BrowsePage from './BrowsePage';
 import AppShell, { AppView } from './AppShell';
-import SettingsPage from './SettingsPage';
-import NovelPage from './NovelPage';
 import './index.css';
 import { loadNavigationPreferences } from './preferences';
+
+const BrowsePage = lazy(() => import('./BrowsePage'));
+const NovelPage = lazy(() => import('./NovelPage'));
+const ProfilePage = lazy(() => import('./profile/ProfilePage'));
+const ScraperDashboard = lazy(() => import('./ScraperDashboard'));
+const SettingsPage = lazy(() => import('./SettingsPage'));
 
 const locationParams = new URLSearchParams(window.location.search);
 const requestedView = locationParams.get('view');
@@ -20,6 +21,7 @@ const activeView: AppView = requestedView === 'discover' || requestedView === 's
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AppShell activeView={activeView}>
+      <Suspense fallback={<main className="route-loading" aria-busy="true"><span>Loading workspace…</span></main>}>
         {activeView === 'scraper'
           ? <ScraperDashboard />
           : activeView === 'browse'
@@ -31,6 +33,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
               : activeView === 'novel'
                 ? <NovelPage />
               : <App />}
+      </Suspense>
     </AppShell>
   </React.StrictMode>
 );

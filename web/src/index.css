@@ -59,6 +59,7 @@ body {
   font-family: var(--font-family);
   line-height: 1.45;
 }
+.route-loading { align-items:center; color:var(--muted); display:flex; justify-content:center; min-height:60vh; }
 
 button, input, select { font: inherit; }
 button, summary, select { -webkit-tap-highlight-color: transparent; }

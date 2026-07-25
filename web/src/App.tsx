@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, useMemo, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, FormEvent, useMemo, useRef } from 'react';
 import {
   BookOpen,
   Check,
@@ -26,14 +26,17 @@ import {
   DataMode,
   RecommendationDataSource
 } from './data';
-import { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile';
+import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile/types';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
-import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { novelPageUrl } from './novelLinks';
+
+const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
+  default: module.NovelInsightsPanel
+})));
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
@@ -132,12 +135,14 @@ export default function App(): JSX.Element {
     setError(null);
     createDataSource(dataMode)
       .then(async (source) => {
-        const [manifest, options] = await Promise.all([source.getManifest(), source.getOptions()]);
+        const manifest = await source.getManifest();
         if (cancelled) return;
         dataSourceRef.current = source;
         setDataSource(source);
         setDataset(manifest);
-        setGenres(options.genres || []);
+        source.getOptions()
+          .then((options) => { if (!cancelled) setGenres(options.genres || []); })
+          .catch(() => { /* Advanced facets can remain unavailable without blocking discovery. */ });
       })
       .catch((initializationError: any) => {
         if (!cancelled) setError(initializationError.message || 'Could not load a recommendation dataset.');
@@ -175,7 +180,7 @@ export default function App(): JSX.Element {
 
   const fetchRecommendations = async (
     novel: NovelSearchResult | null = selectedNovel,
-    requestedLimit = Math.min(24, maxResults),
+    requestedLimit = Math.min(8, maxResults),
     expanding = false
   ) => {
     const source = dataSourceRef.current;
@@ -1049,7 +1054,9 @@ function NovelDetailDialog({
                   <span><strong>{detail.related_series_count}</strong> related series</span>
                 </div>
               </section>
-              <NovelInsightsPanel novelId={detail.id} source={source} />
+              <Suspense fallback={<div className="detail-loading" aria-busy="true">Loading catalog context…</div>}>
+                <NovelInsightsPanel novelId={detail.id} source={source} />
+              </Suspense>
             </div>
           </>
         )}

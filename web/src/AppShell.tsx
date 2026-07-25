@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { BookMarked, BookOpen, Database, Settings, Sparkles, User } from 'lucide-react';
 import { configuredDataMode } from './data';
-import { LocalUserProfile } from './profile';
+import type { LocalUserProfile } from './profile/types';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
