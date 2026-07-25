@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent, useMemo, useRef } from 'react';
 import {
   BookOpen,
+  Check,
   ExternalLink,
   Heart,
   Search,
@@ -10,6 +11,7 @@ import {
   Users,
   X
 } from 'lucide-react';
+import { Menu } from '@base-ui/react/menu';
 import {
   DatasetManifest,
   RecommendResponse,
@@ -526,19 +528,35 @@ export default function App(): JSX.Element {
         {showSuggestions && suggestions.length > 0 && (
           <div className="suggestions" role="listbox" aria-label="Novel matches">
             {suggestions.map((novel) => (
-              <button
-                type="button"
-                className="suggestion"
-                key={novel.id}
-                onClick={() => chooseNovel(novel)}
-              >
-                <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
-                <span className="suggestion-copy">
-                  <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
-                  <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
-                </span>
-                <span className="select-label">Select</span>
-              </button>
+              <div className="suggestion-row" key={novel.id}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={selectedNovel?.id === novel.id}
+                  className="suggestion"
+                  onClick={() => chooseNovel(novel)}
+                >
+                  <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
+                  <span className="suggestion-copy">
+                    <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
+                    <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
+                  </span>
+                  <span className="select-label">Select</span>
+                </button>
+                <div className="suggestion-links">
+                  <Tooltip content="View details">
+                    <a href={novelPageUrl(novel.id)} aria-label={`View details for ${novel.title}`}>
+                      <BookOpen size={16} aria-hidden="true" />
+                    </a>
+                  </Tooltip>
+                  <Tooltip content="Open on Novel Updates">
+                    <a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer"
+                      aria-label={`Open ${novel.title} on Novel Updates`}>
+                      <ExternalLink size={16} aria-hidden="true" />
+                    </a>
+                  </Tooltip>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -680,11 +698,17 @@ export default function App(): JSX.Element {
             <CoverImage src={data.seed_novel.cover_url} alt="" variant="seed" />
             <div className="results-heading-copy">
               <span className="eyebrow">Based on your starting novel</span>
-              <h2>
-                <a href={data.seed_novel.novelupdates_url} target="_blank" rel="noopener noreferrer">
-                  {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}<ExternalLink size={15} aria-hidden="true" />
-                </a>
-              </h2>
+              <div className="seed-title-row">
+                <h2><a href={novelPageUrl(data.seed_novel.id)}>
+                  {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
+                </a></h2>
+                <Tooltip content="Open on Novel Updates">
+                  <a className="seed-external-link" href={data.seed_novel.novelupdates_url} target="_blank"
+                    rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on Novel Updates`}>
+                    <ExternalLink size={15} aria-hidden="true" />
+                  </a>
+                </Tooltip>
+              </div>
               <p><span>{data.count}</span> evidence-backed matches, ranked for fit</p>
             </div>
           </Card>
@@ -786,19 +810,34 @@ export default function App(): JSX.Element {
                       imported_title: rec.title,
                       status: profileEntries.get(rec.target_id)?.status || 'reading',
                       source_file: 'recommendation'
-                    })}><Sparkles size={14} aria-hidden="true" /> More like this</Button>
-                    <label className="card-reading-status">
-                      <span className="sr-only">Reading status for {rec.title}</span>
-                      <BookOpen size={15} aria-hidden="true" />
-                      <select value={profileEntries.get(rec.target_id)?.status || ''}
-                        aria-label={`Reading status for ${rec.title}`}
-                        onChange={(event) => setReadingStatus(rec, event.target.value as ReadingStatus | '')}>
-                        <option value="">Add to library</option>
-                        <option value="reading">Reading</option>
-                        <option value="completed">Completed</option>
-                        <option value="plan_to_read">Plan to read</option>
-                      </select>
-                    </label>
+                    })}><Sparkles size={14} aria-hidden="true" /> Similar</Button>
+                    <Menu.Root>
+                      <Tooltip content="Set reading status">
+                        <Menu.Trigger className="card-icon-action"
+                          aria-label={`Set reading status for ${rec.title}`}>
+                          <BookOpen size={16} aria-hidden="true" />
+                        </Menu.Trigger>
+                      </Tooltip>
+                      <Menu.Portal>
+                        <Menu.Positioner sideOffset={6} align="end" className="reading-menu-positioner">
+                          <Menu.Popup className="reading-menu">
+                            {([
+                              ['', 'Add'],
+                              ['reading', 'Reading'],
+                              ['completed', 'Completed'],
+                              ['plan_to_read', 'Plan']
+                            ] as const).map(([status, label]) => (
+                              <Menu.Item key={status || 'add'} className="reading-menu-item"
+                                onClick={() => setReadingStatus(rec, status)}>
+                                <span>{label}</span>
+                                {(profileEntries.get(rec.target_id)?.status || '') === status &&
+                                  <Check size={14} aria-hidden="true" />}
+                              </Menu.Item>
+                            ))}
+                          </Menu.Popup>
+                        </Menu.Positioner>
+                      </Menu.Portal>
+                    </Menu.Root>
                     <div className="card-preference-actions">
                       <Tooltip content="Love this recommendation">
                         <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`}
