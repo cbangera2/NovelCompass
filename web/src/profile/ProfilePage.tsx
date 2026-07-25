@@ -6,6 +6,7 @@ import { ProfilePanel } from './ProfilePanel';
 import { loadLocalProfile } from './store';
 import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
+import { novelPageUrl } from '../novelLinks';
 import { browseFacetUrl } from '../metadataLinks';
 const ProfileAnalytics = lazy(() => import('./ProfileAnalytics'));
 
@@ -30,7 +31,7 @@ export default function ProfilePage(): JSX.Element {
   const [visibleLibraryCount, setVisibleLibraryCount] = useState(60);
   const [libraryCatalog, setLibraryCatalog] = useState<Map<string, NovelSearchResult>>(new Map());
   const [activeDetail, setActiveDetail] = useState<NovelDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [taste, setTaste] = useState<{
     details: NovelDetail[];
@@ -137,17 +138,7 @@ export default function ProfilePage(): JSX.Element {
   };
 
   const openDetailById = async (novelId: number) => {
-    if (!source) return;
-    setDetailLoading(true);
-    setDetailError('');
-    setActiveDetail(null);
-    try {
-      setActiveDetail(await source.getNovel(novelId));
-    } catch (error: any) {
-      setDetailError(error.message || 'Details are unavailable in this dataset.');
-    } finally {
-      setDetailLoading(false);
-    }
+    window.location.href = novelPageUrl(novelId);
   };
 
   useEffect(() => {

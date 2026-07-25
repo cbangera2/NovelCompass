@@ -30,6 +30,7 @@ import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
 import { Button, Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
+import { novelPageUrl } from './novelLinks';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -668,7 +669,7 @@ export default function App(): JSX.Element {
                 key={rec.target_id || index}
                 className="novel-card"
                 onClick={(event) => {
-                  if (!(event.target as HTMLElement).closest('button, a')) openNovelDetail(rec);
+                  if (!(event.target as HTMLElement).closest('button, a')) window.location.href = novelPageUrl(rec.target_id, data.seed_novel.id);
                 }}
               >
                 <div className="card-content">
@@ -681,9 +682,9 @@ export default function App(): JSX.Element {
                     <div className="card-summary">
                       <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
                       <h3 className="novel-title">
-                        <button type="button" onClick={() => openNovelDetail(rec)}>
+                        <a href={novelPageUrl(rec.target_id, data.seed_novel.id)}>
                           {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
-                        </button>
+                        </a>
                         <Tooltip content="Open this title on Novel Updates">
                         <a
                           className="card-external-link"
@@ -735,6 +736,7 @@ export default function App(): JSX.Element {
                   </ul>
 
                   <div className="feedback-actions">
+                    <button className="btn-feedback" onClick={() => openNovelDetail(rec)}><BookOpen size={14} aria-hidden="true" /> Quick look</button>
                     <button className="btn-feedback" onClick={() => useProfileEntryAsSeed({
                       novel_id: rec.target_id,
                       slug: rec.slug,

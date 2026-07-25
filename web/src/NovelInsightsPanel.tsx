@@ -3,6 +3,7 @@ import { BarChart3, BookOpen } from 'lucide-react';
 import { RecommendationDataSource } from './data';
 import { NovelInsights } from './types';
 import { browseFacetUrl } from './metadataLinks';
+import { novelPageUrl } from './novelLinks';
 import './novel-insights.css';
 
 const LABELS = { rating: 'Rating', rating_votes: 'Rating votes', readers: 'Readers' };
@@ -35,7 +36,7 @@ export function NovelInsightsPanel({ novelId, source, onPeer }: {
     {insights.peers.length > 0 && <div className="insight-peers"><h4>Closest catalog peers</h4><p>{insights.cohort_definition}</p><div>{insights.peers.map((peer) =>
       <article key={peer.id}>{peer.cover_url ? <img src={peer.cover_url} alt="" loading="lazy" /> : <BookOpen />}
         {onPeer ? <button onClick={() => onPeer(peer.id)}>{peer.title}</button>
-          : <a href={`${import.meta.env.BASE_URL}?seed=${peer.id}`}>{peer.title}</a>}
+          : <a href={novelPageUrl(peer.id, novelId)}>{peer.title}</a>}
         <small>{peer.shared_tag_count} shared tags · {peer.shared_genre_count} shared genres</small></article>
     )}</div></div>}
     {!insights.capabilities.relationships && <p className="insights-note">Detailed relationship-edge analytics are unavailable; no relationship strength is inferred.</p>}

@@ -6,10 +6,11 @@ import { ProfilePage } from './profile';
 import BrowsePage from './BrowsePage';
 import AppShell, { AppView } from './AppShell';
 import SettingsPage from './SettingsPage';
+import NovelPage from './NovelPage';
 import './index.css';
 
 const requestedView = new URLSearchParams(window.location.search).get('view');
-const activeView: AppView = requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings'
+const activeView: AppView = requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings' || requestedView === 'novel'
   ? requestedView
   : 'discover';
 
@@ -23,7 +24,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
             : activeView === 'profile'
               ? <ProfilePage />
               : activeView === 'settings'
-                ? <SettingsPage />
+              ? <SettingsPage />
+              : activeView === 'novel'
+                ? <NovelPage />
               : <App />}
     </AppShell>
   </React.StrictMode>

@@ -6,7 +6,7 @@ import { loadLocalProfile } from './profile/store';
 import { Tooltip } from './ui';
 import './app-shell.css';
 
-export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper';
+export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
 
 const NAV_ITEMS = [
   { view: 'discover' as const, label: 'Discover', note: 'Find related novels', icon: Sparkles },

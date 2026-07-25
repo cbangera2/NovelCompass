@@ -7,6 +7,7 @@ import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { Button, FieldGroup, Select } from './ui';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
+import { novelPageUrl } from './novelLinks';
 
 const PAGE_SIZE = 24;
 
@@ -216,7 +217,7 @@ export default function BrowsePage(): JSX.Element {
       <div className="browse-heading"><div><BookOpen /><h2>Novels</h2></div><span>{hasLoaded ? `${total.toLocaleString()} matches` : 'Catalog status unavailable'}</span></div>
       {error && <p className="browse-error">{error}</p>}
       <section className="browse-grid">
-        {items.map((novel) => <BrowseCard key={novel.id} novel={novel} onOpen={() => openDetail(novel.id)} />)}
+        {items.map((novel) => <BrowseCard key={novel.id} novel={novel} />)}
       </section>
       {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
       <div ref={sentinelRef} className="browse-sentinel" aria-hidden="true" />
@@ -257,20 +258,20 @@ export default function BrowsePage(): JSX.Element {
   );
 }
 
-function BrowseCard({ novel, onOpen }: { novel: BrowseNovel; onOpen: () => void }) {
+function BrowseCard({ novel }: { novel: BrowseNovel }) {
   const { settings } = useDisplaySettings();
   const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
   return <article className="browse-card">
-    <button className="browse-cover" onClick={onOpen}>
+    <a className="browse-cover" href={novelPageUrl(novel.id)}>
       {novel.cover_url ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
-    </button>
+    </a>
     <div>
-      <button className="browse-title" onClick={onOpen}>{title}</button>
+      <a className="browse-title" href={novelPageUrl(novel.id)}>{title}</a>
       <p>{novel.author ? <a href={browseFacetUrl('author', novel.author)}>{novel.author}</a> : 'Unknown author'}</p>
       <div className="browse-meta"><span><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></span>
         <span><Users size={14} /> {novel.reading_list_count.toLocaleString()}</span></div>
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
-      <footer><button onClick={onOpen}>Details</button><a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`${title} on Novel Updates`}><ExternalLink size={15} /></a></footer>
+      <footer><a href={novelPageUrl(novel.id)}>View novel</a><a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`${title} on Novel Updates`}><ExternalLink size={15} /></a></footer>
     </div>
   </article>;
 }
