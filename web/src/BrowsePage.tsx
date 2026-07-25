@@ -126,7 +126,7 @@ export default function BrowsePage(): JSX.Element {
           loadRequestedRef.current = false;
         }
       }
-    }, query ? 180 : 0);
+    }, page === 1 ? 240 : 0);
     return () => window.clearTimeout(timer);
   }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, libraryIds, page, retryToken]);
 

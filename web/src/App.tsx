@@ -59,6 +59,7 @@ export default function App(): JSX.Element {
   const searchSectionRef = useRef<HTMLElement>(null);
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
   const recommendationRequestRef = useRef(0);
+  const autoRefreshReadyRef = useRef(false);
   const detailRequestRef = useRef(0);
   const dataSourceRef = useRef<RecommendationDataSource | null>(null);
   const [dataSource, setDataSource] = useState<RecommendationDataSource | null>(null);
@@ -124,6 +125,7 @@ export default function App(): JSX.Element {
   useEffect(() => {
     let cancelled = false;
     dataSourceRef.current = null;
+    autoRefreshReadyRef.current = false;
     setDataSource(null);
     setDataset(null);
     setData(null);
@@ -252,13 +254,28 @@ export default function App(): JSX.Element {
           chooseNovel(seed);
           return fetchRecommendations(seed);
         })
-        .catch(() => fetchRecommendations(DEFAULT_NOVEL));
+        .catch(() => fetchRecommendations(DEFAULT_NOVEL))
+        .finally(() => { autoRefreshReadyRef.current = true; });
     } else {
-      fetchRecommendations(DEFAULT_NOVEL);
+      fetchRecommendations(DEFAULT_NOVEL).finally(() => { autoRefreshReadyRef.current = true; });
     }
     // Load the initial recommendation set once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataSource]);
+
+  useEffect(() => {
+    if (!autoRefreshReadyRef.current || !selectedNovel || !dataSource) return;
+    const timer = window.setTimeout(() => {
+      setAvailableExhausted(false);
+      fetchRecommendations(selectedNovel, Math.min(24, maxResults));
+    }, 280);
+    return () => window.clearTimeout(timer);
+    // The selected seed is fetched explicitly when chosen. This effect only
+    // reacts to recommendation controls and coalesces rapid text/slider edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataSource, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
+    minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
+    excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
 
   const chooseNovel = (novel: NovelSearchResult) => {
     setSelectedNovel(novel);
