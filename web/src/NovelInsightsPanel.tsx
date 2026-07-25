@@ -71,11 +71,6 @@ export function NovelInsightsPanel({
           </Card>
         ))}
       </div>
-      {currentNovel && insights.peers.length > 0 && (
-        <Suspense fallback={<p className="insights-loading">Loading cohort chart…</p>}>
-          <NovelCohortChart novel={currentNovel} insights={insights} />
-        </Suspense>
-      )}
       {insights.cohorts.length > 0 && (
         <Card className="insight-cohorts">
           <h4>Comparable readership</h4>
@@ -141,6 +136,11 @@ export function NovelInsightsPanel({
             ))}
           </div>
         </div>
+      )}
+      {currentNovel && insights.peers.length > 0 && (
+        <Suspense fallback={<p className="insights-loading">Loading cohort chart…</p>}>
+          <NovelCohortChart novel={currentNovel} insights={insights} />
+        </Suspense>
       )}
       {!insights.capabilities.relationships && (
         <p className="insights-note">
