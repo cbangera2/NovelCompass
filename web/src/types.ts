@@ -60,6 +60,10 @@ export interface DatasetManifest {
   bootstrap_novel_count?: number;
   detail_novel_count?: number;
   recommendation_seed_count?: number;
+  rich_recommendation_seed_count?: number;
+  recommendation_index_seed_count?: number;
+  recommendation_index_candidate_limit?: number;
+  recommendation_index_url?: string;
   snapshot_scope?: string;
   recommendable_seed_count?: number;
   catalog_url?: string;

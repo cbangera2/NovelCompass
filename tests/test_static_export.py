@@ -74,8 +74,13 @@ class StaticExportTest(unittest.TestCase):
                 pool["candidates"][0]["lists"],
                 [{"id": 10, "title": "Thoughtful progression fantasy"}],
             )
-            empty = json.loads((root / "out/recs/01/257.json").read_text())
-            self.assertEqual(empty["reason"], "not_precomputed")
+            self.assertFalse((root / "out/recs/01/257.json").exists())
+            compact = json.loads(
+                (root / "out/recommendation-index/01.json").read_text()
+            )
+            self.assertEqual(compact["channels"][0], "tag")
+            self.assertEqual(compact["pools"]["257"][0][0], 1)
+            self.assertEqual(compact["pools"]["257"][0][2], [0])
             detail = json.loads((root / "out/details/01/1.json").read_text())
             self.assertEqual(detail["novelupdates_url"], "https://www.novelupdates.com/?p=1")
             self.assertEqual(manifest["novel_count"], 2)
@@ -102,6 +107,11 @@ class StaticExportTest(unittest.TestCase):
             self.assertTrue((root / "layered/details/01/1.json").is_file())
             self.assertFalse((root / "layered/details/01/257.json").exists())
             self.assertFalse((root / "layered/recs/01/257.json").exists())
+            layered_compact = json.loads(
+                (root / "layered/recommendation-index/01.json").read_text()
+            )
+            self.assertEqual(set(layered_compact["pools"]), {"1", "257"})
+            self.assertEqual(layered["recommendation_index_seed_count"], 2)
 
 
 if __name__ == "__main__":

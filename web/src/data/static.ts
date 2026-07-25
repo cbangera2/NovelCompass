@@ -72,6 +72,14 @@ type RecommendationPool = {
   reason?: string;
 };
 
+type CompactCandidate = [number, Array<number | null>, number[]?];
+
+type CompactRecommendationShard = {
+  algorithm_version?: number;
+  channels?: string[];
+  pools?: Record<string, CompactCandidate[]>;
+};
+
 const SUPPORTED_SCHEMA = 1;
 const SUPPORTED_ALGORITHM = 1;
 const DEFAULT_CHANNELS = ['tag', 'direct_rec', 'rec_list', 'structural', 'vector'];
@@ -103,6 +111,7 @@ export class StaticDataSource implements RecommendationDataSource {
   private bootstrapPromise?: Promise<void>;
   private catalogPromise?: Promise<void>;
   private facetsPromise?: Promise<FacetsFile>;
+  private compactRecommendationPromises = new Map<string, Promise<CompactRecommendationShard>>();
   private cards = new Map<number, CatalogCard>();
   private aliases = new Map<number, string[]>();
   private languages: string[] = [];
@@ -209,6 +218,34 @@ export class StaticDataSource implements RecommendationDataSource {
       );
     }
     return this.facetsPromise;
+  }
+
+  private async loadCompactRecommendationPool(
+    seedId: number,
+    manifest: DatasetManifest
+  ): Promise<RecommendationPool | undefined> {
+    if (!manifest.recommendation_index_url) return undefined;
+    const bucket = bucketForNovel(seedId);
+    let promise = this.compactRecommendationPromises.get(bucket);
+    if (!promise) {
+      const path = manifest.recommendation_index_url.replace('{bucket}', bucket);
+      promise = jsonFetch<CompactRecommendationShard>(joinUrl(this.baseUrl, path));
+      this.compactRecommendationPromises.set(bucket, promise);
+    }
+    const shard = await promise;
+    const compact = shard.pools?.[String(seedId)];
+    if (!compact) return undefined;
+    return {
+      seed: seedId,
+      algorithm_version: shard.algorithm_version,
+      channels: shard.channels,
+      candidates: compact.map(([id, r, sharedTagIds]) => ({
+        id,
+        r,
+        shared_tag_ids: sharedTagIds || []
+      })),
+      ...(compact.length ? {} : { reason: 'insufficient_evidence' })
+    };
   }
 
   async searchNovels(query: string, limit: number): Promise<NovelSearchResult[]> {
@@ -401,17 +438,23 @@ export class StaticDataSource implements RecommendationDataSource {
     const seedCard = this.cards.get(seedId);
     if (!seedId || !seedCard) throw new DataSourceError('Select a novel from the search results.');
     let pool: RecommendationPool;
+    const manifest = await this.getManifest();
     try {
       pool = await jsonFetch<RecommendationPool>(
         joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
       );
     } catch (error) {
       if (error instanceof DataSourceError && error.message.includes('returned 404')) {
-        throw new DataSourceError(
-          'Recommendations for this title are not precomputed in the bounded static snapshot.'
-        );
+        const compactPool = await this.loadCompactRecommendationPool(seedId, manifest);
+        if (!compactPool) {
+          throw new DataSourceError(
+            'Recommendations for this title are unavailable in this static snapshot.'
+          );
+        }
+        pool = compactPool;
+      } else {
+        throw error;
       }
-      throw error;
     }
     const needsTagTraits = Boolean(
       request.exclude_harem || request.exclude_bl || request.exclude_yuri ||

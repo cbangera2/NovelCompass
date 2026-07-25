@@ -17,7 +17,12 @@ const idIndex = catalog.fields.indexOf('id');
 const novelId = Number(catalog.rows[0][idIndex]);
 const bucket = (novelId % 256).toString(16).padStart(2, '0');
 await json(`data/details/${bucket}/${novelId}.json`);
-await json(`data/recs/${bucket}/${novelId}.json`);
+try {
+  await json(`data/recs/${bucket}/${novelId}.json`);
+} catch {
+  const shard = await json(`data/${(manifest.recommendation_index_url || 'recommendation-index/{bucket}.json').replace('{bucket}', bucket)}`);
+  if (!shard.pools?.[String(novelId)]) throw new Error(`Missing recommendation pool for ${novelId}`);
+}
 
 console.log(JSON.stringify({
   base: base === '/' ? '/' : `${base}/`,

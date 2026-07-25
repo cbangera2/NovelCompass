@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import heapq
 import json
+import math
 import os
 import re
 import tempfile
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
 from src.db.schema import DEFAULT_DB_PATH, get_connection
 from src.engine.candidate_gen import CandidateGenerator
+from src.nlp.taxonomy import HIGH_PRIORITY_TAGS
 
 
 SCHEMA_VERSION = 1
@@ -174,6 +178,173 @@ def _export_pool(
     return result
 
 
+class CompactCandidateIndex:
+    """Batch-friendly candidate lookup used for the all-catalog fallback.
+
+    Unlike CandidateGenerator, this builds the tag, graph, list, author, and
+    genre indexes once. Compact pools intentionally omit synopsis vectors and
+    rich evidence; the richer per-title shards remain the preferred tier.
+    """
+
+    def __init__(self, conn: Any, novel_ids: set[int], tag_indices: dict[int, int]):
+        self.novel_ids = novel_ids
+        self.tag_indices = tag_indices
+        self.tags_by_novel: dict[int, set[int]] = defaultdict(set)
+        self.novels_by_tag: dict[int, list[int]] = defaultdict(list)
+        tag_frequency: dict[int, int] = {}
+        for novel_id, tag_id in conn.execute(
+            "SELECT novel_id, tag_id FROM novel_tags ORDER BY novel_id, tag_id"
+        ):
+            if novel_id in novel_ids:
+                self.tags_by_novel[novel_id].add(tag_id)
+                self.novels_by_tag[tag_id].append(novel_id)
+                tag_frequency[tag_id] = tag_frequency.get(tag_id, 0) + 1
+        total = max(1, len(novel_ids))
+        priority = {name.lower() for name in HIGH_PRIORITY_TAGS}
+        tag_names = dict(conn.execute("SELECT id, name FROM tags"))
+        self.tag_weights = {
+            tag_id: (math.log((total + 1.0) / (frequency + 1.0)) + 1.0)
+            * (1.5 if (tag_names.get(tag_id) or "").lower() in priority else 1.0)
+            for tag_id, frequency in tag_frequency.items()
+        }
+        self.tag_totals = {
+            novel_id: sum(self.tag_weights.get(tag_id, 1.0) for tag_id in tag_ids)
+            for novel_id, tag_ids in self.tags_by_novel.items()
+        }
+
+        self.direct: dict[int, list[tuple[int, float]]] = defaultdict(list)
+        for source, target, votes, mutual in conn.execute(
+            "SELECT source_novel_id, target_novel_id, votes, is_mutual FROM direct_recs"
+        ):
+            if source in novel_ids and target in novel_ids:
+                score = (1.5 if mutual else 1.0) * (1.0 + 0.2 * (votes or 0))
+                self.direct[source].append((target, score))
+                self.direct[target].append((source, score))
+
+        self.lists_by_novel: dict[int, list[int]] = defaultdict(list)
+        self.novels_by_list: dict[int, list[int]] = defaultdict(list)
+        for list_id, novel_id in conn.execute(
+            "SELECT list_id, novel_id FROM rec_list_items ORDER BY list_id, position"
+        ):
+            if novel_id in novel_ids:
+                self.lists_by_novel[novel_id].append(list_id)
+                self.novels_by_list[list_id].append(novel_id)
+
+        self.structural: dict[int, set[int]] = defaultdict(set)
+        authors: dict[str, list[int]] = defaultdict(list)
+        for novel_id, author in conn.execute("SELECT id, author FROM novels"):
+            if novel_id in novel_ids and author:
+                authors[author].append(novel_id)
+        for author_ids in authors.values():
+            if len(author_ids) > 1:
+                for novel_id in author_ids:
+                    self.structural[novel_id].update(
+                        candidate_id for candidate_id in author_ids if candidate_id != novel_id
+                    )
+        for source, target in conn.execute(
+            "SELECT source_novel_id, target_novel_id FROM related_series"
+        ):
+            if source in novel_ids and target in novel_ids:
+                self.structural[source].add(target)
+                self.structural[target].add(source)
+
+        # Genre peers provide a bounded metadata fallback for sparsely linked
+        # titles. Popularity is only a tie breaker; no metadata is duplicated.
+        self.genres_by_novel: dict[int, set[int]] = defaultdict(set)
+        self.novels_by_genre: dict[int, list[int]] = defaultdict(list)
+        for novel_id, genre_id in conn.execute(
+            "SELECT novel_id, genre_id FROM novel_genres ORDER BY novel_id, genre_id"
+        ):
+            if novel_id in novel_ids:
+                self.genres_by_novel[novel_id].add(genre_id)
+                self.novels_by_genre[genre_id].append(novel_id)
+        self.popularity = dict(conn.execute(
+            "SELECT id, COALESCE(reading_list_count, 0) FROM novels"
+        ))
+
+    @staticmethod
+    def _top(scores: dict[int, float] | list[tuple[int, float]], limit: int) -> list[tuple[int, float]]:
+        items = scores.items() if isinstance(scores, dict) else scores
+        return heapq.nlargest(limit, items, key=lambda item: (item[1], -item[0]))
+
+    def channels(self, seed_id: int, limit: int) -> dict[str, list[tuple[int, float]]]:
+        intersections: dict[int, float] = defaultdict(float)
+        for tag_id in self.tags_by_novel.get(seed_id, set()):
+            weight = self.tag_weights.get(tag_id, 1.0)
+            for candidate_id in self.novels_by_tag[tag_id]:
+                if candidate_id != seed_id:
+                    intersections[candidate_id] += weight
+        seed_total = self.tag_totals.get(seed_id, 0.0)
+        tag_scores = {
+            candidate_id: shared / (
+                seed_total + self.tag_totals.get(candidate_id, 0.0) - shared
+            )
+            for candidate_id, shared in intersections.items()
+        }
+
+        list_scores: dict[int, float] = defaultdict(float)
+        for list_id in self.lists_by_novel.get(seed_id, []):
+            for candidate_id in self.novels_by_list[list_id]:
+                if candidate_id != seed_id:
+                    list_scores[candidate_id] += 1.0
+
+        structural_scores = {
+            candidate_id: 2.0
+            for candidate_id in self.structural.get(seed_id, set())
+        }
+        if len(structural_scores) < limit:
+            shared_genres: dict[int, float] = defaultdict(float)
+            for genre_id in self.genres_by_novel.get(seed_id, set()):
+                for candidate_id in self.novels_by_genre[genre_id]:
+                    if candidate_id != seed_id and candidate_id not in structural_scores:
+                        shared_genres[candidate_id] += 1.0
+            genre_peers = self._top({
+                candidate_id: shared * 1_000_000
+                + math.log1p(max(0, self.popularity.get(candidate_id, 0)))
+                for candidate_id, shared in shared_genres.items()
+            }, limit - len(structural_scores))
+            structural_scores.update(
+                (candidate_id, score / 1_000_000) for candidate_id, score in genre_peers
+            )
+
+        return {
+            "tag": self._top(tag_scores, limit),
+            "direct_rec": self._top(self.direct.get(seed_id, []), limit),
+            "rec_list": self._top(list_scores, limit),
+            "structural": self._top(structural_scores, limit),
+            "vector": [],
+        }
+
+    def pool(self, seed_id: int, limit: int) -> list[list[Any]]:
+        raw_channels = self.channels(seed_id, limit)
+        ranks: dict[int, dict[str, int]] = {}
+        for channel in CHANNELS:
+            for rank, (candidate_id, _score) in enumerate(raw_channels[channel], 1):
+                ranks.setdefault(candidate_id, {})[channel] = rank
+        selected = sorted(
+            ranks,
+            key=lambda candidate_id: (
+                -len(ranks[candidate_id]),
+                min(ranks[candidate_id].values()),
+                candidate_id,
+            ),
+        )[:limit]
+        return [
+            [
+                candidate_id,
+                [ranks[candidate_id].get(channel) for channel in CHANNELS],
+                sorted(
+                    self.tag_indices[tag_id]
+                    for tag_id in (
+                        self.tags_by_novel.get(seed_id, set())
+                        & self.tags_by_novel.get(candidate_id, set())
+                    )
+                ),
+            ]
+            for candidate_id in selected
+        ]
+
+
 def export_static_dataset(
     output: Path,
     max_novels: int | None = None,
@@ -206,6 +377,7 @@ def export_static_dataset(
         else:
             bootstrap_novels = novels
         exported_ids = {row["id"] for row in bootstrap_novels}
+        catalog_ids = {row["id"] for row in novels}
         languages, language_ids = _indexed_values(row["language"] for row in novels)
         statuses, status_ids = _indexed_values(row["status_trans"] for row in novels)
         genre_rows = conn.execute("SELECT id, name FROM genres ORDER BY id").fetchall()
@@ -301,7 +473,7 @@ def export_static_dataset(
         }
         selected &= exported_ids
         generator = CandidateGenerator(conn)
-        recommendable = 0
+        rich_recommendable = 0
         for index, row in enumerate(bootstrap_novels, 1):
             novel_id = row["id"]
             _atomic_json(
@@ -325,12 +497,30 @@ def export_static_dataset(
                 if not pool["candidates"]:
                     pool["reason"] = "no_candidates_in_snapshot"
             else:
-                pool = {"seed": novel_id, "algorithm_version": ALGORITHM_VERSION,
-                        "channels": list(CHANNELS), "candidates": [], "reason": "not_precomputed"}
-            recommendable += bool(pool["candidates"])
-            _atomic_json(pool_path, pool)
+                pool = None
+            if pool is not None:
+                rich_recommendable += bool(pool["candidates"])
+                _atomic_json(pool_path, pool)
+            elif pool_path.exists():
+                pool_path.unlink()
             if index % 100 == 0:
                 print(f"Exported recommendation pools: {index}/{len(bootstrap_novels)}")
+
+        compact_index = CompactCandidateIndex(conn, catalog_ids, tag_indices)
+        compact_buckets: dict[str, dict[str, list[list[Any]]]] = defaultdict(dict)
+        recommendable = 0
+        for index, novel_id in enumerate(sorted(catalog_ids), 1):
+            compact_pool = compact_index.pool(novel_id, candidate_limit)
+            compact_buckets[bucket_for_id(novel_id)][str(novel_id)] = compact_pool
+            recommendable += bool(compact_pool)
+            if index % 1000 == 0:
+                print(f"Exported compact recommendation pools: {index}/{len(catalog_ids)}")
+        for bucket in (f"{value:02x}" for value in range(256)):
+            _atomic_json(output / "recommendation-index" / f"{bucket}.json", {
+                "algorithm_version": ALGORITHM_VERSION,
+                "channels": list(CHANNELS),
+                "pools": compact_buckets.get(bucket, {}),
+            })
 
         # Re-running a bounded export into the same directory must not leave
         # addressable detail/pool files from a different catalog scope.
@@ -349,12 +539,17 @@ def export_static_dataset(
             "source_novel_count": source_novel_count,
             "bootstrap_novel_count": len(bootstrap_novels),
             "detail_novel_count": len(bootstrap_novels),
-            "recommendation_seed_count": len(bootstrap_novels),
+            "recommendation_seed_count": len(selected),
+            "rich_recommendation_seed_count": len(selected),
             "snapshot_scope": (
                 f"complete_catalog_with_top_{len(bootstrap_novels)}_bootstrap"
                 if catalog_limit is not None else "complete_catalog"
             ),
             "recommendable_seed_count": recommendable,
+            "rich_recommendable_seed_count": rich_recommendable,
+            "recommendation_index_url": "recommendation-index/{bucket}.json",
+            "recommendation_index_seed_count": len(catalog_ids),
+            "recommendation_index_candidate_limit": candidate_limit,
             "catalog_url": "catalog.json",
             "bootstrap_catalog_url": (
                 "bootstrap-catalog.json" if catalog_limit is not None else "catalog.json"
@@ -401,12 +596,27 @@ def verify_export(
         raise ValueError("options and catalog facet dictionaries differ")
     for row in bootstrap["rows"]:
         novel_id = row[0]
-        for group in ("details", "recs"):
-            path = output / group / bucket_for_id(novel_id) / f"{novel_id}.json"
+        path = output / "details" / bucket_for_id(novel_id) / f"{novel_id}.json"
+        if not path.is_file():
+            raise ValueError(f"missing details artifact for novel {novel_id}")
+        if json.loads(path.read_text())["id"] != novel_id:
+            raise ValueError(f"invalid details artifact for novel {novel_id}")
+    index_template = manifest.get("recommendation_index_url")
+    if index_template:
+        indexed_seeds = 0
+        for bucket in (f"{value:02x}" for value in range(manifest.get("bucket_count", 256))):
+            path = output / index_template.replace("{bucket}", bucket)
             if not path.is_file():
-                raise ValueError(f"missing {group} artifact for novel {novel_id}")
-            if json.loads(path.read_text())["id" if group == "details" else "seed"] != novel_id:
-                raise ValueError(f"invalid {group} artifact for novel {novel_id}")
+                raise ValueError(f"missing compact recommendation bucket {bucket}")
+            shard = json.loads(path.read_text())
+            if shard.get("channels") != list(CHANNELS):
+                raise ValueError(f"invalid compact recommendation channels in bucket {bucket}")
+            for raw_id, candidates in shard.get("pools", {}).items():
+                if bucket_for_id(int(raw_id)) != bucket or not isinstance(candidates, list):
+                    raise ValueError(f"invalid compact recommendation pool for {raw_id}")
+                indexed_seeds += 1
+        if indexed_seeds != manifest.get("recommendation_index_seed_count"):
+            raise ValueError("compact recommendation index seed count differs")
 
 
 def main() -> None:
