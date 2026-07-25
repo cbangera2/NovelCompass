@@ -24,16 +24,21 @@ export default function BrowsePage(): JSX.Element {
   const [minRating, setMinRating] = useState(0);
   const [minVotes, setMinVotes] = useState(0);
   const [page, setPage] = useState(1);
+  const [retryToken, setRetryToken] = useState(0);
   const [total, setTotal] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [tagSupported, setTagSupported] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [batchError, setBatchError] = useState('');
+  const [observerSupported] = useState(() => typeof window !== 'undefined' && 'IntersectionObserver' in window);
   const [detail, setDetail] = useState<NovelDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [luckyLoading, setLuckyLoading] = useState(false);
   const requestRef = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadRequestedRef = useRef(false);
 
   useEffect(() => {
     createDataSource(configuredDataMode()).then(async (next) => {
@@ -47,7 +52,8 @@ export default function BrowsePage(): JSX.Element {
     const requestId = ++requestRef.current;
     const timer = window.setTimeout(async () => {
       setLoading(true);
-      setError('');
+      if (page === 1) setError('');
+      setBatchError('');
       try {
         const result = await source.browseNovels({
           query, sort, language, author, genre, tag, min_rating: minRating,
@@ -60,18 +66,55 @@ export default function BrowsePage(): JSX.Element {
         setHasMore(result.has_more);
         setTagSupported(result.capabilities.tags);
       } catch (reason: any) {
-        if (requestId === requestRef.current) setError(reason.message || 'Could not browse novels.');
+        if (requestId === requestRef.current) {
+          const message = reason.message || 'Could not browse novels.';
+          if (page > 1) setBatchError(message);
+          else setError(message);
+        }
       } finally {
-        if (requestId === requestRef.current) setLoading(false);
+        if (requestId === requestRef.current) {
+          setLoading(false);
+          loadRequestedRef.current = false;
+        }
       }
     }, query ? 180 : 0);
     return () => window.clearTimeout(timer);
-  }, [source, query, sort, language, author, genre, tag, minRating, minVotes, page]);
+  }, [source, query, sort, language, author, genre, tag, minRating, minVotes, page, retryToken]);
 
   const resetPage = (action: () => void) => {
     action();
     setPage(1);
+    setBatchError('');
+    loadRequestedRef.current = false;
   };
+
+  const requestNextPage = () => {
+    if (loading || !hasMore || loadRequestedRef.current) return;
+    loadRequestedRef.current = true;
+    setPage((value) => value + 1);
+  };
+
+  const retryBatch = () => {
+    if (loading || loadRequestedRef.current) return;
+    loadRequestedRef.current = true;
+    setBatchError('');
+    setRetryToken((value) => value + 1);
+  };
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!observerSupported || !sentinel || !hasMore || batchError) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) requestNextPage();
+      },
+      { rootMargin: '500px 0px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // requestNextPage intentionally reads the latest render state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [observerSupported, hasMore, loading, batchError, page]);
 
   const browseRequest = () => ({
     query, sort, language, author, genre, tag,
@@ -175,8 +218,16 @@ export default function BrowsePage(): JSX.Element {
         {items.map((novel) => <BrowseCard key={novel.id} novel={novel} onOpen={() => openDetail(novel.id)} />)}
       </section>
       {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
-      {loading && <div className="browse-loading" role="status"><span /> Loading {page > 1 ? 'more novels' : 'catalog'}…</div>}
-      {hasMore && !loading && <div className="browse-pagination"><Button className="browse-more" onClick={() => setPage((value) => value + 1)}>Load {PAGE_SIZE} more</Button><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>}
+      <div ref={sentinelRef} className="browse-sentinel" aria-hidden="true" />
+      <div className="browse-page-status" role="status" aria-live="polite">
+        {loading && <div className="browse-loading"><span /> Loading {page > 1 ? 'more novels' : 'catalog'}…</div>}
+        {batchError && <div className="browse-batch-error"><span>{batchError}</span><Button onClick={retryBatch}>Retry loading more</Button></div>}
+        {hasMore && !loading && !batchError && !observerSupported && (
+          <div className="browse-pagination"><Button className="browse-more" onClick={requestNextPage}>Load {PAGE_SIZE} more</Button><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>
+        )}
+        {hasMore && observerSupported && !batchError && <span className="sr-only">More novels load automatically as you scroll.</span>}
+        {hasLoaded && !hasMore && items.length > 0 && <p className="browse-end">End of results · {items.length.toLocaleString()} novels shown</p>}
+      </div>
 
       {(detailLoading || detail) && <div className="browse-modal-backdrop" onMouseDown={() => setDetail(null)}>
         <article className="browse-modal" onMouseDown={(event) => event.stopPropagation()}>
