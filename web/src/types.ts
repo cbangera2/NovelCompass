@@ -149,3 +149,27 @@ export interface BrowseResponse {
     total_is_exact: boolean;
   };
 }
+
+export interface NovelInsights {
+  novel_id: number;
+  catalog_size: number;
+  metrics: Array<{
+    key: 'rating' | 'rating_votes' | 'readers';
+    value: number;
+    percentile: number;
+    rank: number;
+    population: number;
+  }>;
+  cohorts: Array<{
+    dimension: 'primary_genre' | 'language' | 'year';
+    value: string;
+    population: number;
+    readership_rank: number;
+  }>;
+  peers: Array<BrowseNovel & {
+    shared_genre_count: number;
+    shared_tag_count: number;
+  }>;
+  cohort_definition: string;
+  capabilities: { relationships: boolean; tags: boolean };
+}

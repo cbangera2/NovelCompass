@@ -29,6 +29,7 @@ import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
 import { Button, Checkbox, FieldGroup, Select, Tooltip } from './ui';
+import { NovelInsightsPanel } from './NovelInsightsPanel';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -778,6 +779,7 @@ export default function App(): JSX.Element {
           onRecommend={recommendFromDetail}
           profileEntry={detail ? profileEntries.get(detail.id) : undefined}
           titlePreference={settings.titlePreference}
+          source={dataSource!}
         />
       )}
     </div>
@@ -792,7 +794,8 @@ function NovelDetailDialog({
   onClose,
   onRecommend,
   profileEntry,
-  titlePreference
+  titlePreference,
+  source
 }: {
   detail: NovelDetail | null;
   loading: boolean;
@@ -802,6 +805,7 @@ function NovelDetailDialog({
   onRecommend: () => void;
   profileEntry?: ProfileEntry;
   titlePreference: 'catalog' | 'alternate';
+  source: RecommendationDataSource;
 }) {
   return (
     <div className="detail-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -904,6 +908,7 @@ function NovelDetailDialog({
                   <span><strong>{detail.related_series_count}</strong> related series</span>
                 </div>
               </section>
+              <NovelInsightsPanel novelId={detail.id} source={source} />
             </div>
           </>
         )}

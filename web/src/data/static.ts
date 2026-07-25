@@ -5,6 +5,7 @@ import {
   DatasetManifest,
   FilterOptions,
   NovelDetail,
+  NovelInsights,
   NovelSearchResult,
   RecommendRequest,
   RecommendResponse,
@@ -259,6 +260,64 @@ export class StaticDataSource implements RecommendationDataSource {
       direct_recommendation_count: Number(detail.direct_recommendation_count || 0),
       related_series_count: Number(detail.related_series_count || 0),
       recommendation_list_count: Number(detail.recommendation_list_count || 0)
+    };
+  }
+
+  async getNovelInsights(id: number): Promise<NovelInsights> {
+    await this.loadCatalog();
+    const card = this.cards.get(id);
+    if (!card) throw new DataSourceError(`Novel ${id} is not in this static snapshot.`);
+    const catalog = [...this.cards.values()];
+    const metric = (key: 'rating' | 'rating_votes' | 'readers', value: number, read: (item: CatalogCard) => number) => ({
+      key, value,
+      percentile: Math.round(1000 * catalog.filter((item) => read(item) <= value).length / catalog.length) / 10,
+      rank: catalog.filter((item) => read(item) > value).length + 1,
+      population: catalog.length
+    });
+    const genreNames = card.genre_ids.map((genreId) => this.genres[genreId]).filter(Boolean).sort();
+    const primaryGenre = genreNames[0];
+    const cohort = (
+      dimension: 'primary_genre' | 'language' | 'year',
+      value: string,
+      members: CatalogCard[]
+    ) => ({
+      dimension, value, population: members.length,
+      readership_rank: members.filter((item) => item.reading_list_count > card.reading_list_count).length + 1
+    });
+    const cohorts: NovelInsights['cohorts'] = [];
+    if (primaryGenre) cohorts.push(cohort('primary_genre', primaryGenre,
+      catalog.filter((item) => item.genre_ids.some((genreId) => this.genres[genreId] === primaryGenre))));
+    if (card.language) cohorts.push(cohort('language', card.language,
+      catalog.filter((item) => normalize(item.language) === normalize(card.language))));
+    if (card.year) cohorts.push(cohort('year', String(card.year),
+      catalog.filter((item) => item.year === card.year)));
+
+    let facets: FacetsFile | undefined;
+    try { facets = await this.loadFacets(); } catch { facets = undefined; }
+    const seedTags = new Set(facets?.novels?.[String(id)]?.t || []);
+    const peers = primaryGenre ? catalog
+      .filter((item) => item.id !== id && normalize(item.language) === normalize(card.language) &&
+        item.genre_ids.some((genreId) => this.genres[genreId] === primaryGenre))
+      .map((item) => ({
+        ...item,
+        genres: item.genre_ids.map((genreId) => this.genres[genreId]).filter(Boolean),
+        shared_genre_count: item.genre_ids.filter((genreId) => card.genre_ids.includes(genreId)).length,
+        shared_tag_count: (facets?.novels?.[String(item.id)]?.t || []).filter((tagId) => seedTags.has(tagId)).length
+      }))
+      .sort((a, b) => b.shared_tag_count - a.shared_tag_count ||
+        b.shared_genre_count - a.shared_genre_count ||
+        b.reading_list_count - a.reading_list_count || a.id - b.id)
+      .slice(0, 10) : [];
+    return {
+      novel_id: id, catalog_size: catalog.length,
+      metrics: [
+        metric('rating', card.rating, (item) => item.rating),
+        metric('rating_votes', card.rating_votes, (item) => item.rating_votes),
+        metric('readers', card.reading_list_count, (item) => item.reading_list_count)
+      ],
+      cohorts, peers,
+      cohort_definition: 'Peers share the alphabetically first catalog genre and exact language; they are ordered by shared tags, shared genres, then readers.',
+      capabilities: { relationships: false, tags: Boolean(facets) }
     };
   }
 

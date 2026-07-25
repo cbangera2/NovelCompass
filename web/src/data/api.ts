@@ -5,6 +5,7 @@ import {
   DatasetManifest,
   FilterOptions,
   NovelDetail,
+  NovelInsights,
   NovelSearchResult,
   RecommendRequest,
   RecommendResponse
@@ -78,6 +79,10 @@ export class ApiDataSource implements RecommendationDataSource {
 
   getNovel(id: number): Promise<NovelDetail> {
     return apiFetch(`/api/novels/${id}`);
+  }
+
+  getNovelInsights(id: number): Promise<NovelInsights> {
+    return apiFetch(`/api/novels/${id}/insights`);
   }
 
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse> {

@@ -146,3 +146,37 @@ def test_random_browse_is_seeded_and_respects_filters(monkeypatch):
     assert first["eligible_count"] == 2
     assert first["novel"]["author"] == "A"
     assert first["novel"]["language"] == "Korean"
+
+
+def test_novel_insights_percentiles_and_cohorts_are_catalog_relative(monkeypatch):
+    def insights_db():
+        conn = contract_db()
+        conn.execute(
+            """UPDATE novels SET rating=4, rating_votes=100,
+               reading_list_count=500, language='Korean', year=2020 WHERE id=38"""
+        )
+        conn.execute(
+            """INSERT INTO novels(id, slug, title, rating, rating_votes,
+               reading_list_count, language, year)
+               VALUES (39, 'peer', 'Peer', 5, 200, 1000, 'Korean', 2020)"""
+        )
+        conn.execute("INSERT INTO genres(name) VALUES ('Fantasy')")
+        genre_id = conn.execute("SELECT id FROM genres").fetchone()[0]
+        conn.executemany(
+            "INSERT INTO novel_genres(novel_id, genre_id) VALUES (?, ?)",
+            [(38, genre_id), (39, genre_id)],
+        )
+        return conn
+
+    monkeypatch.setattr(main, "get_db", insights_db)
+    result = main.get_novel_insights(38)
+    rating = next(item for item in result["metrics"] if item["key"] == "rating")
+    assert rating == {
+        "key": "rating", "value": 4, "percentile": 50.0,
+        "rank": 2, "population": 2,
+    }
+    assert result["cohorts"][0] == {
+        "dimension": "primary_genre", "value": "Fantasy",
+        "population": 2, "readership_rank": 2,
+    }
+    assert result["peers"][0]["title"] == "Peer"

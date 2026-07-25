@@ -6,6 +6,7 @@ import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { Button, FieldGroup, Select } from './ui';
+import { NovelInsightsPanel } from './NovelInsightsPanel';
 
 const PAGE_SIZE = 24;
 
@@ -243,6 +244,7 @@ export default function BrowsePage(): JSX.Element {
               <p>{detail.synopsis || 'No synopsis is available in this dataset.'}</p>
               <div className="browse-chips">{detail.genres.map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
               <div className="browse-chips browse-tag-chips">{detail.tags.map((item) => <a key={item} href={browseFacetUrl('tag', item)}>{item}</a>)}</div>
+              {source && <NovelInsightsPanel novelId={detail.id} source={source} onPeer={openDetail} />}
               <footer>
                 <a href={`${import.meta.env.BASE_URL}?seed=${detail.id}`}>Find similar</a>
                 <a href={detail.novelupdates_url} target="_blank" rel="noopener noreferrer">Novel Updates <ExternalLink size={14} /></a>

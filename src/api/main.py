@@ -384,6 +384,120 @@ def get_novel_detail(novel_id: int):
         conn.close()
 
 
+@app.get("/api/novels/{novel_id}/insights")
+def get_novel_insights(novel_id: int):
+    """Return descriptive catalog statistics with explicit populations."""
+    conn = get_db()
+    try:
+        novel = conn.execute(
+            """SELECT id, rating, rating_votes, reading_list_count, language, year
+               FROM novels WHERE id = ?""",
+            (novel_id,),
+        ).fetchone()
+        if not novel:
+            raise HTTPException(status_code=404, detail=f"Novel {novel_id} not found.")
+        total = conn.execute("SELECT COUNT(*) FROM novels").fetchone()[0]
+        metric_columns = {
+            "rating": "rating",
+            "rating_votes": "rating_votes",
+            "readers": "reading_list_count",
+        }
+        metrics = []
+        for key, column in metric_columns.items():
+            value = novel[column] or 0
+            below = conn.execute(
+                f"SELECT COUNT(*) FROM novels WHERE COALESCE({column}, 0) <= ?",
+                (value,),
+            ).fetchone()[0]
+            above = conn.execute(
+                f"SELECT COUNT(*) FROM novels WHERE COALESCE({column}, 0) > ?",
+                (value,),
+            ).fetchone()[0]
+            metrics.append({
+                "key": key, "value": value,
+                "percentile": round(100 * below / total, 1) if total else 0,
+                "rank": above + 1, "population": total,
+            })
+
+        primary_genre_row = conn.execute(
+            """SELECT MIN(g.name) FROM novel_genres ng
+               JOIN genres g ON g.id=ng.genre_id WHERE ng.novel_id=?""",
+            (novel_id,),
+        ).fetchone()
+        primary_genre = primary_genre_row[0] if primary_genre_row else None
+        cohorts = []
+        cohort_specs = [
+            ("primary_genre", primary_genre, """
+                EXISTS (SELECT 1 FROM novel_genres x
+                        JOIN genres gx ON gx.id=x.genre_id
+                        WHERE x.novel_id=n.id AND gx.name=?)"""),
+            ("language", novel["language"], "n.language = ?"),
+            ("year", str(novel["year"]) if novel["year"] else None, "n.year = ?"),
+        ]
+        for dimension, value, clause in cohort_specs:
+            if not value:
+                continue
+            parameter = novel["year"] if dimension == "year" else value
+            population = conn.execute(
+                f"SELECT COUNT(*) FROM novels n WHERE {clause}", (parameter,)
+            ).fetchone()[0]
+            above = conn.execute(
+                f"""SELECT COUNT(*) FROM novels n WHERE {clause}
+                    AND COALESCE(n.reading_list_count,0) > ?""",
+                (parameter, novel["reading_list_count"] or 0),
+            ).fetchone()[0]
+            cohorts.append({
+                "dimension": dimension, "value": str(value),
+                "population": population, "readership_rank": above + 1,
+            })
+
+        peers = []
+        if primary_genre:
+            for row in conn.execute(
+                """
+                SELECT n.id, n.title, n.slug, n.author, n.cover_url, n.rating,
+                       n.rating_votes, n.reading_list_count, n.language, n.year,
+                       (SELECT COUNT(*) FROM novel_genres a
+                        JOIN novel_genres b ON b.genre_id=a.genre_id
+                        WHERE a.novel_id=? AND b.novel_id=n.id) shared_genres,
+                       (SELECT COUNT(*) FROM novel_tags a
+                        JOIN novel_tags b ON b.tag_id=a.tag_id
+                        WHERE a.novel_id=? AND b.novel_id=n.id) shared_tags
+                FROM novels n
+                WHERE n.id != ? AND n.language = ?
+                  AND EXISTS (
+                    SELECT 1 FROM novel_genres ng JOIN genres g ON g.id=ng.genre_id
+                    WHERE ng.novel_id=n.id AND g.name=?
+                  )
+                ORDER BY shared_tags DESC, shared_genres DESC,
+                         n.reading_list_count DESC, n.id
+                LIMIT 10
+                """,
+                (novel_id, novel_id, novel_id, novel["language"], primary_genre),
+            ):
+                peers.append({
+                    "id": row["id"], "title": row["title"], "slug": row["slug"] or "",
+                    "novelupdates_url": novelupdates_url(row["id"], row["slug"]),
+                    "author": row["author"] or "", "cover_url": row["cover_url"],
+                    "rating": row["rating"] or 0, "rating_votes": row["rating_votes"] or 0,
+                    "reading_list_count": row["reading_list_count"] or 0,
+                    "language": row["language"] or "", "year": row["year"],
+                    "shared_genre_count": row["shared_genres"],
+                    "shared_tag_count": row["shared_tags"],
+                })
+        return {
+            "novel_id": novel_id, "catalog_size": total, "metrics": metrics,
+            "cohorts": cohorts, "peers": peers,
+            "cohort_definition": (
+                "Peers share the alphabetically first catalog genre and exact "
+                "language; they are ordered by shared tags, shared genres, then readers."
+            ),
+            "capabilities": {"relationships": False, "tags": True},
+        }
+    finally:
+        conn.close()
+
+
 @app.get("/api/options")
 def recommendation_options():
     conn = get_db()

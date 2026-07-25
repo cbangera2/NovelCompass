@@ -5,6 +5,7 @@ import {
   DatasetManifest,
   FilterOptions,
   NovelDetail,
+  NovelInsights,
   NovelSearchResult,
   RecommendRequest,
   RecommendResponse
@@ -17,6 +18,7 @@ export interface RecommendationDataSource {
   getOptions(): Promise<FilterOptions>;
   resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>>;
   getNovel(id: number): Promise<NovelDetail>;
+  getNovelInsights(id: number): Promise<NovelInsights>;
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse>;
   browseNovels(request: BrowseRequest): Promise<BrowseResponse>;
   getRandomNovel(request: BrowseRequest, randomValue?: number): Promise<BrowseNovel>;
