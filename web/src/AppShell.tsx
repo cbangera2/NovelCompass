@@ -1,6 +1,8 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { BookMarked, BookOpen, Database, ExternalLink, Menu, Sparkles, User, X } from 'lucide-react';
+import { BookMarked, BookOpen, ChevronLeft, ChevronRight, Database, ExternalLink, Menu, Sparkles, User, X } from 'lucide-react';
 import { configuredDataMode } from './data';
+import { LocalUserProfile } from './profile';
+import { loadLocalProfile } from './profile/store';
 import './app-shell.css';
 
 export type AppView = 'discover' | 'browse' | 'profile' | 'scraper';
@@ -19,7 +21,18 @@ function viewUrl(view: AppView): string {
 
 export default function AppShell({ activeView, children }: { activeView: AppView; children: ReactNode }): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem('novel-compass:sidebar-collapsed') === 'true');
+  const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const dataMode = configuredDataMode();
+  const staticDeployment = dataMode === 'static' || window.location.hostname.endsWith('.github.io');
+  const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
+
+  useEffect(() => {
+    const refreshProfile = () => loadLocalProfile().then(setProfile).catch(() => setProfile(null));
+    refreshProfile();
+    window.addEventListener('focus', refreshProfile);
+    return () => window.removeEventListener('focus', refreshProfile);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -29,15 +42,21 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   }, [menuOpen]);
 
   return (
-    <div className="application-shell">
+    <div className={`application-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <header className="shell-mobile-header">
         <a className="shell-brand compact" href={viewUrl('discover')} aria-label="Novel Compass home">
           <span><BookMarked size={18} /></span><strong>Novel Compass</strong>
         </a>
-        <button className="shell-menu-button" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
-          aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
-          {menuOpen ? <X /> : <Menu />}
-        </button>
+        <div className="shell-mobile-actions">
+          <a className="shell-mobile-account" href={viewUrl('profile')}
+            aria-label={profile ? `Open local profile for ${profile.username || 'reader'}` : 'Open local profile'}>
+            <User size={17} />{profile && <span>{profile.entries.length}</span>}
+          </a>
+          <button className="shell-menu-button" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
+            aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
+            {menuOpen ? <X /> : <Menu />}
+          </button>
+        </div>
       </header>
       {menuOpen && <button className="shell-scrim" aria-label="Close navigation" onClick={() => setMenuOpen(false)} />}
       <aside className={`shell-sidebar ${menuOpen ? 'open' : ''}`}>
@@ -45,9 +64,19 @@ export default function AppShell({ activeView, children }: { activeView: AppView
           <span><BookMarked size={21} /></span>
           <div><strong>Novel Compass</strong><small>Relationship-first discovery</small></div>
         </a>
+        <button className="shell-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed} onClick={() => {
+            setCollapsed((value) => {
+              window.localStorage.setItem('novel-compass:sidebar-collapsed', String(!value));
+              return !value;
+            });
+          }}>
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          <span>Collapse sidebar</span>
+        </button>
         <nav className="shell-nav" aria-label="Application navigation">
           <p>Explore</p>
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             return <a key={item.view} href={viewUrl(item.view)} className={activeView === item.view ? 'active' : ''}
               aria-current={activeView === item.view ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
@@ -56,6 +85,12 @@ export default function AppShell({ activeView, children }: { activeView: AppView
           })}
         </nav>
         <div className="shell-sidebar-footer">
+          <a className={`shell-account ${activeView === 'profile' ? 'active' : ''}`} href={viewUrl('profile')}>
+            <span className="shell-avatar"><User size={16} /></span>
+            <span><strong>{profile?.username || 'Local profile'}</strong>
+              <small>{profile ? `${profile.entries.length.toLocaleString()} saved title${profile.entries.length === 1 ? '' : 's'}` : 'Private to this browser'}</small>
+            </span>
+          </a>
           <div className="shell-status"><i /><span>
             <strong>{dataMode === 'auto' ? 'Automatic data source' : `${dataMode} data mode`}</strong>
             <small>Private, local-first tools</small>
