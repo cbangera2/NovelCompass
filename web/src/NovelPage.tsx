@@ -1,6 +1,5 @@
-import { Tabs } from '@base-ui/react/tabs';
 import {
-  ArrowLeft, BookMarked, BookOpen, Check, ExternalLink, Heart, Library,
+  ArrowDown, ArrowLeft, BookMarked, BookOpen, Check, ExternalLink, Heart, Library,
   MessageSquare, Search, Sparkles, ThumbsDown
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -13,6 +12,7 @@ import { LocalNovelFeedback, LocalUserProfile } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { NovelDetail, Recommendation } from './types';
 import { novelPageUrl } from './novelLinks';
+import { CollapsibleFacetList } from './CollapsibleFacetList';
 import './novel-page.css';
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -32,6 +32,7 @@ export default function NovelPage(): JSX.Element {
   const [related, setRelated] = useState<Recommendation[]>([]);
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [error, setError] = useState('');
+  const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || (fromId ? 'relationship' : 'overview'));
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +86,28 @@ export default function NovelPage(): JSX.Element {
     setProfile(updated);
   };
 
+  useEffect(() => {
+    const sections = [...document.querySelectorAll<HTMLElement>('[data-novel-section]')];
+    if (!sections.length) return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting)
+        .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top));
+      const id = visible[0]?.target.id;
+      if (id) setActiveSection(id);
+    }, { rootMargin: '-22% 0px -58% 0px', threshold: [0, .1, .5] });
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [detail]);
+
+  const goToSection = (id: string) => {
+    const section = document.getElementById(id);
+    if (!section) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    section.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${id}`);
+    setActiveSection(id);
+  };
+
   if (error) return <main className="novel-page-state"><Card><BookOpen /><h1>Novel unavailable</h1><p>{error}</p><DSButton as="a" href={import.meta.env.BASE_URL}>Return to Discover</DSButton></Card></main>;
   if (!detail || !source) return <main className="novel-page novel-page-loading" aria-busy="true"><Skeleton className="novel-hero-skeleton" /><Skeleton className="novel-content-skeleton" /></main>;
 
@@ -128,14 +151,16 @@ export default function NovelPage(): JSX.Element {
       </div>
     </section>
 
-    <Tabs.Root className="novel-tabs" defaultValue={fromId ? 'relationship' : 'overview'}>
-      <Tabs.List className="novel-tab-list" aria-label="Novel information">
-        <Tabs.Tab value="overview"><BookOpen size={16} />Overview</Tabs.Tab>
-        <Tabs.Tab value="insights"><Library size={16} />Insights</Tabs.Tab>
-        <Tabs.Tab value="relationship"><MessageSquare size={16} />Relationships</Tabs.Tab>
-        <Tabs.Indicator className="novel-tab-indicator" />
-      </Tabs.List>
-      <Tabs.Panel value="overview" className="novel-tab-panel">
+    <nav className="novel-section-nav" aria-label="Novel sections">
+      {([['overview', BookOpen, 'Overview'], ['insights', Library, 'Insights'], ['relationship', MessageSquare, 'Relationships']] as const)
+        .map(([id, Icon, label]) => <button key={id} className={activeSection === id ? 'active' : ''}
+          aria-current={activeSection === id ? 'location' : undefined} onClick={() => goToSection(id)}>
+          <Icon size={15} />{label}
+        </button>)}
+    </nav>
+    <div className="novel-sections">
+      <section id="overview" data-novel-section className="novel-major-section">
+        <header className="novel-section-heading"><span>01</span><div><h2>Overview</h2><p>Story details, genres, and themes.</p></div></header>
         <div className="novel-content-grid">
           <Card className="novel-about">
             <h2>About this novel</h2>
@@ -144,17 +169,21 @@ export default function NovelPage(): JSX.Element {
           </Card>
           <Card className="novel-facets">
             <h2>Genres & themes</h2>
-            <div>{detail.genres.map((genre) => <a key={genre} href={browseFacetUrl('genre', genre)}>{genre}</a>)}</div>
+            <CollapsibleFacetList items={detail.genres} compactCount={8} noun="genres" hrefFor={(genre) => browseFacetUrl('genre', genre)} />
             <h3>Tags</h3>
-            <div>{detail.tags.map((tag) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>)}</div>
+            <CollapsibleFacetList items={detail.tags} compactCount={12} noun="tags" hrefFor={(tag) => browseFacetUrl('tag', tag)} />
           </Card>
         </div>
-      </Tabs.Panel>
-      <Tabs.Panel value="insights" className="novel-tab-panel">
+        <button className="next-section" onClick={() => goToSection('insights')}>Continue to catalog insights <ArrowDown size={15} /></button>
+      </section>
+      <section id="insights" data-novel-section className="novel-major-section">
+        <header className="novel-section-heading"><span>02</span><div><h2>Insights</h2><p>How this title sits within the current catalog snapshot.</p></div></header>
         <NovelInsightsPanel novelId={novelId} source={source}
           onPeer={(peerId) => { window.location.href = novelPageUrl(peerId, novelId); }} />
-      </Tabs.Panel>
-      <Tabs.Panel value="relationship" className="novel-tab-panel">
+        <button className="next-section" onClick={() => goToSection('relationship')}>Continue to relationships <ArrowDown size={15} /></button>
+      </section>
+      <section id="relationship" data-novel-section className="novel-major-section">
+        <header className="novel-section-heading"><span>03</span><div><h2>Relationships</h2><p>Recommendation evidence and related directions to explore.</p></div></header>
         <RelationshipPanel relationship={relationship} origin={origin} current={detail} />
         {related.length > 0 && <section className="novel-related">
           <div className="section-heading"><div><span>Continue exploring</span><h2>Related novels</h2></div><a href={`${import.meta.env.BASE_URL}?seed=${novelId}`}>See full recommendations <Search size={15} /></a></div>
@@ -164,8 +193,8 @@ export default function NovelPage(): JSX.Element {
               <span><strong>{item.title}</strong><small>{item.author || item.language}</small><b>{item.match_score_percent.toFixed(0)}% match</b></span>
             </a>)}</div>
         </section>}
-      </Tabs.Panel>
-    </Tabs.Root>
+      </section>
+    </div>
   </main>;
 }
 
