@@ -43,6 +43,8 @@ const DEFAULT_NOVEL: NovelSearchResult = {
 export default function App(): JSX.Element {
   const { settings } = useDisplaySettings();
   const searchSectionRef = useRef<HTMLElement>(null);
+  const resultsSentinelRef = useRef<HTMLDivElement>(null);
+  const recommendationRequestRef = useRef(0);
   const detailRequestRef = useRef(0);
   const dataSourceRef = useRef<RecommendationDataSource | null>(null);
   const [dataSource, setDataSource] = useState<RecommendationDataSource | null>(null);
@@ -72,13 +74,17 @@ export default function App(): JSX.Element {
   const [listWeight, setListWeight] = useState(1);
   const [structuralWeight, setStructuralWeight] = useState(0.6);
   const [hiddenGemStrength, setHiddenGemStrength] = useState(0.3);
-  const [resultLimit, setResultLimit] = useState(30);
+  const [maxResults, setMaxResults] = useState(60);
   const [genres, setGenres] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<RecommendResponse | null>(null);
   const [visibleCount, setVisibleCount] = useState(8);
+  const [loadedLimit, setLoadedLimit] = useState(0);
+  const [availableExhausted, setAvailableExhausted] = useState(false);
+  const [observerSupported, setObserverSupported] = useState(true);
+  const [incrementalError, setIncrementalError] = useState<string | null>(null);
   const [activeDetailId, setActiveDetailId] = useState<number | null>(null);
   const [detail, setDetail] = useState<NovelDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -141,19 +147,25 @@ export default function App(): JSX.Element {
     };
   }, [query, selectedNovel, dataSource]);
 
-  const fetchRecommendations = async (novel: NovelSearchResult | null = selectedNovel) => {
+  const fetchRecommendations = async (
+    novel: NovelSearchResult | null = selectedNovel,
+    requestedLimit = Math.min(24, maxResults),
+    expanding = false
+  ) => {
     const source = dataSourceRef.current;
     if (!source) return;
     const requestedQuery = novel ? String(novel.id) : selectedNovel ? String(selectedNovel.id) : query.trim();
     if (!requestedQuery) return;
 
+    const requestId = ++recommendationRequestRef.current;
     setLoading(true);
+    if (!expanding) setIncrementalError(null);
     setError(null);
     setShowSuggestions(false);
     try {
       const payload: RecommendRequest = {
         query: requestedQuery,
-        limit: resultLimit,
+        limit: requestedLimit,
         hidden_gem_mode: hiddenGemMode,
         exclude_harem: excludeHarem,
         exclude_bl: excludeBL,
@@ -179,12 +191,21 @@ export default function App(): JSX.Element {
       };
 
       const json = await source.getRecommendations(payload);
+      if (requestId !== recommendationRequestRef.current) return;
       setData(json);
-      setVisibleCount(8);
+      setLoadedLimit(requestedLimit);
+      setAvailableExhausted(json.recommendations.length < requestedLimit || (expanding && json.recommendations.length <= (data?.recommendations.length || 0)));
+      if (!expanding) setVisibleCount(8);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch recommendations.');
+      if (requestId !== recommendationRequestRef.current) return;
+      if (expanding) {
+        setIncrementalError(err.message || 'Could not load more recommendations.');
+        setAvailableExhausted(true);
+      } else {
+        setError(err.message || 'Failed to fetch recommendations.');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === recommendationRequestRef.current) setLoading(false);
     }
   };
 
@@ -391,6 +412,36 @@ export default function App(): JSX.Element {
     return active;
   }, [hideLibraryTitles, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
 
+  const filteredRecommendations = useMemo(() => (data?.recommendations || [])
+    .filter((rec) => feedbackByNovel.get(rec.target_id) !== 'not_for_me')
+    .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
+    .slice(0, maxResults), [data, feedbackByNovel, hideLibraryTitles, maxResults, profileEntries]);
+
+  const loadNextRecommendationBatch = () => {
+    if (loading || !data) return;
+    if (visibleCount < filteredRecommendations.length) {
+      setVisibleCount((count) => Math.min(count + 8, filteredRecommendations.length));
+      return;
+    }
+    if (availableExhausted || data.recommendations.length >= maxResults) return;
+    fetchRecommendations(selectedNovel, Math.min(maxResults, Math.max(loadedLimit + 24, data.recommendations.length + 24)), true);
+  };
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') {
+      setObserverSupported(false);
+      return;
+    }
+    setObserverSupported(true);
+    const sentinel = resultsSentinelRef.current;
+    if (!sentinel || !data) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadNextRecommendationBatch();
+    }, { rootMargin: '500px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [data, visibleCount, filteredRecommendations.length, loading, availableExhausted, maxResults, loadedLimit, selectedNovel]);
+
   return (
     <div className="app-container">
       <header className="header">
@@ -495,10 +546,10 @@ export default function App(): JSX.Element {
               <option value="4">4.0+</option>
               <option value="4.3">4.3+</option>
             </Select>
-            <Select label="Results" value={resultLimit} onChange={(e) => setResultLimit(Number(e.currentTarget.value))}>
-              <option value="12">12</option>
-              <option value="20">20</option>
-              <option value="30">30</option>
+            <Select label="Results" value={maxResults} onChange={(e) => { setMaxResults(Number(e.currentTarget.value)); setAvailableExhausted(false); }}>
+              <option value="30">Up to 30</option>
+              <option value="60">Up to 60</option>
+              <option value="100">Up to 100 (pool limit)</option>
             </Select>
           </div>
         </div>
@@ -611,10 +662,7 @@ export default function App(): JSX.Element {
           </div>
 
           <div className="results-grid">
-            {data.recommendations
-              .filter((rec) => feedbackByNovel.get(rec.target_id) !== 'not_for_me')
-              .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
-              .slice(0, visibleCount).map((rec, index) => (
+            {filteredRecommendations.slice(0, visibleCount).map((rec, index) => (
               <article
                 key={rec.target_id || index}
                 className="novel-card"
@@ -702,18 +750,21 @@ export default function App(): JSX.Element {
             ))}
           </div>
 
-          {visibleCount < data.recommendations.length && (
-            <div className="load-more-row">
-              <button
-                type="button"
-                className="load-more-button"
-                onClick={() => setVisibleCount((count) => count + 8)}
-              >
-                Load 8 more
-              </button>
-              <span>Showing {visibleCount} of {data.recommendations.length}</span>
-            </div>
-          )}
+          <div className="results-sentinel" ref={resultsSentinelRef}>
+            <p aria-live="polite">
+              {loading
+                ? 'Loading more recommendations…'
+                : incrementalError
+                  ? incrementalError
+                : visibleCount < filteredRecommendations.length || (!availableExhausted && data.recommendations.length < maxResults)
+                  ? `Showing ${Math.min(visibleCount, filteredRecommendations.length)} results · more load automatically`
+                  : `Showing ${filteredRecommendations.length} · end of the available candidate pool`}
+            </p>
+            {!observerSupported && !loading && (visibleCount < filteredRecommendations.length || (!availableExhausted && data.recommendations.length < maxResults)) && (
+              <Button variant="default" onClick={loadNextRecommendationBatch}>Load more recommendations</Button>
+            )}
+            {incrementalError && !loading && <Button variant="ghost" onClick={() => { setIncrementalError(null); setAvailableExhausted(false); }}>Retry automatic loading</Button>}
+          </div>
         </main>
       )}
 
