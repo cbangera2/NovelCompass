@@ -207,6 +207,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .analytics-tooltip { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.22); display: flex; flex-direction: column; gap: .15rem; max-width: 220px; padding: .5rem .6rem; }
 .analytics-tooltip strong { font-size: .7rem; }
 .analytics-tooltip span { color: var(--muted); font-size: .64rem; }
+.chart-selectable-point { cursor: pointer; outline: none; }
+.chart-selectable-point:focus { filter: drop-shadow(0 0 4px var(--accent-bright)); stroke: var(--accent-bright); stroke-width: 3px; }
+.chart-point-card { align-items: center; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 9px; box-shadow: 0 8px 24px rgba(0,0,0,.18); display: flex; gap: .75rem; justify-content: space-between; margin-top: .55rem; padding: .65rem .75rem; }
+.chart-point-card > div { display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
+.chart-point-card strong { font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-point-card span { color: var(--muted); font-size: .66rem; }
+.chart-point-card a { background: var(--accent); border-radius: 7px; color: #fff; flex: 0 0 auto; font-size: .7rem; font-weight: 700; padding: .45rem .65rem; text-decoration: none; }
+.chart-point-card a:hover { background: var(--accent-bright); }
 .language-bars { display: grid; gap: .45rem; }
 .language-bars > div { align-items: center; display: grid; gap: .5rem; grid-template-columns: 90px 1fr 28px; }
 .language-bars span,.language-bars strong { font-size: .68rem; }

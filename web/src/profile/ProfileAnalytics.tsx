@@ -30,15 +30,14 @@ function AnalyticsTooltip({ active, payload, label }: any) {
     {item.rating != null && <span>Rating {item.rating}</span>}
     {item.readers != null && <span>{Number(item.readers).toLocaleString()} readers</span>}
     {item.hidden && <span>Potential hidden gem</span>}
-    {item.id != null && <span>Click to open novel</span>}
+    {item.id != null && <span>Select for novel details</span>}
   </div>;
 }
 
 export default function ProfileAnalytics({
   profile,
   source,
-  datasetVersion,
-  onOpenNovel
+  datasetVersion
 }: {
   profile: LocalUserProfile;
   source: RecommendationDataSource | null;
@@ -51,6 +50,13 @@ export default function ProfileAnalytics({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [selectedPoint, setSelectedPoint] = useState<{
+    id: number;
+    title: string;
+    rating: number;
+    readers: number;
+    hidden: boolean;
+  } | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -162,7 +168,7 @@ export default function ProfileAnalytics({
         <article className="analytics-card scatter-card">
           <h3>Rating vs. readers</h3>
           <p>Gold points meet the transparent potential-hidden-gem rule: rating ≥ 4.2 and fewer than 2,000 readers. This is not a calibrated quality score.</p>
-          <div className="analytics-chart analytics-chart-scatter" aria-hidden="true">
+          <div className="analytics-chart analytics-chart-scatter" role="group" aria-label="Interactive rating and readership plot. Select a point to show novel details.">
             <ResponsiveContainer width="100%" height={340}>
               <ScatterChart margin={{ top: 18, right: 24, bottom: 26, left: 4 }}>
                 <CartesianGrid stroke="var(--border)" />
@@ -171,15 +177,32 @@ export default function ProfileAnalytics({
                 <YAxis type="number" dataKey="rating" name="Rating" domain={[0, 5]} tick={{ fill: 'var(--muted)', fontSize: 10 }} width={34} />
                 <ChartTooltip content={<AnalyticsTooltip />} cursor={{ strokeDasharray: '3 3', stroke: 'var(--border-strong)' }} />
                 <Legend verticalAlign="top" height={28} formatter={() => 'Sampled profile titles · gold indicates potential hidden gem'} wrapperStyle={{ color: 'var(--muted)', fontSize: 11 }} />
-                <Scatter name="Titles" data={scatterData} isAnimationActive={!reducedMotion} onClick={(point: any) => {
-                  const id = Number(point?.id ?? point?.payload?.id);
-                  if (Number.isInteger(id) && id > 0) onOpenNovel(id);
-                }}>
+                <Scatter name="Titles" data={scatterData} isAnimationActive={!reducedMotion}
+                  shape={(props: any) => {
+                    const point = props.payload;
+                    const select = () => setSelectedPoint(point);
+                    return <circle cx={props.cx} cy={props.cy} r={6} fill={point.hidden ? '#d89113' : 'var(--accent)'}
+                      stroke="var(--surface)" strokeWidth={2} className="chart-selectable-point" role="button" tabIndex={0}
+                      aria-label={`${point.title}, rating ${point.rating}, ${point.readers.toLocaleString()} readers. Show details.`}
+                      onClick={select} onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          select();
+                        }
+                      }} />;
+                  }}>
                   {scatterData.map((point) => <Cell key={point.id} fill={point.hidden ? '#d89113' : 'var(--accent)'} stroke="var(--surface)" strokeWidth={2} />)}
                 </Scatter>
               </ScatterChart>
             </ResponsiveContainer>
           </div>
+          {selectedPoint && <div className="chart-point-card" role="status">
+            <div><strong>{selectedPoint.title}</strong>
+              <span>{selectedPoint.rating} rating · {selectedPoint.readers.toLocaleString()} readers</span>
+              {selectedPoint.hidden && <span>Potential hidden gem</span>}
+            </div>
+            <a href={novelPageUrl(selectedPoint.id)}>Open novel</a>
+          </div>}
           <div className="analytics-table-wrap"><table><caption>Plotted novel data</caption><thead><tr><th>Novel</th><th>Rating</th><th>Readers</th><th>Classification</th></tr></thead><tbody>
             {scatter.map((detail) => <tr key={detail.id}><th><a href={novelPageUrl(detail.id)}>{detail.title}</a></th><td>{detail.rating}</td><td>{detail.reading_list_count.toLocaleString()}</td><td>{hiddenGem(detail) ? 'Potential hidden gem' : 'Other sample title'}</td></tr>)}
           </tbody></table></div>
