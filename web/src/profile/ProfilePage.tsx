@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from '../data';
-import { DatasetManifest } from '../types';
+import { DatasetManifest, NovelDetail } from '../types';
 import { ProfilePanel } from './ProfilePanel';
 import { loadLocalProfile } from './store';
 import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
@@ -23,6 +23,14 @@ export default function ProfilePage(): JSX.Element {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | ReadingStatus>('all');
   const [rating, setRating] = useState(0);
+  const [taste, setTaste] = useState<{
+    details: NovelDetail[];
+    requested: number;
+    failed: number;
+    genres: Array<[string, number]>;
+    tags: Array<[string, number]>;
+  } | null>(null);
+  const [tasteLoading, setTasteLoading] = useState(false);
 
   useEffect(() => {
     loadLocalProfile().then(setProfile);
@@ -31,6 +39,46 @@ export default function ProfilePage(): JSX.Element {
       setDataset(await next.getManifest());
     }).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!profile || !source) {
+      setTaste(null);
+      setTasteLoading(false);
+      return;
+    }
+    const rated = profile.entries
+      .filter((entry) => entry.novel_id != null && entry.rating != null)
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    const completed = profile.entries.filter((entry) => entry.novel_id != null && entry.status === 'completed');
+    const selected = [...rated, ...completed]
+      .filter((entry, index, entries) => entries.findIndex((item) => item.novel_id === entry.novel_id) === index)
+      .slice(0, 12);
+    if (!selected.length) {
+      setTaste({ details: [], requested: 0, failed: 0, genres: [], tags: [] });
+      setTasteLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setTasteLoading(true);
+    Promise.allSettled(selected.map((entry) => source.getNovel(entry.novel_id!))).then((results) => {
+      if (cancelled) return;
+      const details = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+      const count = (values: string[]) => {
+        const totals = new Map<string, number>();
+        values.forEach((value) => totals.set(value, (totals.get(value) || 0) + 1));
+        return [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      };
+      setTaste({
+        details,
+        requested: selected.length,
+        failed: results.length - details.length,
+        genres: count(details.flatMap((detail) => detail.genres)).slice(0, 8),
+        tags: count(details.flatMap((detail) => detail.tags)).slice(0, 12)
+      });
+      setTasteLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [profile, source]);
 
   const counts = useMemo(() => {
     const next: Record<ReadingStatus, number> = { reading: 0, completed: 0, plan_to_read: 0 };
@@ -82,6 +130,46 @@ export default function ProfilePage(): JSX.Element {
             <div><strong>{counts.completed.toLocaleString()}</strong><span>Completed</span></div>
             <div><strong>{counts.plan_to_read.toLocaleString()}</strong><span>Plan to read</span></div>
             <div><strong>{profile.entries.filter((entry) => entry.novel_id != null).length.toLocaleString()}</strong><span>Matched</span></div>
+          </section>
+
+          <section className="taste-snapshot" aria-labelledby="taste-title">
+            <div className="profile-library-heading">
+              <div><span className="eyebrow">Descriptive, not predictive</span><h2 id="taste-title">Taste snapshot</h2></div>
+              <span>{dataset?.dataset_version || profile.dataset_version}</span>
+            </div>
+            {tasteLoading && <p className="profile-list-note">Loading known genres and tags from your strongest profile signals…</p>}
+            {!tasteLoading && taste && taste.requested === 0 && (
+              <p className="profile-list-note">Add personal ratings or import Completed titles to create a transparent taste sample.</p>
+            )}
+            {!tasteLoading && taste && taste.requested > 0 && (
+              <>
+                <p className="profile-list-note">
+                  Based on {taste.details.length} of {taste.requested} selected titles: explicitly rated novels first, then Completed titles.
+                  {taste.failed ? ` ${taste.failed} detail file${taste.failed === 1 ? '' : 's'} could not be loaded.` : ''}
+                  {' '}This describes recurring metadata; it does not infer dislikes or predict compatibility.
+                </p>
+                <div className="taste-columns">
+                  <div>
+                    <h3>Recurring genres</h3>
+                    <div className="taste-chips">
+                      {taste.genres.map(([genre, count]) => <span key={genre}>{genre}<strong>{count}/{taste.details.length}</strong></span>)}
+                      {!taste.genres.length && <small>No genre metadata was available.</small>}
+                    </div>
+                  </div>
+                  <div>
+                    <h3>Recurring tags</h3>
+                    <div className="taste-chips">
+                      {taste.tags.map(([tag, count]) => <span key={tag}>{tag}<strong>{count}/{taste.details.length}</strong></span>)}
+                      {!taste.tags.length && <small>No tag metadata was available.</small>}
+                    </div>
+                  </div>
+                </div>
+                <details className="taste-sample">
+                  <summary>Titles used in this snapshot</summary>
+                  <ul>{taste.details.map((detail) => <li key={detail.id}>{detail.title}</li>)}</ul>
+                </details>
+              </>
+            )}
           </section>
 
           <section className="profile-library-section">

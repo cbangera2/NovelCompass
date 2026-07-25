@@ -118,6 +118,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .profile-page-stats > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; padding: 1rem; }
 .profile-page-stats strong { font-size: 1.5rem; }
 .profile-page-stats span { color: var(--dim); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; }
+.taste-snapshot { background: linear-gradient(145deg, rgba(155,135,245,.08), rgba(17,21,32,.88)); border: 1px solid rgba(155,135,245,.2); border-radius: 15px; padding: 1.1rem; }
+.taste-columns { display: grid; gap: 1rem; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+.taste-columns h3 { color: var(--dim); font-size: .68rem; letter-spacing: .08em; margin-bottom: .55rem; text-transform: uppercase; }
+.taste-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.taste-chips span { align-items: center; background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; color: #d9d5e6; display: inline-flex; font-size: .72rem; gap: .35rem; padding: .3rem .5rem; }
+.taste-chips strong { color: var(--accent-bright); font-size: .62rem; }
+.taste-chips small { color: var(--dim); }
+.taste-sample { margin-top: .8rem; }
+.taste-sample summary { color: var(--accent-bright); cursor: pointer; font-size: .72rem; }
+.taste-sample ul { color: var(--muted); columns: 2; font-size: .72rem; margin: .45rem 0 0 1rem; }
 .profile-library-section, .profile-lists-section { margin-top: 2.5rem; }
 .profile-library-heading { align-items: flex-end; display: flex; justify-content: space-between; margin-bottom: .9rem; }
 .profile-library-heading h2 { font-size: 1.65rem; }
@@ -249,6 +259,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .profile-page-nav { gap: .6rem; margin-bottom: 2rem; }
   .profile-library-controls { grid-template-columns: 1fr; }
   .profile-entry-grid, .profile-list-grid { grid-template-columns: 1fr; }
+  .taste-columns { grid-template-columns: 1fr; }
+  .taste-sample ul { columns: 1; }
 }
 
 .dataset-controls {
