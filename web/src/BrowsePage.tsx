@@ -9,39 +9,51 @@ import { FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { novelPageUrl } from './novelLinks';
 import { loadLocalProfile } from './profile/store';
+import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
   const initialParams = new URLSearchParams(window.location.search);
-  const initialNumber = (key: string) => Number(initialParams.get(key) || 0);
+  const saved = loadFilterSnapshot('browse', {
+    query: '', sort: 'popular', direction: 'desc', language: '', author: '', genre: '', tag: '',
+    minRating: 0, maxRating: 0, minVotes: 0, minYear: 0, maxYear: 0, status: '',
+    minChapters: 0, maxChapters: 0, minReaders: 0, maxReaders: 0, includeGenres: '',
+    excludeGenres: '', includeTags: '', excludeTags: '', excludeLibrary: false, density: 'grid'
+  });
+  const savedSort: BrowseSort = ['popular', 'rating', 'votes', 'title', 'newest'].includes(String(saved.sort))
+    ? saved.sort as BrowseSort : 'popular';
+  const savedDirection: BrowseSortDirection = saved.direction === 'asc' ? 'asc' : 'desc';
+  const savedDensity: 'grid' | 'list' = saved.density === 'list' ? 'list' : 'grid';
+  const initialString = (urlKey: string, savedKey: keyof typeof saved) => initialParams.has(urlKey) ? initialParams.get(urlKey) || '' : String(saved[savedKey] || '');
+  const initialNumber = (key: string, savedKey: keyof typeof saved) => initialParams.has(key) ? Number(initialParams.get(key) || 0) : Number(saved[savedKey] || 0);
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
-  const [query, setQuery] = useState(initialParams.get('q') || '');
-  const [sort, setSort] = useState<BrowseSort>((initialParams.get('sort') as BrowseSort) || 'popular');
-  const [direction, setDirection] = useState<BrowseSortDirection>((initialParams.get('direction') as BrowseSortDirection) || 'desc');
-  const [language, setLanguage] = useState(initialParams.get('language') || '');
-  const [author, setAuthor] = useState(initialParams.get('author') || '');
-  const [genre, setGenre] = useState(initialParams.get('genre') || '');
-  const [tag, setTag] = useState(initialParams.get('tag') || '');
-  const [minRating, setMinRating] = useState(initialNumber('min_rating'));
-  const [maxRating, setMaxRating] = useState(initialNumber('max_rating'));
-  const [minVotes, setMinVotes] = useState(initialNumber('min_votes'));
-  const [minYear, setMinYear] = useState(initialNumber('min_year'));
-  const [maxYear, setMaxYear] = useState(initialNumber('max_year'));
-  const [status, setStatus] = useState(initialParams.get('status') || '');
-  const [minChapters, setMinChapters] = useState(initialNumber('min_chapters'));
-  const [maxChapters, setMaxChapters] = useState(initialNumber('max_chapters'));
-  const [minReaders, setMinReaders] = useState(initialNumber('min_readers'));
-  const [maxReaders, setMaxReaders] = useState(initialNumber('max_readers'));
-  const [includeGenres, setIncludeGenres] = useState(initialParams.get('include_genres') || '');
-  const [excludeGenres, setExcludeGenres] = useState(initialParams.get('exclude_genres') || '');
-  const [includeTags, setIncludeTags] = useState(initialParams.get('include_tags') || '');
-  const [excludeTags, setExcludeTags] = useState(initialParams.get('exclude_tags') || '');
-  const [excludeLibrary, setExcludeLibrary] = useState(initialParams.get('exclude_library') === '1');
+  const [query, setQuery] = useState(initialString('q', 'query'));
+  const [sort, setSort] = useState<BrowseSort>(initialParams.has('sort') && ['popular', 'rating', 'votes', 'title', 'newest'].includes(initialParams.get('sort') || '') ? initialParams.get('sort') as BrowseSort : savedSort);
+  const [direction, setDirection] = useState<BrowseSortDirection>(initialParams.has('direction') ? (initialParams.get('direction') === 'asc' ? 'asc' : 'desc') : savedDirection);
+  const [language, setLanguage] = useState(initialString('language', 'language'));
+  const [author, setAuthor] = useState(initialString('author', 'author'));
+  const [genre, setGenre] = useState(initialString('genre', 'genre'));
+  const [tag, setTag] = useState(initialString('tag', 'tag'));
+  const [minRating, setMinRating] = useState(initialNumber('min_rating', 'minRating'));
+  const [maxRating, setMaxRating] = useState(initialNumber('max_rating', 'maxRating'));
+  const [minVotes, setMinVotes] = useState(initialNumber('min_votes', 'minVotes'));
+  const [minYear, setMinYear] = useState(initialNumber('min_year', 'minYear'));
+  const [maxYear, setMaxYear] = useState(initialNumber('max_year', 'maxYear'));
+  const [status, setStatus] = useState(initialString('status', 'status'));
+  const [minChapters, setMinChapters] = useState(initialNumber('min_chapters', 'minChapters'));
+  const [maxChapters, setMaxChapters] = useState(initialNumber('max_chapters', 'maxChapters'));
+  const [minReaders, setMinReaders] = useState(initialNumber('min_readers', 'minReaders'));
+  const [maxReaders, setMaxReaders] = useState(initialNumber('max_readers', 'maxReaders'));
+  const [includeGenres, setIncludeGenres] = useState(initialString('include_genres', 'includeGenres'));
+  const [excludeGenres, setExcludeGenres] = useState(initialString('exclude_genres', 'excludeGenres'));
+  const [includeTags, setIncludeTags] = useState(initialString('include_tags', 'includeTags'));
+  const [excludeTags, setExcludeTags] = useState(initialString('exclude_tags', 'excludeTags'));
+  const [excludeLibrary, setExcludeLibrary] = useState(initialParams.has('exclude_library') ? initialParams.get('exclude_library') === '1' : Boolean(saved.excludeLibrary));
   const [libraryIds, setLibraryIds] = useState<number[]>([]);
-  const [density, setDensity] = useState<'grid' | 'list'>((initialParams.get('density') as 'grid' | 'list') || 'grid');
+  const [density, setDensity] = useState<'grid' | 'list'>(initialParams.has('density') ? (initialParams.get('density') === 'list' ? 'list' : 'grid') : savedDensity);
   const [page, setPage] = useState(1);
   const [retryToken, setRetryToken] = useState(0);
   const [total, setTotal] = useState(0);
@@ -63,6 +75,14 @@ export default function BrowsePage(): JSX.Element {
       setOptions(await next.getOptions());
     }).catch((reason) => setError(reason.message || 'Could not load the catalog.'));
   }, []);
+
+  useEffect(() => {
+    saveFilterSnapshot('browse', { query, sort, direction, language, author, genre, tag, minRating, maxRating,
+      minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders,
+      includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density });
+  }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear,
+    status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags,
+    excludeTags, excludeLibrary, density]);
 
   useEffect(() => {
     loadLocalProfile().then((profile) => setLibraryIds(

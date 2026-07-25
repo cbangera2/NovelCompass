@@ -34,6 +34,7 @@ import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { novelPageUrl } from './novelLinks';
+import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -46,6 +47,14 @@ const DEFAULT_NOVEL: NovelSearchResult = {
 };
 
 export default function App(): JSX.Element {
+  const savedFilters = loadFilterSnapshot('discover', {
+    hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
+    requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
+    minYear: 0, maxYear: 0, genreStates: {} as Record<string, 'include' | 'exclude'>,
+    includeTagsText: '', excludeTagsText: '', tagWeight: .8, directRecWeight: 1.2,
+    listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60
+  });
+  const savedNumber = (value: unknown, fallback: number) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   const { settings } = useDisplaySettings();
   const searchSectionRef = useRef<HTMLElement>(null);
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
@@ -60,26 +69,28 @@ export default function App(): JSX.Element {
   const [suggestions, setSuggestions] = useState<NovelSearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [hiddenGemMode, setHiddenGemMode] = useState(false);
-  const [excludeHarem, setExcludeHarem] = useState(false);
-  const [excludeBL, setExcludeBL] = useState(false);
-  const [excludeYuri, setExcludeYuri] = useState(false);
-  const [requireCompleted, setRequireCompleted] = useState(false);
-  const [language, setLanguage] = useState('');
-  const [minRating, setMinRating] = useState(0);
-  const [minRatingVotes, setMinRatingVotes] = useState(0);
-  const [maxReaders, setMaxReaders] = useState(0);
-  const [minYear, setMinYear] = useState(0);
-  const [maxYear, setMaxYear] = useState(0);
-  const [genreStates, setGenreStates] = useState<Record<string, 'include' | 'exclude'>>({});
-  const [includeTagsText, setIncludeTagsText] = useState('');
-  const [excludeTagsText, setExcludeTagsText] = useState('');
-  const [tagWeight, setTagWeight] = useState(0.8);
-  const [directRecWeight, setDirectRecWeight] = useState(1.2);
-  const [listWeight, setListWeight] = useState(1);
-  const [structuralWeight, setStructuralWeight] = useState(0.6);
-  const [hiddenGemStrength, setHiddenGemStrength] = useState(0.3);
-  const [maxResults, setMaxResults] = useState(60);
+  const [hiddenGemMode, setHiddenGemMode] = useState(Boolean(savedFilters.hiddenGemMode));
+  const [excludeHarem, setExcludeHarem] = useState(Boolean(savedFilters.excludeHarem));
+  const [excludeBL, setExcludeBL] = useState(Boolean(savedFilters.excludeBL));
+  const [excludeYuri, setExcludeYuri] = useState(Boolean(savedFilters.excludeYuri));
+  const [requireCompleted, setRequireCompleted] = useState(Boolean(savedFilters.requireCompleted));
+  const [language, setLanguage] = useState(String(savedFilters.language || ''));
+  const [minRating, setMinRating] = useState(savedNumber(savedFilters.minRating, 0));
+  const [minRatingVotes, setMinRatingVotes] = useState(savedNumber(savedFilters.minRatingVotes, 0));
+  const [maxReaders, setMaxReaders] = useState(savedNumber(savedFilters.maxReaders, 0));
+  const [minYear, setMinYear] = useState(savedNumber(savedFilters.minYear, 0));
+  const [maxYear, setMaxYear] = useState(savedNumber(savedFilters.maxYear, 0));
+  const [genreStates, setGenreStates] = useState<Record<string, 'include' | 'exclude'>>(() =>
+    Object.fromEntries(Object.entries(savedFilters.genreStates).filter(([, value]) => value === 'include' || value === 'exclude'))
+  );
+  const [includeTagsText, setIncludeTagsText] = useState(String(savedFilters.includeTagsText || ''));
+  const [excludeTagsText, setExcludeTagsText] = useState(String(savedFilters.excludeTagsText || ''));
+  const [tagWeight, setTagWeight] = useState(savedNumber(savedFilters.tagWeight, .8));
+  const [directRecWeight, setDirectRecWeight] = useState(savedNumber(savedFilters.directRecWeight, 1.2));
+  const [listWeight, setListWeight] = useState(savedNumber(savedFilters.listWeight, 1));
+  const [structuralWeight, setStructuralWeight] = useState(savedNumber(savedFilters.structuralWeight, .6));
+  const [hiddenGemStrength, setHiddenGemStrength] = useState(savedNumber(savedFilters.hiddenGemStrength, .3));
+  const [maxResults, setMaxResults] = useState(savedNumber(savedFilters.maxResults, 60));
   const [genres, setGenres] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -101,6 +112,14 @@ export default function App(): JSX.Element {
   useEffect(() => {
     loadLocalProfile().then(setProfile).catch(() => setProfile(null));
   }, []);
+
+  useEffect(() => {
+    saveFilterSnapshot('discover', { hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted,
+      language, minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
+      excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults });
+  }, [hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language, minRating,
+    minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
+    tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
 
   useEffect(() => {
     let cancelled = false;
