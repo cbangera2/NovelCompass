@@ -32,3 +32,5 @@
   .novel-content-grid,.relationship-layout{grid-template-columns:minmax(0,1fr)}.novel-about,.novel-facets,.relationship-card{min-width:0}
 }
 @media(max-width:360px){.novel-cover-shell{width:170px}.novel-actions{grid-template-columns:1fr}.novel-rank-strip{grid-template-columns:1fr}.novel-section-nav button{font-size:.58rem}}
+.novel-related+.relationship-empty{background:linear-gradient(135deg,var(--surface),color-mix(in srgb,var(--accent-soft) 32%,var(--surface)));margin-top:1.6rem;padding:1.75rem}.novel-related+.relationship-empty h2{margin:.5rem 0 .3rem}.novel-related+.relationship-empty p{margin-bottom:.85rem}
+@media(max-width:640px){.novel-related+.relationship-empty{margin-top:1.1rem;padding:1.35rem 1rem}}
