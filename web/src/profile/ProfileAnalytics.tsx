@@ -126,7 +126,7 @@ export default function ProfileAnalytics({
             <h3>Language distribution</h3>
             <p>Language metadata among successfully loaded sample titles.</p>
             <div className="analytics-chart analytics-chart-bars" aria-hidden="true">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={languageData} layout="vertical" margin={{ top: 6, right: 18, bottom: 6, left: 12 }}>
                   <defs><linearGradient id="languageGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="var(--accent)" /><stop offset="100%" stopColor="var(--green)" /></linearGradient></defs>
                   <CartesianGrid horizontal={false} stroke="var(--border)" />
@@ -143,7 +143,7 @@ export default function ProfileAnalytics({
             <h3>Personal rating summary</h3>
             <p>{ratingCounts.reduce((sum, [, count]) => sum + count, 0)} entries have an explicit imported rating; unrated entries are excluded.</p>
             <div className="analytics-chart analytics-chart-bars" aria-hidden="true">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={ratingData} margin={{ top: 8, right: 10, bottom: 4, left: -18 }}>
                   <defs><linearGradient id="ratingGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.42} /><stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.03} /></linearGradient></defs>
                   <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
@@ -161,7 +161,7 @@ export default function ProfileAnalytics({
           <h3>Rating vs. readers</h3>
           <p>Gold points meet the transparent potential-hidden-gem rule: rating ≥ 4.2 and fewer than 2,000 readers. This is not a calibrated quality score.</p>
           <div className="analytics-chart analytics-chart-scatter" aria-hidden="true">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={340}>
               <ScatterChart margin={{ top: 18, right: 24, bottom: 26, left: 4 }}>
                 <CartesianGrid stroke="var(--border)" />
                 <XAxis type="number" dataKey="readerScale" name="Readers (log scale)" tick={{ fill: 'var(--muted)', fontSize: 10 }}
