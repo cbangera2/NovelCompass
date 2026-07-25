@@ -10,7 +10,7 @@ import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { LocalNovelFeedback, LocalUserProfile } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { NovelDetail, Recommendation } from './types';
+import { NovelDetail, NovelInsights, Recommendation } from './types';
 import { novelPageUrl } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import './novel-page.css';
@@ -30,6 +30,7 @@ export default function NovelPage(): JSX.Element {
   const [origin, setOrigin] = useState<NovelDetail | null>(null);
   const [relationship, setRelationship] = useState<Recommendation | null>(null);
   const [related, setRelated] = useState<Recommendation[]>([]);
+  const [insights, setInsights] = useState<NovelInsights | null>(null);
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || (fromId ? 'relationship' : 'overview'));
@@ -51,6 +52,9 @@ export default function NovelPage(): JSX.Element {
         const relatedRequest = dataSource.getRecommendations({ query: String(novelId), limit: 12 })
           .then((response) => !cancelled && setRelated(response.recommendations))
           .catch(() => undefined);
+        const insightsRequest = dataSource.getNovelInsights(novelId)
+          .then((value) => !cancelled && setInsights(value))
+          .catch(() => undefined);
         const relationshipRequest = fromId
           ? Promise.all([
               dataSource.getNovel(fromId).catch(() => null),
@@ -61,7 +65,7 @@ export default function NovelPage(): JSX.Element {
               setRelationship(response?.recommendations.find((item) => item.target_id === novelId) || null);
             })
           : Promise.resolve();
-        await Promise.all([relatedRequest, relationshipRequest]);
+        await Promise.all([relatedRequest, insightsRequest, relationshipRequest]);
       })
       .catch((reason) => !cancelled && setError(reason.message || 'Could not load this novel.'));
     return () => { cancelled = true; };
@@ -134,6 +138,19 @@ export default function NovelPage(): JSX.Element {
           <div><strong>{detail.reading_list_count.toLocaleString()}</strong><span>readers</span><small>on reading lists</small></div>
           <div><strong>{detail.chapters_trans.toLocaleString()}</strong><span>chapters</span><small>{detail.chapters_orig ? `${detail.chapters_orig.toLocaleString()} original` : 'translated'}</small></div>
         </div>
+        {insights && <div className="novel-rank-strip" aria-label="Catalog ranks">
+          {insights.metrics.map((metric) => <div key={metric.key}>
+            <span>{metric.key === 'rating_votes' ? 'votes' : metric.key}</span>
+            <strong>#{metric.rank.toLocaleString()}</strong>
+            <small>of {metric.population.toLocaleString()}</small>
+          </div>)}
+        </div>}
+        <dl className="novel-facts" aria-label="Publication details">
+          {detail.language && <div><dt>Language</dt><dd><a href={browseFacetUrl('language', detail.language)}>{detail.language}</a></dd></div>}
+          {detail.year && <div><dt>Year</dt><dd>{detail.year}</dd></div>}
+          {detail.status_trans && <div><dt>Status</dt><dd>{detail.status_trans}</dd></div>}
+          <div><dt>Translated</dt><dd>{detail.chapters_trans.toLocaleString()} chapters</dd></div>
+        </dl>
         <div className="novel-actions">
           <DSButton as="a" variant="primary" href={`${import.meta.env.BASE_URL}?seed=${novelId}`}><Sparkles size={17} />Find similar</DSButton>
           <DSButton as="a" variant="outline" href={detail.novelupdates_url} target="_blank" rel="noopener noreferrer">Novel Updates <ExternalLink size={15} /></DSButton>
@@ -177,7 +194,7 @@ export default function NovelPage(): JSX.Element {
       </section>
       <section id="insights" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>02</span><div><h2>Insights</h2><p>How this title sits within the current catalog snapshot.</p></div></header>
-        <NovelInsightsPanel novelId={novelId} source={source}
+        <NovelInsightsPanel novelId={novelId} source={source} providedInsights={insights} currentNovel={detail}
           onPeer={(peerId) => { window.location.href = novelPageUrl(peerId, novelId); }} />
       </section>
       <section id="relationship" data-novel-section className="novel-major-section">
@@ -185,15 +202,27 @@ export default function NovelPage(): JSX.Element {
         <RelationshipPanel relationship={relationship} origin={origin} current={detail} />
         {related.length > 0 && <section className="novel-related">
           <div className="section-heading"><div><span>Continue exploring</span><h2>Related novels</h2></div><a href={`${import.meta.env.BASE_URL}?seed=${novelId}`}>See full recommendations <Search size={15} /></a></div>
-          <div className="novel-related-grid">{related.slice(0, 8).map((item) =>
+          <p className="related-definition">Ranked from the current recommendation candidate pool. Percent match is normalized within this seed’s result set; signal ranks show which evidence channels surfaced each title.</p>
+          <div className="novel-related-grid">{related.slice(0, 10).map((item) =>
             <a className="related-novel" key={item.target_id} href={novelPageUrl(item.target_id, novelId)}>
               {item.cover_url ? <img src={item.cover_url} alt="" loading="lazy" /> : <BookMarked />}
-              <span><strong>{item.title}</strong><small>{item.author || item.language}</small><b>{item.match_score_percent.toFixed(0)}% match</b></span>
+              <span><strong>{item.title}</strong><small>{item.author || item.language}</small>
+                <span className="related-match"><b>{item.match_score_percent.toFixed(0)}% match</b>{topSignals(item).map((signal) => <em key={signal}>{signal}</em>)}</span>
+                <small className="related-reason">{item.evidence_bullets[0] || `${item.shared_tags.length} shared tags`}</small>
+              </span>
             </a>)}</div>
         </section>}
       </section>
     </div>
   </main>;
+}
+
+function topSignals(item: Recommendation): string[] {
+  return Object.entries(item.channel_ranks)
+    .filter(([, rank]) => Number.isFinite(rank))
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, 2)
+    .map(([channel]) => CHANNEL_LABELS[channel] || channel.replace(/_rank$/, '').replace(/_/g, ' '));
 }
 
 function RelationshipPanel({ relationship, origin, current }: {
