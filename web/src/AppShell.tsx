@@ -107,7 +107,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
           <span>Novel Compass · personal discovery workspace</span>
           <nav aria-label="Footer links">
             <a href={viewUrl('profile')}>Local data</a>
-            <a href={viewUrl('scraper')}>Catalog tools</a>
+            {!staticDeployment && <a href={viewUrl('scraper')}>Catalog tools</a>}
             <a href="https://github.com/shaido987/novel-dataset" target="_blank" rel="noopener noreferrer">Source dataset</a>
           </nav>
         </footer>
