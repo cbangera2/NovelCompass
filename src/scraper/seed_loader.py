@@ -63,8 +63,9 @@ def seed_database_from_dataset(
         if seed_crawl_queue:
             for list_id in SEED_LIST_IDS:
                 cur.execute("""
-                    INSERT OR IGNORE INTO crawl_queue (url, type, item_id, priority, status)
-                    VALUES (?, 'rec_list', ?, 100, 'pending')
+                    INSERT OR IGNORE INTO crawl_queue
+                        (url, type, item_id, priority, phase, status)
+                    VALUES (?, 'rec_list', ?, 100, 'discovery', 'pending')
                 """, (f"https://www.novelupdates.com/viewlist/{list_id}/", list_id))
 
         seen_slugs = set()
@@ -240,16 +241,17 @@ def seed_database_from_dataset(
                 for novel_id, (_, slug) in item_by_id.items()
             ]
             cur.executemany("""
-                INSERT OR IGNORE INTO crawl_queue (url, type, item_id, priority, status)
-                VALUES (?, 'novel', ?, 10, 'pending')
+                INSERT OR IGNORE INTO crawl_queue
+                    (url, type, item_id, priority, phase, status)
+                VALUES (?, 'novel', ?, 10, 'refresh_existing', 'pending')
             """, queue_rows)
 
             # Independent discovery sources find novels absent from the snapshot.
             cur.executemany(
                 """
                 INSERT OR IGNORE INTO crawl_queue
-                    (url, type, priority, status)
-                VALUES (?, 'discovery', 90, 'pending')
+                    (url, type, priority, phase, status)
+                VALUES (?, 'discovery', 90, 'discovery', 'pending')
                 """,
                 [
                     (

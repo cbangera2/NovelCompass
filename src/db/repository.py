@@ -178,16 +178,42 @@ class Repository:
             path += "/"
         return urlunsplit(("https", "www.novelupdates.com", path or "/", parts.query, ""))
 
-    def add_to_crawl_queue(self, url: str, item_type: str, item_id: Optional[int] = None, priority: int = 0):
+    def add_to_crawl_queue(
+        self,
+        url: str,
+        item_type: str,
+        item_id: Optional[int] = None,
+        priority: int = 0,
+        phase: str = "refresh_existing",
+    ):
         url = self.canonicalize_url(url)
         with self.conn:
             self.conn.execute("""
-                INSERT INTO crawl_queue (url, type, item_id, priority, status)
-                VALUES (?, ?, ?, ?, 'pending')
+                INSERT INTO crawl_queue
+                    (url, type, item_id, priority, phase, status)
+                VALUES (?, ?, ?, ?, ?, 'pending')
                 ON CONFLICT(url) DO UPDATE SET
                     item_id=COALESCE(crawl_queue.item_id, excluded.item_id),
-                    priority=MAX(crawl_queue.priority, excluded.priority)
-            """, (url, item_type, item_id, priority))
+                    priority=MAX(crawl_queue.priority, excluded.priority),
+                    phase=CASE
+                        WHEN crawl_queue.phase = 'refresh_existing'
+                        THEN excluded.phase
+                        ELSE crawl_queue.phase
+                    END
+            """, (url, item_type, item_id, priority, phase))
+
+    def add_discovered_novel(
+        self, url: str, item_id: Optional[int], priority: int = 30
+    ) -> str:
+        """Queue absent novels ahead of baseline refreshes."""
+        known = None
+        if item_id is not None:
+            known = self.conn.execute(
+                "SELECT 1 FROM novels WHERE id = ?", (item_id,)
+            ).fetchone()
+        phase = "refresh_existing" if known else "new_novel"
+        self.add_to_crawl_queue(url, "novel", item_id, priority, phase)
+        return phase
 
     def claim_next_queue_item(self, max_attempts: int = 4) -> Optional[sqlite3.Row]:
         with self.conn:
@@ -195,7 +221,11 @@ class Repository:
                 """
                 SELECT * FROM crawl_queue
                 WHERE status = 'pending' AND attempts < ?
-                ORDER BY priority DESC, id ASC
+                ORDER BY CASE phase
+                    WHEN 'discovery' THEN 0
+                    WHEN 'new_novel' THEN 1
+                    ELSE 2
+                END, priority DESC, id ASC
                 LIMIT 1
                 """,
                 (max_attempts,),

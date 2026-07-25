@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS crawl_queue (
     priority INTEGER DEFAULT 0,
     status TEXT DEFAULT 'pending',
     attempts INTEGER DEFAULT 0,
+    phase TEXT DEFAULT 'refresh_existing',
     last_error TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -171,6 +172,28 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 conn.execute(
                     f"ALTER TABLE scrape_runs ADD COLUMN {name} {declaration}"
                 )
+        queue_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(crawl_queue)")
+        }
+        if "phase" not in queue_columns:
+            conn.execute(
+                "ALTER TABLE crawl_queue ADD COLUMN phase TEXT "
+                "DEFAULT 'refresh_existing'"
+            )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_crawl_queue_phase
+            ON crawl_queue(status, phase, priority DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS artifact_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
     return conn
 
 if __name__ == "__main__":

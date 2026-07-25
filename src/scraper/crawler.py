@@ -57,9 +57,8 @@ class Crawler:
         before = self.repo.queue_counts()
         before_total = sum(before.values())
         for link in links:
-            self.repo.add_to_crawl_queue(
+            self.repo.add_discovered_novel(
                 link["url"],
-                "novel",
                 item_id=link.get("id"),
                 priority=priority,
             )
@@ -131,6 +130,7 @@ class Crawler:
                         self._pagination_url(url, page_number),
                         "discovery",
                         priority=80,
+                        phase="discovery",
                     )
                     after = sum(self.repo.queue_counts().values())
                     discovered += max(0, after - before)

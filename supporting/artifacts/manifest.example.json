@@ -1,0 +1,19 @@
+{
+  "artifact_version": "2026",
+  "database": "novelupdates-2026.sqlite",
+  "novels": 0,
+  "publishable": false,
+  "queue": {
+    "discovery": {
+      "pending": 0
+    },
+    "new_novel": {
+      "pending": 0
+    },
+    "refresh_existing": {
+      "pending": 0
+    }
+  },
+  "status": "prepared",
+  "updated_at": "ISO-8601 timestamp"
+}

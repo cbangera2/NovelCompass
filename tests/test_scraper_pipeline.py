@@ -4,6 +4,7 @@ from pathlib import Path
 from src.db.repository import Repository
 from src.db.schema import SCHEMA_SQL
 from src.scraper.html_parser import parse_discovery_page, parse_series_page
+from src.scraper.refresh import artifact_status, prepare_artifact
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -83,3 +84,48 @@ def test_queue_claim_is_restartable_and_relationships_are_replaced():
             """
         ).fetchone()
     ) == (2, 3)
+
+
+def test_discovered_novels_are_claimed_before_baseline_refreshes():
+    repo = memory_repo()
+    repo.conn.execute(
+        "INSERT INTO novels(id, slug, title) VALUES (1, 'known', 'Known')"
+    )
+    repo.add_to_crawl_queue(
+        "https://www.novelupdates.com/?p=1",
+        "novel",
+        1,
+        priority=1000,
+        phase="refresh_existing",
+    )
+    assert repo.add_discovered_novel(
+        "https://www.novelupdates.com/series/new/", 2
+    ) == "new_novel"
+    assert repo.claim_next_queue_item()["item_id"] == 2
+
+
+def test_refresh_artifact_is_a_separate_versioned_copy(tmp_path):
+    source = tmp_path / "baseline.db"
+    target = tmp_path / "novelupdates-2026.sqlite"
+    conn = sqlite3.connect(source)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA_SQL)
+    conn.execute(
+        "INSERT INTO novels(id, slug, title) VALUES (1, 'baseline', 'Baseline')"
+    )
+    conn.commit()
+    conn.close()
+
+    result = prepare_artifact(source, target)
+    status = artifact_status(target)
+
+    assert result["status"] == "prepared"
+    assert status["novels"] == 1
+    assert status["metadata"]["artifact_version"] == "2026"
+    assert status["queue"]["discovery"]["pending"] == 7
+    assert status["queue"]["refresh_existing"]["pending"] == 1
+    assert target.with_suffix(".manifest.json").exists()
+
+    baseline = sqlite3.connect(source)
+    assert baseline.execute("SELECT COUNT(*) FROM crawl_queue").fetchone()[0] == 0
+    baseline.close()

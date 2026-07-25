@@ -9,6 +9,8 @@
 *.sqlite3
 data/raw/
 data/cache/
+supporting/artifacts/*.sqlite*
+supporting/artifacts/*.manifest.json
 
 # Secrets and local configuration
 .env
