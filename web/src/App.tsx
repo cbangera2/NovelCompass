@@ -38,6 +38,7 @@ const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((modul
   default: module.NovelInsightsPanel
 })));
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
+import { discoverSearchParams, parseDiscoverRoute, stableRouteUrl } from './routeState';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 6780,
@@ -57,6 +58,10 @@ export default function App(): JSX.Element {
     includeTagsText: '', excludeTagsText: '', tagWeight: .8, directRecWeight: 1.2,
     listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60
   });
+  const initialRoute = parseDiscoverRoute(new URLSearchParams(window.location.search), {
+    ...savedFilters,
+    genreStates: savedFilters.genreStates
+  });
   const savedNumber = (value: unknown, fallback: number) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   const { settings } = useDisplaySettings();
   const searchSectionRef = useRef<HTMLElement>(null);
@@ -73,28 +78,29 @@ export default function App(): JSX.Element {
   const [suggestions, setSuggestions] = useState<NovelSearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [hiddenGemMode, setHiddenGemMode] = useState(Boolean(savedFilters.hiddenGemMode));
-  const [excludeHarem, setExcludeHarem] = useState(Boolean(savedFilters.excludeHarem));
-  const [excludeBL, setExcludeBL] = useState(Boolean(savedFilters.excludeBL));
-  const [excludeYuri, setExcludeYuri] = useState(Boolean(savedFilters.excludeYuri));
-  const [requireCompleted, setRequireCompleted] = useState(Boolean(savedFilters.requireCompleted));
-  const [language, setLanguage] = useState(String(savedFilters.language || ''));
-  const [minRating, setMinRating] = useState(savedNumber(savedFilters.minRating, 0));
-  const [minRatingVotes, setMinRatingVotes] = useState(savedNumber(savedFilters.minRatingVotes, 0));
-  const [maxReaders, setMaxReaders] = useState(savedNumber(savedFilters.maxReaders, 0));
-  const [minYear, setMinYear] = useState(savedNumber(savedFilters.minYear, 0));
-  const [maxYear, setMaxYear] = useState(savedNumber(savedFilters.maxYear, 0));
+  const [hiddenGemMode, setHiddenGemMode] = useState(Boolean(initialRoute.hiddenGemMode));
+  const [excludeHarem, setExcludeHarem] = useState(Boolean(initialRoute.excludeHarem));
+  const [excludeBL, setExcludeBL] = useState(Boolean(initialRoute.excludeBL));
+  const [excludeYuri, setExcludeYuri] = useState(Boolean(initialRoute.excludeYuri));
+  const [requireCompleted, setRequireCompleted] = useState(Boolean(initialRoute.requireCompleted));
+  const [language, setLanguage] = useState(String(initialRoute.language || ''));
+  const [minRating, setMinRating] = useState(savedNumber(initialRoute.minRating, 0));
+  const [minRatingVotes, setMinRatingVotes] = useState(savedNumber(initialRoute.minRatingVotes, 0));
+  const [maxReaders, setMaxReaders] = useState(savedNumber(initialRoute.maxReaders, 0));
+  const [minYear, setMinYear] = useState(savedNumber(initialRoute.minYear, 0));
+  const [maxYear, setMaxYear] = useState(savedNumber(initialRoute.maxYear, 0));
   const [genreStates, setGenreStates] = useState<Record<string, 'include' | 'exclude'>>(() =>
-    Object.fromEntries(Object.entries(savedFilters.genreStates).filter(([, value]) => value === 'include' || value === 'exclude'))
+    Object.fromEntries(Object.entries(initialRoute.genreStates).filter(([, value]) => value === 'include' || value === 'exclude'))
   );
-  const [includeTagsText, setIncludeTagsText] = useState(String(savedFilters.includeTagsText || ''));
-  const [excludeTagsText, setExcludeTagsText] = useState(String(savedFilters.excludeTagsText || ''));
-  const [tagWeight, setTagWeight] = useState(savedNumber(savedFilters.tagWeight, .8));
-  const [directRecWeight, setDirectRecWeight] = useState(savedNumber(savedFilters.directRecWeight, 1.2));
-  const [listWeight, setListWeight] = useState(savedNumber(savedFilters.listWeight, 1));
-  const [structuralWeight, setStructuralWeight] = useState(savedNumber(savedFilters.structuralWeight, .6));
-  const [hiddenGemStrength, setHiddenGemStrength] = useState(savedNumber(savedFilters.hiddenGemStrength, .3));
-  const [maxResults, setMaxResults] = useState(savedNumber(savedFilters.maxResults, 60));
+  const [includeTagsText, setIncludeTagsText] = useState(String(initialRoute.includeTagsText || ''));
+  const [excludeTagsText, setExcludeTagsText] = useState(String(initialRoute.excludeTagsText || ''));
+  const [tagWeight, setTagWeight] = useState(savedNumber(initialRoute.tagWeight, .8));
+  const [directRecWeight, setDirectRecWeight] = useState(savedNumber(initialRoute.directRecWeight, 1.2));
+  const [listWeight, setListWeight] = useState(savedNumber(initialRoute.listWeight, 1));
+  const [structuralWeight, setStructuralWeight] = useState(savedNumber(initialRoute.structuralWeight, .6));
+  const [hiddenGemStrength, setHiddenGemStrength] = useState(savedNumber(initialRoute.hiddenGemStrength, .3));
+  const [maxResults, setMaxResults] = useState(savedNumber(initialRoute.maxResults, 60));
+  const [routeRevision, setRouteRevision] = useState(0);
   const [genres, setGenres] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -123,6 +129,19 @@ export default function App(): JSX.Element {
       excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults });
   }, [hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language, minRating,
     minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
+    tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const params = discoverSearchParams({ seed: selectedNovel?.id, hiddenGemMode, excludeHarem, excludeBL,
+        excludeYuri, requireCompleted, language, minRating, minRatingVotes, maxReaders, minYear, maxYear,
+        genreStates, includeTagsText, excludeTagsText, tagWeight, directRecWeight, listWeight,
+        structuralWeight, hiddenGemStrength, maxResults });
+      window.history.replaceState(null, '', stableRouteUrl(params));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [selectedNovel?.id, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
+    minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
     tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
 
   useEffect(() => {
@@ -269,6 +288,31 @@ export default function App(): JSX.Element {
   }, [dataSource]);
 
   useEffect(() => {
+    if (!dataSource) return;
+    const restore = async () => {
+      const route = parseDiscoverRoute(new URLSearchParams(window.location.search), { ...savedFilters, genreStates: savedFilters.genreStates });
+      setHiddenGemMode(route.hiddenGemMode); setExcludeHarem(route.excludeHarem); setExcludeBL(route.excludeBL);
+      setExcludeYuri(route.excludeYuri); setRequireCompleted(route.requireCompleted); setLanguage(route.language);
+      setMinRating(route.minRating); setMinRatingVotes(route.minRatingVotes); setMaxReaders(route.maxReaders);
+      setMinYear(route.minYear); setMaxYear(route.maxYear); setGenreStates(route.genreStates);
+      setIncludeTagsText(route.includeTagsText); setExcludeTagsText(route.excludeTagsText);
+      setTagWeight(route.tagWeight); setDirectRecWeight(route.directRecWeight); setListWeight(route.listWeight);
+      setStructuralWeight(route.structuralWeight); setHiddenGemStrength(route.hiddenGemStrength); setMaxResults(route.maxResults);
+      let seed = DEFAULT_NOVEL;
+      if (route.seed) {
+        const detail = await dataSource.getNovel(route.seed).catch(() => null);
+        if (detail) seed = { id: detail.id, title: detail.title, slug: detail.slug, novelupdates_url: detail.novelupdates_url,
+          author: detail.author || '', cover_url: detail.cover_url, rating: detail.rating, rating_votes: detail.rating_votes };
+      }
+      chooseNovel(seed);
+      setRouteRevision((value) => value + 1);
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataSource]);
+
+  useEffect(() => {
     if (!autoRefreshReadyRef.current || !selectedNovel || !dataSource) return;
     const timer = window.setTimeout(() => {
       setAvailableExhausted(false);
@@ -280,13 +324,19 @@ export default function App(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataSource, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
     minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
-    excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
+    excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults, routeRevision]);
 
   const chooseNovel = (novel: NovelSearchResult) => {
     setSelectedNovel(novel);
     setQuery(novel.title);
     setSuggestions([]);
     setShowSuggestions(false);
+  };
+  const pushSeedRoute = (novel: NovelSearchResult) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('view', 'discover');
+    params.set('seed', String(novel.id));
+    window.history.pushState(null, '', stableRouteUrl(params));
   };
 
   const useProfileEntryAsSeed = async (entry: ProfileEntry) => {
@@ -298,6 +348,7 @@ export default function App(): JSX.Element {
       const novel = resolved.get(entry.slug);
       if (!novel) throw new Error('This title is not available in the active dataset.');
       chooseNovel(novel);
+      pushSeedRoute(novel);
       window.requestAnimationFrame(() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
       await fetchRecommendations(novel);
     } catch (profileError: any) {
@@ -399,6 +450,7 @@ export default function App(): JSX.Element {
       rating_votes: detail.rating_votes
     };
     chooseNovel(nextSeed);
+    pushSeedRoute(nextSeed);
     closeNovelDetail();
     window.requestAnimationFrame(() => {
       searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -422,6 +474,7 @@ export default function App(): JSX.Element {
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
+    if (selectedNovel) pushSeedRoute(selectedNovel);
     fetchRecommendations();
   };
 

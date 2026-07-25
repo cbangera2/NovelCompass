@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowDownUp, BookOpen, ExternalLink, LayoutGrid, List, Search, Shuffle, SlidersHorizontal, Sparkles, Star, Users, X } from 'lucide-react';
 import { createDataSource, RecommendationDataSource } from './data';
 import { useDataModePreference } from './dataModePreference';
+import { stableRouteUrl } from './routeState';
 import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
@@ -189,7 +190,7 @@ export default function BrowsePage(): JSX.Element {
     Object.entries(values).forEach(([key, value]) => {
       if (value && value !== 'desc' && value !== 'grid') params.set(key, value === true ? '1' : String(value));
     });
-    window.history.replaceState(null, '', `${window.location.pathname}?${params}`);
+    window.history.replaceState(null, '', stableRouteUrl(params));
   }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density]);
 
   const browseRequest = () => ({
