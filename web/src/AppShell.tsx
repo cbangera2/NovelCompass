@@ -1,10 +1,13 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   BookMarked,
   BookOpen,
   Clock3,
   Database,
+  Download,
+  FileUp,
+  LogOut,
   Search,
   Settings,
   Sparkles,
@@ -12,7 +15,8 @@ import {
   X,
 } from 'lucide-react';
 import type { LocalUserProfile } from './profile/types';
-import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
+import { clearLocalProfile, loadLocalProfile, saveLocalProfile, subscribeLocalProfile } from './profile/store';
+import { downloadProfileBackup, parseProfileBackup } from './profile/transfer';
 import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
@@ -178,7 +182,7 @@ export default function AppShell({
       </Sidebar>
       <SidebarInset>
         <header className="shell-desktop-header">
-          <GlobalNovelSearch />
+          <GlobalNovelSearch compact={activeView === 'discover' || activeView === 'browse'} />
           <AccountMenu profile={profile} profileLabel={profileLabel} />
         </header>
         <div className="shell-content">{children}</div>
@@ -203,7 +207,7 @@ export default function AppShell({
 
 const RECENT_SEARCH_KEY = 'novel-compass:recent-searches:v1';
 
-function GlobalNovelSearch({ mobile = false }: { mobile?: boolean }) {
+function GlobalNovelSearch({ mobile = false, compact = false }: { mobile?: boolean; compact?: boolean }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NovelSearchResult[]>([]);
   const [recent, setRecent] = useState<NovelSearchResult[]>(() => {
@@ -216,6 +220,16 @@ function GlobalNovelSearch({ mobile = false }: { mobile?: boolean }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [open]);
 
   useEffect(() => {
     const onShortcut = (event: KeyboardEvent) => {
@@ -267,8 +281,9 @@ function GlobalNovelSearch({ mobile = false }: { mobile?: boolean }) {
   };
 
   const browseUrl = `${import.meta.env.BASE_URL}?view=browse&q=${encodeURIComponent(query.trim())}`;
+  const hasPanelContent = loading || query.trim().length >= 2 || recent.length > 0;
   const searchPanel = (
-    <div className="shell-search-panel">
+    <div className="shell-search-panel" ref={rootRef}>
       <label>
         <Search size={17} aria-hidden="true" />
         <input
@@ -301,7 +316,7 @@ function GlobalNovelSearch({ mobile = false }: { mobile?: boolean }) {
         )}
         {!mobile && <kbd>/</kbd>}
       </label>
-      {open && (
+      {open && hasPanelContent && (
         <div className="shell-search-results">
           <div className="shell-search-result-list">
             {loading && <p className="shell-search-state">Searching catalog…</p>}
@@ -340,11 +355,11 @@ function GlobalNovelSearch({ mobile = false }: { mobile?: boolean }) {
     </div>
   );
 
-  if (!mobile) return searchPanel;
+  if (!mobile && !compact) return searchPanel;
   return (
     <>
       <button
-        className="shell-mobile-search-trigger"
+        className={mobile ? 'shell-mobile-search-trigger' : 'shell-compact-search-trigger'}
         type="button"
         aria-label="Search novels"
         aria-expanded={open}
@@ -355,7 +370,7 @@ function GlobalNovelSearch({ mobile = false }: { mobile?: boolean }) {
       >
         <Search size={17} />
       </button>
-      {open && <div className="shell-mobile-search">{searchPanel}</div>}
+      {open && <div className={mobile ? 'shell-mobile-search' : 'shell-compact-search'}>{searchPanel}</div>}
     </>
   );
 }
@@ -369,6 +384,30 @@ function AccountMenu({
   profileLabel: string;
   mobile?: boolean;
 }) {
+  const [message, setMessage] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const next = parseProfileBackup(JSON.parse(await file.text()));
+      if (!window.confirm(`Import ${file.name} and ${profile ? 'replace your current local profile' : 'restore this local profile'}?`)) return;
+      await saveLocalProfile(next);
+      setMessage(`Imported ${next.entries.length.toLocaleString()} saved titles.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'This profile backup could not be imported.');
+    }
+  };
+
+  const clearSession = async () => {
+    if (!window.confirm('Clear this local session? This permanently deletes the profile, library, ratings, and recommendation feedback stored in this browser. It does not affect Novel Updates.')) return;
+    await clearLocalProfile();
+    localStorage.removeItem(RECENT_SEARCH_KEY);
+    setMessage('Local session cleared.');
+  };
+
   return (
     <details className={`shell-account-menu${mobile ? ' mobile' : ''}`}>
       <summary aria-label={`Open account menu for ${profile?.username || 'local profile'}`}>
@@ -400,6 +439,12 @@ function AccountMenu({
             Settings<small>Appearance and defaults</small>
           </span>
         </a>
+        <div className="shell-account-divider" />
+        <button type="button" onClick={() => inputRef.current?.click()}><FileUp size={16} /><span>Import profile<small>Restore a JSON backup</small></span></button>
+        <input ref={inputRef} className="shell-account-file" type="file" accept=".json,application/json" onChange={importBackup} />
+        <button type="button" disabled={!profile} onClick={() => profile && downloadProfileBackup(profile)}><Download size={16} /><span>Export profile<small>Download library and ratings</small></span></button>
+        <button type="button" className="shell-clear-session" onClick={clearSession}><LogOut size={16} /><span>Clear local session<small>Delete browser-only data</small></span></button>
+        {message && <p className="shell-account-message" role="status">{message}</p>}
       </nav>
     </details>
   );

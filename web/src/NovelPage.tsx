@@ -1,6 +1,6 @@
 import {
   ArrowLeft, BookMarked, BookOpen, Check, ExternalLink, Heart, Library,
-  MessageSquare, Search, Sparkles, ThumbsDown
+  MessageSquare, Search, Sparkles, Star, ThumbsDown
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { createDataSource, RecommendationDataSource } from './data';
@@ -74,6 +74,7 @@ export default function NovelPage(): JSX.Element {
   }, [dataMode, fromId, novelId]);
 
   const currentFeedback = profile?.feedback?.find((item) => item.novel_id === novelId)?.signal;
+  const currentRating = profile?.entries.find((item) => item.novel_id === novelId)?.rating;
   const title = detail ? displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference) : '';
 
   const saveFeedback = async (signal: LocalNovelFeedback['signal']) => {
@@ -88,6 +89,25 @@ export default function NovelPage(): JSX.Element {
       novel_id: novelId, slug: detail.slug, title: detail.title, signal, updated_at: now
     });
     const updated = { ...base, feedback };
+    await saveLocalProfile(updated);
+    setProfile(updated);
+  };
+
+  const saveRating = async (rating?: number) => {
+    if (!detail) return;
+    const now = new Date().toISOString();
+    const base: LocalUserProfile = profile || {
+      profile_id: crypto.randomUUID(), parser_version: 1, dataset_version: 'local',
+      imported_at: now, source_fingerprints: [], entries: [], curated_lists: [], feedback: []
+    };
+    const existing = base.entries.find((entry) => entry.novel_id === novelId);
+    const entries = base.entries.filter((entry) => entry.novel_id !== novelId);
+    if (existing || rating != null) entries.push({
+      novel_id: novelId, slug: detail.slug, imported_title: detail.title,
+      status: existing?.status || 'plan_to_read', rating, progress: existing?.progress,
+      source_file: existing?.source_file || 'local-rating'
+    });
+    const updated = { ...base, entries };
     await saveLocalProfile(updated);
     setProfile(updated);
   };
@@ -166,6 +186,16 @@ export default function NovelPage(): JSX.Element {
               onClick={() => saveFeedback(signal)}><Icon size={15} />{label}</button>
           )}
           <small>Saved only in this browser</small>
+        </div>
+        <div className="novel-personal-rating" aria-label="Your personal rating">
+          <span>Your rating</span>
+          <div>{[1, 2, 3, 4, 5].map((rating) => <button key={rating} type="button"
+            className={(currentRating || 0) >= rating ? 'active' : ''}
+            aria-label={`Rate ${rating} out of 5`} aria-pressed={currentRating === rating}
+            onClick={() => saveRating(currentRating === rating ? undefined : rating)}>
+            <Star size={18} fill="currentColor" />
+          </button>)}</div>
+          <small>{currentRating ? `${currentRating} of 5 · select again to clear` : 'Not rated · saved only in this browser'}</small>
         </div>
       </div>
     </section>
