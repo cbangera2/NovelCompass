@@ -1,0 +1,91 @@
+export interface SeedNovel {
+  id: number;
+  title: string;
+  slug: string;
+  novelupdates_url: string;
+  cover_url?: string;
+}
+
+export interface Recommendation {
+  target_id: number;
+  title: string;
+  author: string;
+  cover_url?: string;
+  slug: string;
+  novelupdates_url: string;
+  language: string;
+  rating: number;
+  rating_votes: number;
+  reading_list_count: number;
+  status_trans: string;
+  chapters_trans: number;
+  rrf_score: number;
+  match_score_percent: number;
+  channel_ranks: Record<string, number>;
+  shared_tags: string[];
+  evidence_bullets: string[];
+}
+
+export interface RecommendRequest {
+  query: string;
+  limit?: number;
+  hidden_gem_mode?: boolean;
+  exclude_harem?: boolean;
+  exclude_bl?: boolean;
+  exclude_yuri?: boolean;
+  language?: string;
+  min_rating?: number;
+  min_rating_votes?: number;
+  max_readers?: number;
+  min_year?: number;
+  max_year?: number;
+  include_genres?: string[];
+  exclude_genres?: string[];
+  include_tags?: string[];
+  exclude_tags?: string[];
+  channel_weights?: Record<string, number>;
+  hidden_gem_strength?: number;
+  min_chapters?: number;
+  require_completed?: boolean;
+}
+
+export interface RecommendResponse {
+  seed_novel: SeedNovel;
+  count: number;
+  recommendations: Recommendation[];
+}
+
+export interface NovelSearchResult {
+  id: number;
+  title: string;
+  slug: string;
+  novelupdates_url: string;
+  author: string;
+  cover_url?: string;
+  rating: number;
+  rating_votes: number;
+}
+
+export interface NovelDetail {
+  id: number;
+  title: string;
+  slug: string;
+  novelupdates_url: string;
+  associated_names: string[];
+  author?: string;
+  language?: string;
+  synopsis?: string;
+  rating: number;
+  rating_votes: number;
+  reading_list_count: number;
+  chapters_orig: number;
+  chapters_trans: number;
+  status_trans?: string;
+  year?: number;
+  cover_url?: string;
+  genres: string[];
+  tags: string[];
+  direct_recommendation_count: number;
+  related_series_count: number;
+  recommendation_list_count: number;
+}
