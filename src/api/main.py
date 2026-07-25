@@ -22,8 +22,10 @@ from src.engine.ranking_contract import (
     calculate_match_percent,
 )
 from src.scraper.seed_loader import seed_database_from_dataset
+from src.api.scraper_dashboard import router as scraper_dashboard_router
 
 app = FastAPI(title="Novel Updates Recommender API", version="1.0.0")
+app.include_router(scraper_dashboard_router)
 
 app.add_middleware(
     CORSMiddleware,
