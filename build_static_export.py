@@ -185,25 +185,27 @@ def export_static_dataset(
     conn = get_connection(db_path)
     try:
         source_novel_count = conn.execute("SELECT COUNT(*) FROM novels").fetchone()[0]
-        if catalog_limit is not None:
-            novels = conn.execute(
-                """SELECT id, slug, title, author, cover_url, rating, rating_votes,
-                          reading_list_count, year, language, status_trans,
-                          chapters_trans, chapters_orig, synopsis, associated_names
-                   FROM novels
-                   ORDER BY reading_list_count DESC, rating_votes DESC, id ASC
-                   LIMIT ?""",
-                (catalog_limit,),
-            ).fetchall()
-            novels = sorted(novels, key=lambda row: row["id"])
-        else:
-            novels = conn.execute(
+        novels = conn.execute(
             """SELECT id, slug, title, author, cover_url, rating, rating_votes,
                       reading_list_count, year, language, status_trans,
                       chapters_trans, chapters_orig, synopsis, associated_names
                FROM novels ORDER BY id"""
-            ).fetchall()
-        exported_ids = {row["id"] for row in novels}
+        ).fetchall()
+        if catalog_limit is not None:
+            bootstrap_novels = sorted(
+                sorted(
+                    novels,
+                    key=lambda row: (
+                        -(row["reading_list_count"] or 0),
+                        -(row["rating_votes"] or 0),
+                        row["id"],
+                    ),
+                )[:catalog_limit],
+                key=lambda row: row["id"],
+            )
+        else:
+            bootstrap_novels = novels
+        exported_ids = {row["id"] for row in bootstrap_novels}
         languages, language_ids = _indexed_values(row["language"] for row in novels)
         statuses, status_ids = _indexed_values(row["status_trans"] for row in novels)
         genre_rows = conn.execute("SELECT id, name FROM genres ORDER BY id").fetchall()
@@ -239,6 +241,7 @@ def export_static_dataset(
         ))
 
         rows, aliases = [], []
+        details: dict[int, dict[str, Any]] = {}
         for row in novels:
             novel_id = row["id"]
             rows.append([
@@ -251,7 +254,7 @@ def export_static_dataset(
             names = _decode_names(row["associated_names"])
             if names:
                 aliases.append([novel_id, names])
-            detail = {
+            details[novel_id] = {
                 "id": novel_id,
                 "synopsis": row["synopsis"] or "",
                 "associated_names": names,
@@ -263,13 +266,20 @@ def export_static_dataset(
                 "recommendation_list_count": list_counts.get(novel_id, 0),
                 "novelupdates_url": f"https://www.novelupdates.com/?p={novel_id}",
             }
-            _atomic_json(output / "details" / bucket_for_id(novel_id) / f"{novel_id}.json", detail)
 
-        _atomic_json(output / "catalog.json", {
+        catalog = {
             "fields": list(CATALOG_FIELDS), "rows": rows, "aliases": aliases,
             "languages": languages, "statuses": statuses,
             "genres": genres, "tags": tags,
-        })
+        }
+        _atomic_json(output / "catalog.json", catalog)
+        if catalog_limit is not None:
+            bootstrap_ids = {row["id"] for row in bootstrap_novels}
+            bootstrap_rows = [row for row in rows if row[0] in bootstrap_ids]
+            bootstrap_aliases = [entry for entry in aliases if entry[0] in bootstrap_ids]
+            _atomic_json(output / "bootstrap-catalog.json", {
+                **catalog, "rows": bootstrap_rows, "aliases": bootstrap_aliases,
+            })
         _atomic_json(output / "facets.json", {
             "genres": genres, "tags": tags,
             "novels": {str(row["id"]): {"g": genre_map.get(row["id"], []), "t": tag_map.get(row["id"], [])}
@@ -289,10 +299,15 @@ def export_static_dataset(
         selected = {row["id"] for row in ordered_seeds[:max_novels]} if max_novels is not None else {
             row["id"] for row in ordered_seeds
         }
+        selected &= exported_ids
         generator = CandidateGenerator(conn)
         recommendable = 0
-        for index, row in enumerate(novels, 1):
+        for index, row in enumerate(bootstrap_novels, 1):
             novel_id = row["id"]
+            _atomic_json(
+                output / "details" / bucket_for_id(novel_id) / f"{novel_id}.json",
+                details[novel_id],
+            )
             pool_path = output / "recs" / bucket_for_id(novel_id) / f"{novel_id}.json"
             if reuse_recommendations and pool_path.is_file():
                 pool = json.loads(pool_path.read_text())
@@ -315,7 +330,7 @@ def export_static_dataset(
             recommendable += bool(pool["candidates"])
             _atomic_json(pool_path, pool)
             if index % 100 == 0:
-                print(f"Exported recommendation pools: {index}/{len(novels)}")
+                print(f"Exported recommendation pools: {index}/{len(bootstrap_novels)}")
 
         # Re-running a bounded export into the same directory must not leave
         # addressable detail/pool files from a different catalog scope.
@@ -332,24 +347,38 @@ def export_static_dataset(
             "generated_at": generated_at,
             "novel_count": len(novels),
             "source_novel_count": source_novel_count,
+            "bootstrap_novel_count": len(bootstrap_novels),
+            "detail_novel_count": len(bootstrap_novels),
+            "recommendation_seed_count": len(bootstrap_novels),
             "snapshot_scope": (
-                f"top_{len(novels)}_by_reading_list_count"
+                f"complete_catalog_with_top_{len(bootstrap_novels)}_bootstrap"
                 if catalog_limit is not None else "complete_catalog"
             ),
             "recommendable_seed_count": recommendable,
             "catalog_url": "catalog.json",
+            "bootstrap_catalog_url": (
+                "bootstrap-catalog.json" if catalog_limit is not None else "catalog.json"
+            ),
             "facets_url": "facets.json",
             "options_url": "options.json",
             "bucket_count": 256,
         }
         _atomic_json(output / "manifest.json", manifest)
-        verify_export(output, expected_novels=len(novels))
+        verify_export(
+            output,
+            expected_novels=len(novels),
+            expected_bootstrap_novels=len(bootstrap_novels),
+        )
         return manifest
     finally:
         conn.close()
 
 
-def verify_export(output: Path, expected_novels: int | None = None) -> None:
+def verify_export(
+    output: Path,
+    expected_novels: int | None = None,
+    expected_bootstrap_novels: int | None = None,
+) -> None:
     manifest = json.loads((output / "manifest.json").read_text())
     catalog = json.loads((output / manifest["catalog_url"]).read_text())
     if catalog["fields"] != list(CATALOG_FIELDS):
@@ -358,10 +387,19 @@ def verify_export(output: Path, expected_novels: int | None = None) -> None:
         raise ValueError("catalog novel count is incomplete")
     if manifest["novel_count"] != len(catalog["rows"]):
         raise ValueError("manifest and catalog novel counts differ")
+    bootstrap = json.loads(
+        (output / manifest.get("bootstrap_catalog_url", manifest["catalog_url"])).read_text()
+    )
+    if bootstrap["fields"] != list(CATALOG_FIELDS):
+        raise ValueError("bootstrap catalog fields do not match the static schema")
+    if expected_bootstrap_novels is not None and len(bootstrap["rows"]) != expected_bootstrap_novels:
+        raise ValueError("bootstrap catalog novel count is incomplete")
+    if manifest.get("bootstrap_novel_count", len(bootstrap["rows"])) != len(bootstrap["rows"]):
+        raise ValueError("manifest and bootstrap catalog novel counts differ")
     options = json.loads((output / manifest.get("options_url", "options.json")).read_text())
     if options.get("genres") != catalog.get("genres") or options.get("tags") != catalog.get("tags"):
         raise ValueError("options and catalog facet dictionaries differ")
-    for row in catalog["rows"]:
+    for row in bootstrap["rows"]:
         novel_id = row[0]
         for group in ("details", "recs"):
             path = output / group / bucket_for_id(novel_id) / f"{novel_id}.json"
@@ -378,8 +416,11 @@ def main() -> None:
     parser.add_argument("--max-novels", type=int, help="Precompute only the N most popular seed pools")
     parser.add_argument("--candidate-limit", type=int, default=200)
     parser.add_argument(
-        "--catalog-limit", type=int,
-        help="Export only the N most-read catalog titles (explicitly recorded in the manifest)",
+        "--bootstrap-limit", "--catalog-limit", dest="catalog_limit", type=int,
+        help=(
+            "Put the N most-read titles in the fast bootstrap and bound detail/"
+            "recommendation shards to them; catalog.json always contains every title"
+        ),
     )
     parser.add_argument(
         "--reuse-recommendations", action="store_true",

@@ -57,9 +57,13 @@ export interface DatasetManifest {
   generated_at?: string;
   novel_count: number;
   source_novel_count?: number;
+  bootstrap_novel_count?: number;
+  detail_novel_count?: number;
+  recommendation_seed_count?: number;
   snapshot_scope?: string;
   recommendable_seed_count?: number;
   catalog_url?: string;
+  bootstrap_catalog_url?: string;
   facets_url?: string;
   options_url?: string;
 }

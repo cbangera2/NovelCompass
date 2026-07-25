@@ -100,6 +100,7 @@ async function jsonFetch<T>(url: string): Promise<T> {
 export class StaticDataSource implements RecommendationDataSource {
   readonly mode = 'static' as const;
   private manifestPromise?: Promise<DatasetManifest>;
+  private bootstrapPromise?: Promise<void>;
   private catalogPromise?: Promise<void>;
   private facetsPromise?: Promise<FacetsFile>;
   private cards = new Map<number, CatalogCard>();
@@ -134,18 +135,14 @@ export class StaticDataSource implements RecommendationDataSource {
     return this.manifestPromise;
   }
 
-  private async loadCatalog(): Promise<void> {
-    if (!this.catalogPromise) {
-      this.catalogPromise = (async () => {
-        const manifest = await this.getManifest();
-        const catalog = await jsonFetch<CatalogFile>(joinUrl(this.baseUrl, manifest.catalog_url || 'catalog.json'));
-        const indexes = new Map(catalog.fields.map((field, index) => [field, index]));
-        const at = (row: unknown[], field: string): any => row[indexes.get(field) ?? -1];
-        this.languages = catalog.languages || [];
-        this.statuses = catalog.statuses || [];
-        this.genres = catalog.genres || [];
-        this.tags = catalog.tags || [];
-        for (const row of catalog.rows) {
+  private ingestCatalog(catalog: CatalogFile): void {
+    const indexes = new Map(catalog.fields.map((field, index) => [field, index]));
+    const at = (row: unknown[], field: string): any => row[indexes.get(field) ?? -1];
+    this.languages = catalog.languages || this.languages;
+    this.statuses = catalog.statuses || this.statuses;
+    this.genres = catalog.genres || this.genres;
+    this.tags = catalog.tags || this.tags;
+    for (const row of catalog.rows) {
           const id = Number(at(row, 'id'));
           const languageValue = at(row, 'language') ?? this.languages[Number(at(row, 'language_id'))] ?? '';
           const statusValue = at(row, 'status_trans') ?? this.statuses[Number(at(row, 'status_id'))] ?? '';
@@ -165,11 +162,44 @@ export class StaticDataSource implements RecommendationDataSource {
             genre_ids: (at(row, 'genre_ids') as number[]) || [],
             novelupdates_url: novelUpdatesUrl(id)
           });
+    }
+    for (const [id, aliases] of catalog.aliases || []) this.aliases.set(id, aliases);
+  }
+
+  private async loadBootstrapCatalog(): Promise<void> {
+    if (!this.bootstrapPromise) {
+      this.bootstrapPromise = (async () => {
+        const manifest = await this.getManifest();
+        const path = manifest.bootstrap_catalog_url || manifest.catalog_url || 'catalog.json';
+        this.ingestCatalog(await jsonFetch<CatalogFile>(joinUrl(this.baseUrl, path)));
+      })();
+    }
+    return this.bootstrapPromise;
+  }
+
+  private async loadCatalog(): Promise<void> {
+    if (!this.catalogPromise) {
+      this.catalogPromise = (async () => {
+        await this.loadBootstrapCatalog();
+        const manifest = await this.getManifest();
+        const fullPath = manifest.catalog_url || 'catalog.json';
+        const bootstrapPath = manifest.bootstrap_catalog_url || fullPath;
+        if (fullPath !== bootstrapPath) {
+          this.ingestCatalog(await jsonFetch<CatalogFile>(joinUrl(this.baseUrl, fullPath)));
         }
-        for (const [id, aliases] of catalog.aliases || []) this.aliases.set(id, aliases);
       })();
     }
     return this.catalogPromise;
+  }
+
+  private warmFullCatalogWhenIdle(): void {
+    if (this.catalogPromise || typeof window === 'undefined') return;
+    const connection = (navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }).connection;
+    if (connection?.saveData || connection?.effectiveType === 'slow-2g' || connection?.effectiveType === '2g') return;
+    const idle = window.requestIdleCallback;
+    if (idle) idle(() => { void this.loadCatalog(); }, { timeout: 5000 });
   }
 
   private async loadFacets(): Promise<FacetsFile> {
@@ -182,10 +212,10 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async searchNovels(query: string, limit: number): Promise<NovelSearchResult[]> {
-    await this.loadCatalog();
+    await this.loadBootstrapCatalog();
     const needle = normalize(query);
     if (!needle) return [];
-    return [...this.cards.values()]
+    const results = [...this.cards.values()]
       .map((card) => {
         const title = normalize(card.title);
         const author = normalize(card.author);
@@ -203,6 +233,8 @@ export class StaticDataSource implements RecommendationDataSource {
       .sort((a, b) => a.score - b.score || b.card.reading_list_count - a.card.reading_list_count)
       .slice(0, limit)
       .map(({ card }) => card);
+    this.warmFullCatalogWhenIdle();
+    return results;
   }
 
   async getOptions(): Promise<FilterOptions> {
@@ -263,12 +295,20 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async getNovel(id: number): Promise<NovelDetail> {
-    await this.loadCatalog();
+    await this.loadBootstrapCatalog();
+    if (!this.cards.has(id)) await this.loadCatalog();
     const card = this.cards.get(id);
     if (!card) throw new DataSourceError(`Novel ${id} is not in this static snapshot.`);
-    const detail = await jsonFetch<any>(
-      joinUrl(this.baseUrl, `details/${bucketForNovel(id)}/${id}.json`)
-    );
+    let detail: any = {};
+    try {
+      detail = await jsonFetch<any>(
+        joinUrl(this.baseUrl, `details/${bucketForNovel(id)}/${id}.json`)
+      );
+    } catch (error) {
+      if (!(error instanceof DataSourceError) || !error.message.includes('returned 404')) throw error;
+      // Full-catalog Browse entries outside the bounded bootstrap intentionally
+      // expose catalog metadata without pretending a detail shard exists.
+    }
     const genreIds: number[] = detail.genre_ids || card.genre_ids || [];
     const tagIds: number[] = detail.tag_ids || [];
     return {
@@ -355,13 +395,24 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async getRecommendations(request: RecommendRequest): Promise<RecommendResponse> {
-    await this.loadCatalog();
+    await this.loadBootstrapCatalog();
     const seedId = Number(request.query);
+    if (seedId && !this.cards.has(seedId)) await this.loadCatalog();
     const seedCard = this.cards.get(seedId);
     if (!seedId || !seedCard) throw new DataSourceError('Select a novel from the search results.');
-    const pool = await jsonFetch<RecommendationPool>(
-      joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
-    );
+    let pool: RecommendationPool;
+    try {
+      pool = await jsonFetch<RecommendationPool>(
+        joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
+      );
+    } catch (error) {
+      if (error instanceof DataSourceError && error.message.includes('returned 404')) {
+        throw new DataSourceError(
+          'Recommendations for this title are not precomputed in the bounded static snapshot.'
+        );
+      }
+      throw error;
+    }
     const needsTagTraits = Boolean(
       request.exclude_harem || request.exclude_bl || request.exclude_yuri ||
       request.include_tags?.length || request.exclude_tags?.length

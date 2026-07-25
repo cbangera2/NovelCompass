@@ -85,6 +85,24 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(options["genres"], ["Fantasy"])
             self.assertEqual(options["tags"], ["Academy"])
 
+            with patch("build_static_export.CandidateGenerator", FakeCandidateGenerator):
+                layered = export_static_dataset(
+                    root / "layered",
+                    max_novels=1,
+                    db_path=str(database),
+                    catalog_limit=1,
+                )
+            full_catalog = json.loads((root / "layered/catalog.json").read_text())
+            bootstrap = json.loads((root / "layered/bootstrap-catalog.json").read_text())
+            self.assertEqual([row[0] for row in full_catalog["rows"]], [1, 257])
+            self.assertEqual([row[0] for row in bootstrap["rows"]], [1])
+            self.assertEqual(layered["novel_count"], 2)
+            self.assertEqual(layered["bootstrap_novel_count"], 1)
+            self.assertEqual(layered["bootstrap_catalog_url"], "bootstrap-catalog.json")
+            self.assertTrue((root / "layered/details/01/1.json").is_file())
+            self.assertFalse((root / "layered/details/01/257.json").exists())
+            self.assertFalse((root / "layered/recs/01/257.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

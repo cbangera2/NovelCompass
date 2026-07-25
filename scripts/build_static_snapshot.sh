@@ -12,6 +12,6 @@ fi
 "$python_bin" build_static_export.py \
   --db data/recommender.db \
   --output web/public/data \
-  --catalog-limit "${NOVEL_SNAPSHOT_CATALOG_LIMIT:-500}" \
+  --bootstrap-limit "${NOVEL_SNAPSHOT_BOOTSTRAP_LIMIT:-${NOVEL_SNAPSHOT_CATALOG_LIMIT:-500}}" \
   --max-novels "${NOVEL_SNAPSHOT_RECOMMENDABLE_LIMIT:-500}" \
   --candidate-limit "${NOVEL_SNAPSHOT_CANDIDATE_LIMIT:-100}"
