@@ -40,13 +40,13 @@ const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((modul
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
-  id: 5,
-  title: 'Coiling Dragon',
-  slug: 'coiling-dragon',
-  novelupdates_url: 'https://www.novelupdates.com/?p=5',
-  author: 'I Eat Tomatoes',
-  rating: 4.5,
-  rating_votes: 1912
+  id: 6780,
+  title: 'Reverend Insanity',
+  slug: 'reverend-insanity',
+  novelupdates_url: 'https://www.novelupdates.com/?p=6780',
+  author: 'gu zhen ren, 蛊真人',
+  rating: 4.3,
+  rating_votes: 1625
 };
 
 export default function App(): JSX.Element {
