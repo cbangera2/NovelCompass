@@ -117,11 +117,20 @@ export default function ProfilePage(): JSX.Element {
       </header>
 
       {!profile ? (
-        <section className="profile-empty">
-          <BookOpen size={30} />
-          <h2>Bring your reading history into discovery</h2>
-          <p>Use “Import my library” above to preview saved Novel Updates profile pages before anything is stored.</p>
-        </section>
+        <>
+          <section className="profile-empty">
+            <BookOpen size={30} />
+            <h2>Bring your reading history into discovery</h2>
+            <p>Use “Import my library” above to preview saved Novel Updates profile pages before anything is stored. The page stays entirely local to this browser.</p>
+            <ProfilePanel source={source} dataset={dataset} profile={profile} onProfileChange={setProfile} onUseSeed={useSeed} showPageLink={false} />
+          </section>
+          <section className="profile-empty-features" aria-label="Local profile features">
+            <article><span>01</span><h3>Library</h3><p>Search Reading, Completed, and Plan-to-read titles with ratings and progress.</p></article>
+            <article><span>02</span><h3>Taste snapshot</h3><p>See recurring genres and tags with the exact contributing sample disclosed.</p></article>
+            <article><span>03</span><h3>Created lists</h3><p>Keep list summaries visible without pretending their membership was imported.</p></article>
+            <article><span>04</span><h3>Local controls</h3><p>Merge, replace, export, or completely delete your normalized profile data.</p></article>
+          </section>
+        </>
       ) : (
         <>
           <section className="profile-page-stats">
@@ -130,6 +139,11 @@ export default function ProfilePage(): JSX.Element {
             <div><strong>{counts.completed.toLocaleString()}</strong><span>Completed</span></div>
             <div><strong>{counts.plan_to_read.toLocaleString()}</strong><span>Plan to read</span></div>
             <div><strong>{profile.entries.filter((entry) => entry.novel_id != null).length.toLocaleString()}</strong><span>Matched</span></div>
+          </section>
+
+          <section className="profile-control-strip">
+            <div><ShieldCheck size={18} /><span><strong>Private local profile</strong><small>Normalized data stays in IndexedDB on this browser.</small></span></div>
+            <ProfilePanel source={source} dataset={dataset} profile={profile} onProfileChange={setProfile} onUseSeed={useSeed} showPageLink={false} />
           </section>
 
           <section className="taste-snapshot" aria-labelledby="taste-title">

@@ -165,7 +165,7 @@ export function ProfilePanel({
         <User size={16} aria-hidden="true" />
         {profile ? `${profile.username || 'Local profile'} · ${profile.entries.length.toLocaleString()} titles` : 'Import my library'}
       </button>
-      {showPageLink && profile && <a className="profile-page-link" href={`${import.meta.env.BASE_URL}?view=profile`}>View profile</a>}
+      {showPageLink && <a className="profile-page-link" href={`${import.meta.env.BASE_URL}?view=profile`}>Open profile page</a>}
       {open && (
         <div className="profile-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setOpen(false)}>
           <section className="profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
