@@ -5,6 +5,7 @@ import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
+import { Button, FieldGroup, Select } from './ui';
 
 const PAGE_SIZE = 24;
 
@@ -131,40 +132,40 @@ export default function BrowsePage(): JSX.Element {
         <label className="browse-search"><Search size={17} /><input value={query}
           onChange={(event) => resetPage(() => setQuery(event.target.value))}
           placeholder="Search titles, aliases, or authors…" /></label>
-        <select value={sort} onChange={(event) => resetPage(() => setSort(event.target.value as BrowseSort))}>
+        <Select label="Sort" value={sort} onChange={(event) => resetPage(() => setSort(event.target.value as BrowseSort))}>
           <option value="popular">Most popular</option>
           <option value="rating">Highest rated</option>
           <option value="votes">Most rated</option>
           <option value="newest">Newest year</option>
           <option value="title">Title A–Z</option>
-        </select>
-        <button className="browse-lucky" disabled={!source || luckyLoading} onClick={feelingLucky}>
+        </Select>
+        <Button variant="primary" className="browse-lucky" disabled={!source || luckyLoading} onClick={feelingLucky}>
           <Shuffle size={16} /> {luckyLoading ? 'Choosing…' : 'Feeling lucky'}
-        </button>
+        </Button>
         <details className="browse-advanced">
           <summary><SlidersHorizontal size={16} /> More filters</summary>
-          <div>
-            <select value={genre} onChange={(event) => resetPage(() => setGenre(event.target.value))}>
+          <FieldGroup label="Catalog metadata">
+            <Select label="Genre" value={genre} onChange={(event) => resetPage(() => setGenre(event.target.value))}>
               <option value="">All genres</option>{options.genres.map((item) => <option key={item}>{item}</option>)}
-            </select>
-            <select value={tag} disabled={!options.tags?.length} onChange={(event) => resetPage(() => setTag(event.target.value))}>
+            </Select>
+            <Select label="Tag" value={tag} disabled={!options.tags?.length} onChange={(event) => resetPage(() => setTag(event.target.value))}>
               <option value="">All tags</option>{options.tags?.map((item) => <option key={item}>{item}</option>)}
-            </select>
-            <select value={language} onChange={(event) => resetPage(() => setLanguage(event.target.value))}>
+            </Select>
+            <Select label="Language" value={language} onChange={(event) => resetPage(() => setLanguage(event.target.value))}>
               <option value="">All languages</option>{options.languages?.map((item) => <option key={item}>{item}</option>)}
-            </select>
-            <select value={minRating} onChange={(event) => resetPage(() => setMinRating(Number(event.target.value)))}>
+            </Select>
+            <Select label="Minimum rating" value={minRating} onChange={(event) => resetPage(() => setMinRating(Number(event.target.value)))}>
               <option value="0">Any rating</option><option value="3">3★ and up</option><option value="4">4★ and up</option><option value="4.5">4.5★ and up</option>
-            </select>
-            <select value={minVotes} onChange={(event) => resetPage(() => setMinVotes(Number(event.target.value)))}>
+            </Select>
+            <Select label="Minimum votes" value={minVotes} onChange={(event) => resetPage(() => setMinVotes(Number(event.target.value)))}>
               <option value="0">Any vote count</option><option value="10">10+ votes</option><option value="100">100+ votes</option><option value="1000">1,000+ votes</option>
-            </select>
-          </div>
+            </Select>
+          </FieldGroup>
         </details>
       </section>
       {activeFilters.length > 0 && <div className="browse-active-filters" aria-label="Active filters">
-        {activeFilters.map((filter) => <button key={filter.label} onClick={() => resetPage(filter.clear)}>{filter.label}<X size={12} /></button>)}
-        <button className="clear-all" onClick={clearAll}>Clear all</button>
+        {activeFilters.map((filter) => <Button variant="ghost" key={filter.label} onClick={() => resetPage(filter.clear)}>{filter.label}<X size={12} /></Button>)}
+        <Button variant="ghost" className="clear-all" onClick={clearAll}>Clear all</Button>
       </div>}
 
       {!tagSupported && <p className="browse-notice">Tag filtering is unavailable in this static snapshot, so the selected tag was not applied.</p>}
@@ -175,7 +176,7 @@ export default function BrowsePage(): JSX.Element {
       </section>
       {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
       {loading && <div className="browse-loading" role="status"><span /> Loading {page > 1 ? 'more novels' : 'catalog'}…</div>}
-      {hasMore && !loading && <div className="browse-pagination"><button className="browse-more" onClick={() => setPage((value) => value + 1)}>Load {PAGE_SIZE} more</button><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>}
+      {hasMore && !loading && <div className="browse-pagination"><Button className="browse-more" onClick={() => setPage((value) => value + 1)}>Load {PAGE_SIZE} more</Button><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>}
 
       {(detailLoading || detail) && <div className="browse-modal-backdrop" onMouseDown={() => setDetail(null)}>
         <article className="browse-modal" onMouseDown={(event) => event.stopPropagation()}>
