@@ -193,6 +193,29 @@ export default function BrowsePage(): JSX.Element {
     window.history.replaceState(null, '', stableRouteUrl(params));
   }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density]);
 
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      const text = (key: string) => params.get(key) || '';
+      const number = (key: string, max = Number.MAX_SAFE_INTEGER) => {
+        const value = Number(params.get(key) || 0);
+        return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : 0;
+      };
+      setQuery(text('q')); setLanguage(text('language')); setAuthor(text('author')); setGenre(text('genre')); setTag(text('tag'));
+      setSort(['popular', 'rating', 'votes', 'title', 'newest'].includes(text('sort')) ? text('sort') as BrowseSort : 'popular');
+      setDirection(text('direction') === 'asc' ? 'asc' : 'desc'); setDensity(text('density') === 'list' ? 'list' : 'grid');
+      setMinRating(number('min_rating', 5)); setMaxRating(number('max_rating', 5)); setMinVotes(number('min_votes'));
+      setMinYear(number('min_year')); setMaxYear(number('max_year')); setStatus(text('status'));
+      setMinChapters(number('min_chapters')); setMaxChapters(number('max_chapters'));
+      setMinReaders(number('min_readers')); setMaxReaders(number('max_readers'));
+      setIncludeGenres(text('include_genres')); setExcludeGenres(text('exclude_genres'));
+      setIncludeTags(text('include_tags')); setExcludeTags(text('exclude_tags'));
+      setExcludeLibrary(text('exclude_library') === '1'); setPage(1); setBatchError(''); loadRequestedRef.current = false;
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
+
   const browseRequest = () => ({
     query, sort, language, author, genre, tag,
     min_rating: minRating, max_rating: maxRating, min_votes: minVotes,
@@ -213,6 +236,7 @@ export default function BrowsePage(): JSX.Element {
   });
 
   const applyPreset = (preset: 'rated' | 'popular' | 'hidden' | 'newest' | 'completed') => resetPage(() => {
+    window.history.pushState(null, '', window.location.href);
     clearAll();
     if (preset === 'rated') { setSort('rating'); setMinVotes(100); }
     if (preset === 'popular') setSort('popular');
