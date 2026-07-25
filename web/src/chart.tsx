@@ -38,7 +38,8 @@ export function ChartTooltipContent({
   payload,
   label,
   config,
-  valueFormatter = (value) => Number(value).toLocaleString()
+  valueFormatter = (value) => Number(value).toLocaleString(),
+  headingFormatter
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{
@@ -46,22 +47,27 @@ export function ChartTooltipContent({
     dataKey?: string | number;
     name?: string | number;
     value?: string | number | ReadonlyArray<string | number>;
+    payload?: Record<string, unknown>;
   }>;
   label?: string | number;
   config: ChartConfig;
-  valueFormatter?: (value: number | string) => string;
+  valueFormatter?: (value: number | string, key: string, payload?: Record<string, unknown>) => string;
+  headingFormatter?: (label: string | number | undefined, payload: ReadonlyArray<{
+    payload?: Record<string, unknown>;
+  }>) => string;
 }) {
   if (!active || !payload?.length) return null;
+  const heading = headingFormatter?.(label, payload) ?? (label == null ? '' : String(label));
 
   return <div className="chart-tooltip" role="status">
-    {label != null && <strong>{String(label)}</strong>}
+    {heading && <strong>{heading}</strong>}
     {payload.map((item) => {
       const key = String(item.dataKey ?? item.name ?? '');
       const entry = config[key];
       return <div className="chart-tooltip-row" key={key}>
         <i style={{ background: item.color || entry?.color }} />
         <span>{entry?.label || item.name || key}</span>
-        <b>{valueFormatter(String(item.value ?? 0))}</b>
+        <b>{valueFormatter(String(item.value ?? 0), key, item.payload)}</b>
       </div>;
     })}
   </div>;

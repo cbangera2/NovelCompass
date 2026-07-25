@@ -1,7 +1,13 @@
 import { useState } from 'react';
-import { Cell, CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { Cell, CartesianGrid, Scatter, ScatterChart, XAxis, YAxis } from 'recharts';
 import { NovelDetail, NovelInsights } from './types';
 import { novelPageUrl } from './novelLinks';
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from './chart';
+
+const cohortChartConfig = {
+  readerScale: { label: 'Readers', color: 'var(--chart-1)' },
+  rating: { label: 'Rating', color: 'var(--chart-2)' }
+} satisfies ChartConfig;
 
 export default function NovelCohortChart({ novel, insights }: { novel: NovelDetail; insights: NovelInsights }) {
   const points = [
@@ -40,23 +46,28 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
   };
   return <section className="cohort-chart-card" aria-labelledby={`cohort-chart-${novel.id}`}>
     <div><h4 id={`cohort-chart-${novel.id}`}>Rating and readership cohort</h4><p>Current novel highlighted against {Math.max(0, points.length - 1)} closest peers. Readership uses a logarithmic scale; identical points overlap and appear darker.</p></div>
-    <div className="cohort-chart" role="group" aria-label="Interactive rating and readership cohort plot. Select a point to show novel details.">
-      <ResponsiveContainer width="100%" height={280}>
-        <ScatterChart margin={{ top: 16, right: 18, bottom: 26, left: 2 }}>
-          <CartesianGrid stroke="var(--chart-grid)" />
+    <ChartContainer config={cohortChartConfig} className="cohort-chart">
+        <ScatterChart accessibilityLayer margin={{ top: 16, right: 18, bottom: 30, left: 4 }}>
+          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
           <XAxis type="number" dataKey="readerScale" domain={[xMin, xMax]} ticks={logarithmicTicks}
-            allowDataOverflow tick={{ fill: 'var(--muted)', fontSize: 10 }} tickFormatter={formatReaders}
-            label={{ value: 'Readers · logarithmic scale', position: 'bottom', fill: 'var(--muted)', fontSize: 10 }} />
+            allowDataOverflow tick={{ fill: 'var(--muted)', fontSize: 11 }} tickFormatter={formatReaders}
+            tickLine={false} tickMargin={9} axisLine={false}
+            label={{ value: 'Readers · logarithmic scale', position: 'bottom', fill: 'var(--muted)', fontSize: 11 }} />
           <YAxis type="number" dataKey="rating" domain={ratingDomain} allowDataOverflow tickCount={5}
-            width={34} tick={{ fill: 'var(--muted)', fontSize: 10 }} tickFormatter={(value) => Number(value).toFixed(1)} />
-          <Tooltip cursor={{ stroke: 'var(--border-strong)', strokeDasharray: '3 3' }}
-            content={({ active, payload }) => active && payload?.[0] ? <div className="cohort-tooltip"><strong>{payload[0].payload.title}</strong><span>{payload[0].payload.rating} rating</span><span>{payload[0].payload.readers.toLocaleString()} readers</span><span>Select for novel details</span></div> : null} />
+            width={38} tick={{ fill: 'var(--muted)', fontSize: 11 }} tickFormatter={(value) => Number(value).toFixed(1)}
+            tickLine={false} tickMargin={8} axisLine={false} />
+          <ChartTooltip cursor={{ stroke: 'var(--border-strong)', strokeDasharray: '3 3' }}
+            content={<ChartTooltipContent config={cohortChartConfig}
+              headingFormatter={(_, payload) => String(payload[0]?.payload?.title || 'Novel')}
+              valueFormatter={(value, key, payload) => key === 'readerScale'
+                ? Number(payload?.readers || 0).toLocaleString()
+                : Number(value).toFixed(1)} />} />
           <Scatter name="Closest peers" data={peerPoints} isAnimationActive={false}
             shape={(props: any) => {
               const point = props.payload;
               const select = () => setSelectedPoint(point);
-              return <circle cx={props.cx} cy={props.cy} r={6} fill="var(--accent)" fillOpacity={.72}
-                stroke="var(--surface)" strokeWidth={2} className="chart-selectable-point" role="button" tabIndex={0}
+              return <circle cx={props.cx} cy={props.cy} r={5} fill="var(--color-readerScale)" fillOpacity={.7}
+                stroke="var(--surface)" strokeWidth={2} className="chart-selectable-point cohort-peer-point" role="button" tabIndex={0}
                 aria-label={`${point.title}, rating ${point.rating}, ${point.readers.toLocaleString()} readers. Show details.`}
                 onClick={select} onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
@@ -65,15 +76,15 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
                   }
                 }} />;
             }}>
-            {peerPoints.map((point) => <Cell key={point.id} fill="var(--accent)" fillOpacity={.72}
+            {peerPoints.map((point) => <Cell key={point.id} fill="var(--color-readerScale)" fillOpacity={.7}
               stroke="var(--surface)" strokeWidth={2} />)}
           </Scatter>
           <Scatter name="Current novel" data={currentPoint} isAnimationActive={false}
             shape={(props: any) => {
               const point = props.payload;
               const select = () => setSelectedPoint(point);
-              return <circle cx={props.cx} cy={props.cy} r={7} fill="var(--green)"
-                stroke="var(--text)" strokeWidth={3} className="chart-selectable-point" role="button" tabIndex={0}
+              return <circle cx={props.cx} cy={props.cy} r={8} fill="var(--color-rating)"
+                stroke="var(--surface)" strokeWidth={3} className="chart-selectable-point cohort-current-point" role="button" tabIndex={0}
                 aria-label={`${point.title}, current novel, rating ${point.rating}, ${point.readers.toLocaleString()} readers. Show details.`}
                 onClick={select} onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
@@ -82,12 +93,11 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
                   }
                 }} />;
             }}>
-            {currentPoint.map((point) => <Cell key={point.id} fill="var(--green)"
-              stroke="var(--text)" strokeWidth={3} />)}
+            {currentPoint.map((point) => <Cell key={point.id} fill="var(--color-rating)"
+              stroke="var(--surface)" strokeWidth={3} />)}
           </Scatter>
         </ScatterChart>
-      </ResponsiveContainer>
-    </div>
+    </ChartContainer>
     {selectedPoint && <div className="chart-point-card" role="status">
       <div><strong>{selectedPoint.title}{selectedPoint.current ? ' (current)' : ''}</strong>
         <span>{selectedPoint.rating} rating · {selectedPoint.readers.toLocaleString()} readers</span>
