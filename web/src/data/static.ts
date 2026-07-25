@@ -218,13 +218,23 @@ export class StaticDataSource implements RecommendationDataSource {
     };
   }
 
-  async resolveSlugs(items: Array<{ slug: string }>): Promise<Map<string, NovelSearchResult>> {
+  async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {
     await this.loadCatalog();
     const requested = new Set(items.map((item) => item.slug.toLowerCase()));
     const result = new Map<string, NovelSearchResult>();
     for (const card of this.cards.values()) {
       const slug = card.slug.toLowerCase();
       if (requested.has(slug)) result.set(slug, card);
+    }
+    for (const item of items) {
+      const key = item.slug.toLowerCase();
+      if (result.has(key)) continue;
+      const title = normalize(item.title);
+      const matches = [...this.cards.values()].filter((card) =>
+        normalize(card.title) === title ||
+        (this.aliases.get(card.id) || []).some((alias) => normalize(alias) === title)
+      );
+      if (matches.length === 1) result.set(key, matches[0]);
     }
     return result;
   }

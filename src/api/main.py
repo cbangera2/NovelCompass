@@ -144,31 +144,75 @@ class RecommendRequest(BaseModel):
     min_chapters: int = 0
     require_completed: bool = False
 
+
+class SlugResolveRequest(BaseModel):
+    slugs: List[str] = Field(default_factory=list, max_length=1000)
+
+
+def novel_search_result(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "id": row[0],
+        "title": row[1],
+        "slug": row[2],
+        "novelupdates_url": novelupdates_url(row[0], row[2]),
+        "author": row[3],
+        "cover_url": row[4],
+        "rating": row[5],
+        "rating_votes": row[6],
+        "associated_names": parse_associated_names(row[7]) if len(row) > 7 else [],
+    }
+
+
+@app.post("/api/resolve-slugs")
+def resolve_novel_slugs(request: SlugResolveRequest):
+    """Resolve imported profile entries by their canonical catalog key.
+
+    Profile imports already contain Novel Updates slugs, so title search is
+    both slower and less reliable. The client may still use title/alias search
+    for the small set of slugs that have genuinely changed.
+    """
+    requested = list(dict.fromkeys(
+        slug.strip().lower() for slug in request.slugs if slug.strip()
+    ))
+    if not requested:
+        return {"results": []}
+
+    conn = get_db()
+    try:
+        results = []
+        for offset in range(0, len(requested), 500):
+            chunk = requested[offset:offset + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = conn.execute(
+                f"""
+                SELECT id, title, slug, author, cover_url, rating, rating_votes,
+                       associated_names
+                FROM novels
+                WHERE lower(slug) IN ({placeholders})
+                """,
+                chunk,
+            ).fetchall()
+            results.extend(novel_search_result(row) for row in rows)
+        return {"results": results}
+    finally:
+        conn.close()
+
+
 @app.get("/api/search")
 def search_novels(q: str = Query(..., min_length=1), limit: int = 10):
     conn = get_db()
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, title, slug, author, cover_url, rating, rating_votes
+            SELECT id, title, slug, author, cover_url, rating, rating_votes,
+                   associated_names
             FROM novels
             WHERE title LIKE ? OR slug LIKE ? OR associated_names LIKE ?
             ORDER BY reading_list_count DESC, rating_votes DESC
             LIMIT ?
         """, (f"%{q}%", f"%{q}%", f"%{q}%", limit))
 
-        results = []
-        for row in cur.fetchall():
-            results.append({
-                "id": row[0],
-                "title": row[1],
-                "slug": row[2],
-                "novelupdates_url": novelupdates_url(row[0], row[2]),
-                "author": row[3],
-                "cover_url": row[4],
-                "rating": row[5],
-                "rating_votes": row[6]
-            })
+        results = [novel_search_result(row) for row in cur.fetchall()]
 
         return {"query": q, "results": results}
     finally:

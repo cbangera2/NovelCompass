@@ -57,6 +57,26 @@ def test_health_exposes_compatibility_contract(monkeypatch):
     }
 
 
+def test_resolve_slugs_uses_exact_slug_without_title_search(monkeypatch):
+    def resolve_db():
+        conn = contract_db()
+        conn.execute(
+            """INSERT INTO novels(id, slug, title, author, rating, rating_votes)
+               VALUES (39, 'canonical-import-key', 'A Completely Different Display Title',
+                       'Author', 4.5, 120)"""
+        )
+        return conn
+
+    monkeypatch.setattr(main, "get_db", resolve_db)
+    result = main.resolve_novel_slugs(main.SlugResolveRequest(
+        slugs=["CANONICAL-IMPORT-KEY", "missing", "canonical-import-key"]
+    ))
+
+    assert len(result["results"]) == 1
+    assert result["results"][0]["id"] == 39
+    assert result["results"][0]["slug"] == "canonical-import-key"
+
+
 def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch):
     def browse_db():
         conn = contract_db()

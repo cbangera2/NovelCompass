@@ -88,6 +88,7 @@ export interface NovelSearchResult {
   cover_url?: string;
   rating: number;
   rating_votes: number;
+  associated_names?: string[];
 }
 
 export interface NovelDetail {

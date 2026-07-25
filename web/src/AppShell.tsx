@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { BookMarked, BookOpen, ChevronLeft, ChevronRight, Database, ExternalLink, Menu, Settings, Sparkles, User, X } from 'lucide-react';
 import { configuredDataMode } from './data';
 import { LocalUserProfile } from './profile';
-import { loadLocalProfile } from './profile/store';
+import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { Tooltip } from './ui';
 import { Badge } from './design-system';
 import './app-shell.css';
@@ -37,8 +37,15 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   useEffect(() => {
     const refreshProfile = () => loadLocalProfile().then(setProfile).catch(() => setProfile(null)).finally(() => setProfileLoaded(true));
     refreshProfile();
+    const unsubscribe = subscribeLocalProfile((next) => {
+      setProfile(next);
+      setProfileLoaded(true);
+    });
     window.addEventListener('focus', refreshProfile);
-    return () => window.removeEventListener('focus', refreshProfile);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', refreshProfile);
+    };
   }, []);
 
   useEffect(() => {

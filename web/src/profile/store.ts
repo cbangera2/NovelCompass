@@ -3,6 +3,7 @@ import { LocalUserProfile } from './types';
 const DB_NAME = 'novel-recommender-local-profile';
 const STORE = 'profiles';
 const KEY = 'active';
+export const LOCAL_PROFILE_CHANGED_EVENT = 'novel-recommender:local-profile-changed';
 
 function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -32,10 +33,18 @@ export async function loadLocalProfile(): Promise<LocalUserProfile | null> {
 
 export async function saveLocalProfile(profile: LocalUserProfile): Promise<void> {
   await transact('readwrite', (store) => store.put(profile, KEY));
+  window.dispatchEvent(new CustomEvent(LOCAL_PROFILE_CHANGED_EVENT, { detail: profile }));
 }
 
 export async function clearLocalProfile(): Promise<void> {
   await transact('readwrite', (store) => store.delete(KEY));
+  window.dispatchEvent(new CustomEvent(LOCAL_PROFILE_CHANGED_EVENT, { detail: null }));
+}
+
+export function subscribeLocalProfile(listener: (profile: LocalUserProfile | null) => void): () => void {
+  const handle = (event: Event) => listener((event as CustomEvent<LocalUserProfile | null>).detail);
+  window.addEventListener(LOCAL_PROFILE_CHANGED_EVENT, handle);
+  return () => window.removeEventListener(LOCAL_PROFILE_CHANGED_EVENT, handle);
 }
 
 export function mergeProfiles(current: LocalUserProfile | null, incoming: LocalUserProfile): LocalUserProfile {

@@ -4,7 +4,7 @@ import { Download, FileUp, Trash2, User, X } from 'lucide-react';
 import { DatasetManifest } from '../types';
 import { RecommendationDataSource } from '../data';
 import { parseProfileFile, PROFILE_PARSER_VERSION, withStatus } from './parser';
-import { resolveEntries } from './resolve';
+import { applyResolvedNovelIds, resolveEntries } from './resolve';
 import { clearLocalProfile, mergeProfiles, saveLocalProfile } from './store';
 import { ImportPreview, LocalUserProfile, ParsedProfileFile, ProfileEntry, ReadingStatus } from './types';
 
@@ -42,7 +42,7 @@ export function ProfilePanel({
         const refreshed = {
           ...profile,
           dataset_version: dataset.dataset_version,
-          entries: profile.entries.map((entry) => ({ ...entry, novel_id: resolved.get(entry.slug)?.id }))
+          entries: applyResolvedNovelIds(profile.entries, resolved)
         };
         await saveLocalProfile(refreshed);
         onProfileChange(refreshed);
