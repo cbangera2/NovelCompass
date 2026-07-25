@@ -12,6 +12,7 @@ export interface RecommendationDataSource {
   getManifest(): Promise<DatasetManifest>;
   searchNovels(query: string, limit: number, signal?: AbortSignal): Promise<NovelSearchResult[]>;
   getOptions(): Promise<FilterOptions>;
+  resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>>;
   getNovel(id: number): Promise<NovelDetail>;
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse>;
 }

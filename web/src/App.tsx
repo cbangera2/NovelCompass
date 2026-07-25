@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, useRef } from 'react';
+import { useState, useEffect, FormEvent, useMemo, useRef } from 'react';
 import {
   BookOpen,
   ExternalLink,
@@ -24,6 +24,7 @@ import {
   DataMode,
   RecommendationDataSource
 } from './data';
+import { LocalUserProfile, ProfileEntry, ProfilePanel } from './profile';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -78,6 +79,8 @@ export default function App(): JSX.Element {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailEvidence, setDetailEvidence] = useState<string[]>([]);
+  const [profile, setProfile] = useState<LocalUserProfile | null>(null);
+  const [hideLibraryTitles, setHideLibraryTitles] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,6 +192,25 @@ export default function App(): JSX.Element {
     setSuggestions([]);
     setShowSuggestions(false);
   };
+
+  const useProfileEntryAsSeed = async (entry: ProfileEntry) => {
+    const source = dataSourceRef.current;
+    if (!source) return;
+    setLoading(true);
+    try {
+      const resolved = await source.resolveSlugs([{ slug: entry.slug, title: entry.imported_title }]);
+      const novel = resolved.get(entry.slug);
+      if (!novel) throw new Error('This title is not available in the active dataset.');
+      chooseNovel(novel);
+      window.requestAnimationFrame(() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      await fetchRecommendations(novel);
+    } catch (profileError: any) {
+      setError(profileError.message || 'Could not use that profile title as a seed.');
+      setLoading(false);
+    }
+  };
+
+  const profileEntries = useMemo(() => new Map(profile?.entries.map((entry) => [entry.novel_id, entry]) || []), [profile]);
 
   const openNovelDetail = async (novel: Recommendation) => {
     const source = dataSourceRef.current;
@@ -309,6 +331,13 @@ export default function App(): JSX.Element {
                 <option value="static">Static snapshot</option>
               </select>
             </label>
+            <ProfilePanel
+              source={dataSource}
+              dataset={dataset}
+              profile={profile}
+              onProfileChange={setProfile}
+              onUseSeed={useProfileEntryAsSeed}
+            />
           </div>
         </div>
       </header>
@@ -358,6 +387,15 @@ export default function App(): JSX.Element {
       </section>
 
       <section className="controls" aria-label="Recommendation controls">
+        {profile && (
+          <div className="control-group">
+            <span className="control-heading">My library</span>
+            <label className="filter-toggle">
+              <input type="checkbox" checked={hideLibraryTitles} onChange={(e) => setHideLibraryTitles(e.target.checked)} />
+              Hide imported titles
+            </label>
+          </div>
+        )}
         <div className="control-group">
           <span className="control-heading">Boost</span>
           <label className="filter-toggle">
@@ -520,7 +558,9 @@ export default function App(): JSX.Element {
           </div>
 
           <div className="results-grid">
-            {data.recommendations.slice(0, visibleCount).map((rec, index) => (
+            {data.recommendations
+              .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
+              .slice(0, visibleCount).map((rec, index) => (
               <article
                 key={rec.target_id || index}
                 className="novel-card"
@@ -559,6 +599,12 @@ export default function App(): JSX.Element {
                         <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
                       </div>
                       <div className="card-badges">
+                        {profileEntries.get(rec.target_id) && (
+                          <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
+                            {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
+                            {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
+                          </span>
+                        )}
                         {rec.language && <span>{rec.language}</span>}
                         {rec.status_trans && <span>{rec.status_trans}</span>}
                       </div>
@@ -576,6 +622,13 @@ export default function App(): JSX.Element {
                   </ul>
 
                   <div className="feedback-actions">
+                    <button className="btn-feedback" onClick={() => useProfileEntryAsSeed({
+                      novel_id: rec.target_id,
+                      slug: rec.slug,
+                      imported_title: rec.title,
+                      status: profileEntries.get(rec.target_id)?.status || 'reading',
+                      source_file: 'recommendation'
+                    })}><Sparkles size={14} aria-hidden="true" /> Use as seed</button>
                     <button className="btn-feedback" onClick={() => alert(`Marked ${rec.title} as loved`)}><Heart size={14} aria-hidden="true" /> Love</button>
                     <button className="btn-feedback" onClick={() => alert(`Marked ${rec.title} as read`)}><BookOpen size={14} aria-hidden="true" /> Read</button>
                     <button className="btn-feedback" onClick={() => alert(`Excluded ${rec.title}`)}><X size={14} aria-hidden="true" /> Not for me</button>
@@ -608,6 +661,7 @@ export default function App(): JSX.Element {
           evidence={detailEvidence}
           onClose={closeNovelDetail}
           onRecommend={recommendFromDetail}
+          profileEntry={detail ? profileEntries.get(detail.id) : undefined}
         />
       )}
     </div>
@@ -620,7 +674,8 @@ function NovelDetailDialog({
   error,
   evidence,
   onClose,
-  onRecommend
+  onRecommend,
+  profileEntry
 }: {
   detail: NovelDetail | null;
   loading: boolean;
@@ -628,6 +683,7 @@ function NovelDetailDialog({
   evidence: string[];
   onClose: () => void;
   onRecommend: () => void;
+  profileEntry?: ProfileEntry;
 }) {
   return (
     <div className="detail-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -654,6 +710,11 @@ function NovelDetailDialog({
                 <span className="eyebrow">{detail.language || 'Web novel'}{detail.year ? ` · ${detail.year}` : ''}</span>
                 <h2 id="novel-detail-title">{detail.title}</h2>
                 <p className="detail-author">{detail.author || 'Unknown author'}</p>
+                {profileEntry && <span className={`detail-library-badge status-${profileEntry.status}`}>
+                  In your library · {profileEntry.status.replace(/_/g, ' ')}
+                  {profileEntry.rating ? ` · ${profileEntry.rating}★` : ''}
+                  {profileEntry.progress ? ` · ${profileEntry.progress}` : ''}
+                </span>}
                 <div className="detail-stats">
                   <span><Star size={15} fill="currentColor" aria-hidden="true" /> {detail.rating || '—'} <small>{detail.rating_votes.toLocaleString()} votes</small></span>
                   <span><Users size={15} aria-hidden="true" /> {detail.reading_list_count.toLocaleString()} readers</span>

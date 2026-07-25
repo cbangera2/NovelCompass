@@ -57,6 +57,21 @@ export class ApiDataSource implements RecommendationDataSource {
     return apiFetch('/api/options');
   }
 
+  async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {
+    const result = new Map<string, NovelSearchResult>();
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(6, items.length) }, async () => {
+      while (cursor < items.length) {
+        const item = items[cursor++];
+        const matches = await this.searchNovels(item.title, 12).catch(() => []);
+        const exact = matches.find((novel) => novel.slug.toLowerCase() === item.slug.toLowerCase());
+        if (exact) result.set(item.slug.toLowerCase(), exact);
+      }
+    });
+    await Promise.all(workers);
+    return result;
+  }
+
   getNovel(id: number): Promise<NovelDetail> {
     return apiFetch(`/api/novels/${id}`);
   }
