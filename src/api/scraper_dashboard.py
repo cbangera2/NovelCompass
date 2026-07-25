@@ -7,6 +7,8 @@ anti-bot stop behavior. This module only starts one bounded worker at a time.
 from __future__ import annotations
 
 import threading
+import os
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -14,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from src.db.schema import init_db
 from src.scraper.crawler import Crawler
+from src.scraper.refresh import DEFAULT_ARTIFACT
 
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
@@ -27,6 +30,24 @@ _lock = threading.Lock()
 _worker: Optional[threading.Thread] = None
 _crawler: Optional[Crawler] = None
 _last_result: Optional[dict] = None
+
+
+def _dashboard_db_path() -> Path:
+    """Operate on the refresh artifact, never the preserved baseline."""
+    return Path(os.environ.get("NOVEL_SCRAPER_DB", str(DEFAULT_ARTIFACT)))
+
+
+def _dashboard_db():
+    path = _dashboard_db_path()
+    if not path.exists():
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The refresh artifact has not been prepared. Run "
+                "`.venv/bin/python -m src.scraper.refresh prepare` first."
+            ),
+        )
+    return init_db(str(path))
 
 
 class BatchRequest(BaseModel):
@@ -66,9 +87,19 @@ def _queue_breakdown(conn) -> dict:
             """
         )
     }
+    by_phase = {
+        row["phase"]: row["count"]
+        for row in conn.execute(
+            """
+            SELECT phase, COUNT(*) count FROM crawl_queue
+            WHERE status = 'pending' GROUP BY phase
+            """
+        )
+    }
     return {
         "counts": counts,
         "pending_by_type": by_type,
+        "pending_by_phase": by_phase,
         "pending_novels": {
             "new_or_unresolved": novel_work["new_count"] or 0,
             "refresh": novel_work["refresh_count"] or 0,
@@ -78,7 +109,7 @@ def _queue_breakdown(conn) -> dict:
 
 def _run_batch(max_items: int) -> None:
     global _crawler, _last_result
-    conn = init_db()
+    conn = _dashboard_db()
     crawler = Crawler(conn)
     with _lock:
         _crawler = crawler
@@ -95,7 +126,7 @@ def _run_batch(max_items: int) -> None:
 
 @router.get("/status")
 def scraper_status():
-    conn = init_db()
+    conn = _dashboard_db()
     try:
         latest = conn.execute(
             """
@@ -120,6 +151,10 @@ def scraper_status():
             running = bool(_worker and _worker.is_alive())
             result = _last_result
         return {
+            "database": str(_dashboard_db_path().resolve()),
+            "artifact": dict(
+                conn.execute("SELECT key, value FROM artifact_metadata")
+            ),
             "running": running,
             "queue": _queue_breakdown(conn),
             "latest_run": dict(latest) if latest else None,
@@ -139,14 +174,15 @@ def scraper_status():
 @router.post("/seed-discovery")
 def seed_discovery(request: Request):
     _require_local(request)
-    conn = init_db()
+    conn = _dashboard_db()
     try:
         with conn:
             for url in DISCOVERY_URLS:
                 conn.execute(
                     """
-                    INSERT INTO crawl_queue (url, type, priority, status)
-                    VALUES (?, 'discovery', 90, 'pending')
+                    INSERT INTO crawl_queue
+                        (url, type, priority, phase, status)
+                    VALUES (?, 'discovery', 90, 'discovery', 'pending')
                     ON CONFLICT(url) DO UPDATE SET
                       priority = MAX(priority, 90),
                       status = CASE

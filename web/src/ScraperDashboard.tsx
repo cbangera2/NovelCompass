@@ -5,10 +5,13 @@ import './scraper-dashboard.css';
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 type Status = {
+  database: string;
+  artifact: Record<string, string>;
   running: boolean;
   queue: {
     counts: Record<string, number>;
     pending_by_type: Record<string, number>;
+    pending_by_phase: Record<string, number>;
     pending_novels: { new_or_unresolved: number; refresh: number };
   };
   latest_run: null | Record<string, string | number | null>;
@@ -82,14 +85,16 @@ export default function ScraperDashboard() {
           <p>Discover missing novels first, then refresh the older snapshot in small, respectful batches.</p>
         </div>
         <span className={`run-state ${status?.running ? 'running' : ''}`}>
-          {status?.running ? 'Batch running' : 'Idle'}
+          {status?.running
+            ? 'Batch running'
+            : `${status?.artifact.artifact_status || 'Loading'} artifact`}
         </span>
       </header>
 
       <section className="scraper-grid metrics">
-        <Metric label="Pending discoveries" value={status?.queue.pending_by_type.discovery || 0} />
-        <Metric label="New or unresolved" value={status?.queue.pending_novels.new_or_unresolved || 0} accent />
-        <Metric label="Existing to refresh" value={status?.queue.pending_novels.refresh || 0} />
+        <Metric label="Pending discovery work" value={status?.queue.pending_by_phase.discovery || 0} />
+        <Metric label="New or unresolved" value={status?.queue.pending_by_phase.new_novel || 0} accent />
+        <Metric label="Existing to refresh" value={status?.queue.pending_by_phase.refresh_existing || 0} />
         <Metric label="Completed" value={counts.complete || 0} />
         <Metric label="Blocked / failed" value={(counts.blocked || 0) + (counts.failed || 0)} warn />
       </section>
