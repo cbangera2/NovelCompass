@@ -677,11 +677,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .novel-card {
   background: var(--surface);
   border: 1px solid var(--border); border-radius: 15px; cursor: pointer; min-width: 0; overflow: hidden;
+  container-type: inline-size;
   transition: border-color .2s, box-shadow .2s, transform .2s;
 }
 .novel-card.ds-card { padding: 0; }
 .novel-card:hover { border-color: rgba(155,135,245,.35); box-shadow: 0 16px 45px rgba(0,0,0,.22); transform: translateY(-2px); }
 .card-content { display: flex; flex-direction: column; min-height: 100%; padding: .85rem; }
+.card-main { min-width: 0; }
+.card-primary { min-width: 0; }
 .card-top { display: flex; gap: .85rem; }
 .card-cover { background: rgba(255,255,255,.03); border-radius: 8px; flex: 0 0 82px; height: 116px; overflow: hidden; position: relative; }
 .cover-card { height: 116px; object-fit: cover; width: 82px; }
@@ -774,7 +777,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .detail-chips { display: flex; flex-wrap: wrap; gap: .38rem; }
 .detail-chips span, .detail-chips a { background: var(--accent-soft); border: 1px solid rgba(155,135,245,.23); border-radius: 999px; color: #d4cbff; font-size: .7rem; padding: .24rem .52rem; text-decoration: none; }
 .detail-chips a:hover, .taste-chips a:hover { border-color: var(--accent); color: var(--text); }
-.card-tag-links { margin-top: .45rem; }
+.card-tag-rail { border-top: 1px solid var(--border); margin-top: .65rem; padding-top: .6rem; }
+.card-tag-label { color: var(--dim); display: block; font-size: .6rem; font-weight: 750; letter-spacing: .09em; margin-bottom: .4rem; text-transform: uppercase; }
+.card-tag-links { margin-top: 0; }
+.card-tag-more { margin-top: .42rem; }
+.card-tag-more summary { color: var(--accent-bright); cursor: pointer; font-size: .65rem; list-style: none; width: max-content; }
+.card-tag-more summary::-webkit-details-marker { display: none; }
+.card-tag-more[open] summary { margin-bottom: .4rem; }
+.card-tag-more .detail-chips { max-height: 5.25rem; overflow: auto; padding-right: .15rem; }
 .novel-author a, .detail-author a, .detail-heading .eyebrow a, .card-badges a { color: inherit; text-decoration: none; }
 .novel-author a:hover, .detail-author a:hover, .detail-heading .eyebrow a:hover, .card-badges a:hover { text-decoration: underline; }
 .detail-tags span { background: rgba(255,255,255,.035); border-color: var(--border); color: var(--muted); }
@@ -782,6 +792,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .detail-signals > div { display: grid; gap: .5rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .detail-signals span { background: rgba(255,255,255,.025); border: 1px solid var(--border); border-radius: 9px; color: var(--muted); font-size: .72rem; padding: .65rem; }
 .detail-signals strong { color: var(--text); display: block; font-size: 1.1rem; }
+
+@container (min-width: 460px) {
+  .card-main { display: grid; gap: .8rem; grid-template-columns: minmax(0, 1fr) minmax(112px, 28%); }
+  .card-tag-rail { border-left: 1px solid var(--border); border-top: 0; margin-top: 0; padding-left: .75rem; padding-top: .1rem; }
+  .card-tag-links, .card-tag-more .detail-chips { align-items: flex-start; flex-direction: column; }
+  .card-tag-links a, .card-tag-more .detail-chips a { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .evidence-label { margin-top: .65rem; }
+}
 
 @media (min-width: 1220px) {
   .results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

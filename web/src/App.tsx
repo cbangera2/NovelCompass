@@ -671,71 +671,89 @@ export default function App(): JSX.Element {
                 key={rec.target_id || index}
                 className="novel-card"
                 onClick={(event) => {
-                  if (!(event.target as HTMLElement).closest('button, a')) window.location.href = novelPageUrl(rec.target_id, data.seed_novel.id);
+                  if (!(event.target as HTMLElement).closest('button, a, summary')) window.location.href = novelPageUrl(rec.target_id, data.seed_novel.id);
                 }}
               >
                 <div className="card-content">
-                  <div className="card-top">
-                    <div className="card-cover">
-                      <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
-                      <span className="card-rank">#{index + 1}</span>
+                  <div className="card-main">
+                    <div className="card-primary">
+                      <div className="card-top">
+                        <div className="card-cover">
+                          <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
+                          <span className="card-rank">#{index + 1}</span>
+                        </div>
+
+                        <div className="card-summary">
+                          <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
+                          <h3 className="novel-title">
+                            <a href={novelPageUrl(rec.target_id, data.seed_novel.id)}>
+                              {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
+                            </a>
+                            <Tooltip content="Open this title on Novel Updates">
+                            <a
+                              className="card-external-link"
+                              href={rec.novelupdates_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Open ${rec.title} on Novel Updates`}
+                            >
+                              <ExternalLink size={14} aria-hidden="true" />
+                            </a>
+                            </Tooltip>
+                          </h3>
+                          <div className="novel-author">{rec.author
+                            ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
+                            : 'Unknown author'}</div>
+
+                          <div className="novel-meta">
+                            <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
+                            <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
+                          </div>
+                          <div className="card-badges">
+                            {profileEntries.get(rec.target_id) && (
+                              <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
+                                {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
+                                {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
+                              </span>
+                            )}
+                            {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
+                            {rec.status_trans && <span>{rec.status_trans}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="evidence-label">Why it matches</div>
+                      <ul className="evidence-list">
+                        {rec.evidence_bullets.map((bullet, i) => (
+                          <li key={i} className="evidence-item">
+                            <span className="evidence-bullet" aria-hidden="true">✓</span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
 
-                    <div className="card-summary">
-                      <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
-                      <h3 className="novel-title">
-                        <a href={novelPageUrl(rec.target_id, data.seed_novel.id)}>
-                          {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
-                        </a>
-                        <Tooltip content="Open this title on Novel Updates">
-                        <a
-                          className="card-external-link"
-                          href={rec.novelupdates_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Open ${rec.title} on Novel Updates`}
-                        >
-                          <ExternalLink size={14} aria-hidden="true" />
-                        </a>
-                        </Tooltip>
-                      </h3>
-                      <div className="novel-author">{rec.author
-                        ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
-                        : 'Unknown author'}</div>
-
-                      <div className="novel-meta">
-                        <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
-                        <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
-                      </div>
-                      <div className="card-badges">
-                        {profileEntries.get(rec.target_id) && (
-                          <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
-                            {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
-                            {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
-                          </span>
-                        )}
-                        {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
-                        {rec.status_trans && <span>{rec.status_trans}</span>}
-                      </div>
-                      {rec.shared_tags.length > 0 && (
+                    {rec.shared_tags.length > 0 && (
+                      <aside className="card-tag-rail" aria-label="Shared tropes">
+                        <span className="card-tag-label">Shared tropes</span>
                         <div className="detail-chips card-tag-links">
-                          {rec.shared_tags.slice(0, 4).map((tag) => (
+                          {rec.shared_tags.slice(0, 3).map((tag) => (
                             <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
                           ))}
                         </div>
-                      )}
-                    </div>
+                        {rec.shared_tags.length > 3 && (
+                          <details className="card-tag-more">
+                            <summary>+{rec.shared_tags.length - 3} more</summary>
+                            <div className="detail-chips">
+                              {rec.shared_tags.slice(3).map((tag) => (
+                                <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </aside>
+                    )}
                   </div>
-
-                  <div className="evidence-label">Why it matches</div>
-                  <ul className="evidence-list">
-                    {rec.evidence_bullets.map((bullet, i) => (
-                      <li key={i} className="evidence-item">
-                        <span className="evidence-bullet" aria-hidden="true">✓</span>
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
 
                   <div className="feedback-actions">
                     <Button variant="ghost" className="btn-feedback" onClick={() => openNovelDetail(rec)}><BookOpen size={14} aria-hidden="true" /> Quick look</Button>
