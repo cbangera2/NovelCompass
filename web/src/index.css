@@ -698,8 +698,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .novel-card:hover { border-color: rgba(155,135,245,.35); box-shadow: 0 16px 45px rgba(0,0,0,.22); transform: translateY(-2px); }
 .card-content { display: flex; flex-direction: column; min-height: 100%; padding: .85rem; }
 .card-main { min-width: 0; }
-.card-primary { min-width: 0; }
-.card-top { display: flex; gap: .85rem; }
+.card-primary { display: grid; grid-template-rows: 8.5rem auto 7.2rem; min-width: 0; }
+.card-top { display: flex; gap: .85rem; min-height: 8.5rem; }
 .card-cover { background: rgba(255,255,255,.03); border-radius: 8px; flex: 0 0 82px; height: 116px; overflow: hidden; position: relative; }
 .cover-card { height: 116px; object-fit: cover; width: 82px; }
 .card-rank {
@@ -708,7 +708,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 .card-summary { min-width: 0; padding-top: .05rem; }
 .card-score { align-items: center; color: var(--accent-bright); display: flex; font-size: .65rem; font-weight: 750; gap: .25rem; letter-spacing: .045em; margin-bottom: .35rem; text-transform: uppercase; }
-.novel-title { align-items: baseline; display: flex; font-size: 1rem; font-weight: 700; gap: .3rem; letter-spacing: -.015em; line-height: 1.2; }
+.novel-title { align-items: baseline; display: flex; font-size: 1rem; font-weight: 700; gap: .3rem; letter-spacing: -.015em; line-height: 1.2; min-height: 2.4em; }
+.novel-title > a:first-child { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .novel-title button {
   background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit;
   font-weight: inherit; letter-spacing: inherit; line-height: inherit; padding: 0; text-align: left;
@@ -725,10 +726,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .card-badges { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
 .card-badges span { background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .61rem; padding: .14rem .38rem; text-transform: capitalize; }
 .evidence-label { color: var(--dim); font-size: .62rem; font-weight: 750; letter-spacing: .1em; margin: .85rem 0 .42rem; text-transform: uppercase; }
-.evidence-list { border-top: 1px solid var(--border); list-style: none; padding-top: .55rem; }
+.evidence-list { border-top: 1px solid var(--border); height: 7.2rem; list-style: none; overflow: hidden; padding-top: .55rem; }
 .evidence-item { align-items: flex-start; color: #cac8d3; display: flex; font-size: .73rem; gap: .4rem; line-height: 1.42; margin-bottom: .34rem; }
+.evidence-item > span:last-child { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .evidence-bullet { align-items: center; background: var(--accent-soft); border-radius: 999px; color: var(--accent-bright); display: inline-flex; flex: 0 0 15px; font-size: .57rem; height: 15px; justify-content: center; margin-top: 1px; }
-.feedback-actions { align-items: center; border-top: 1px solid var(--border); display:flex; gap: .3rem; margin-top: .7rem; padding-top: .65rem; }
+.feedback-actions { align-items: center; border-top: 1px solid var(--border); display:flex; gap: .3rem; margin-top:auto; padding-top: .65rem; }
 .card-primary-action { flex:1; min-height:44px; min-width:0; }
 .feedback-actions > .ui-tooltip { display:flex; flex:none; }
 .card-icon-action { align-items:center; background:rgba(255,255,255,.035); border:1px solid var(--border); border-radius:7px; color:var(--muted); cursor:pointer; display:flex; height:44px; justify-content:center; padding:0; width:44px; }
@@ -804,7 +806,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .detail-chips { display: flex; flex-wrap: wrap; gap: .38rem; }
 .detail-chips span, .detail-chips a { background: var(--accent-soft); border: 1px solid rgba(155,135,245,.23); border-radius: 999px; color: #d4cbff; font-size: .7rem; padding: .24rem .52rem; text-decoration: none; }
 .detail-chips a:hover, .taste-chips a:hover { border-color: var(--accent); color: var(--text); }
-.card-tag-rail { border-top: 1px solid var(--border); margin-top: .65rem; padding-top: .6rem; }
+.card-tag-rail { border-top: 1px solid var(--border); margin-top: .65rem; min-height: 7.25rem; padding-top: .6rem; }
 .card-tag-label { color: var(--dim); display: block; font-size: .6rem; font-weight: 750; letter-spacing: .09em; margin-bottom: .4rem; text-transform: uppercase; }
 .card-tag-links { margin-top: 0; }
 .card-tag-more { margin-top: .42rem; }
@@ -822,7 +824,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 @container (min-width: 460px) {
   .card-main { display: grid; gap: .8rem; grid-template-columns: minmax(0, 1fr) minmax(112px, 28%); }
-  .card-tag-rail { border-left: 1px solid var(--border); border-top: 0; margin-top: 0; padding-left: .75rem; padding-top: .1rem; }
+  .card-primary { grid-template-rows: 8.5rem auto minmax(7.2rem,auto); }
+  .card-tag-rail { border-left: 1px solid var(--border); border-top: 0; margin-top: 0; min-height:0; padding-left: .75rem; padding-top: .1rem; }
   .card-tag-links, .card-tag-more .detail-chips { align-items: flex-start; flex-direction: column; }
   .card-tag-links a, .card-tag-more .detail-chips a { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .evidence-label { margin-top: .65rem; }
@@ -846,6 +849,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .select-controls select { width: 100%; }
   .advanced-grid, .weight-grid { grid-template-columns: 1fr; }
   .advanced-grid label:nth-child(-n + 2) { grid-column: auto; }
+  .card-primary { display:block; }
+  .card-top { min-height:0; }
+  .novel-title { min-height:0; }
+  .evidence-list { height:auto; max-height:none; overflow:visible; }
+  .evidence-item > span:last-child { display:block; overflow:visible; }
+  .card-tag-rail { min-height:0; }
   .detail-hero { grid-template-columns: 120px minmax(0, 1fr); padding-right: 1.8rem; }
   .cover-detail { height: 168px; width: 120px; }
   .detail-signals > div { grid-template-columns: 1fr; }
