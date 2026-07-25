@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, ExternalLink, Search, Star, Users, X } from 'lucide-react';
+import { BookOpen, ExternalLink, Search, Shuffle, SlidersHorizontal, Star, Users, X } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from './data';
 import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
 import { browseFacetUrl } from './metadataLinks';
@@ -31,6 +31,7 @@ export default function BrowsePage(): JSX.Element {
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<NovelDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [luckyLoading, setLuckyLoading] = useState(false);
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -71,6 +72,40 @@ export default function BrowsePage(): JSX.Element {
     setPage(1);
   };
 
+  const browseRequest = () => ({
+    query, sort, language, author, genre, tag,
+    min_rating: minRating, min_votes: minVotes
+  });
+
+  const clearAll = () => resetPage(() => {
+    setQuery(''); setLanguage(''); setAuthor(''); setGenre(''); setTag('');
+    setMinRating(0); setMinVotes(0); setSort('popular');
+  });
+
+  const feelingLucky = async () => {
+    if (!source) return;
+    setLuckyLoading(true);
+    setError('');
+    try {
+      const novel = await source.getRandomNovel(browseRequest());
+      await openDetail(novel.id);
+    } catch (reason: any) {
+      setError(reason.message || 'Could not choose a random novel.');
+    } finally {
+      setLuckyLoading(false);
+    }
+  };
+
+  const activeFilters = [
+    query && { label: `Search: ${query}`, clear: () => setQuery('') },
+    author && { label: `Author: ${author}`, clear: () => setAuthor('') },
+    genre && { label: `Genre: ${genre}`, clear: () => setGenre('') },
+    tag && { label: `Tag: ${tag}`, clear: () => setTag('') },
+    language && { label: `Language: ${language}`, clear: () => setLanguage('') },
+    minRating > 0 && { label: `Rating: ${minRating}★+`, clear: () => setMinRating(0) },
+    minVotes > 0 && { label: `Votes: ${minVotes.toLocaleString()}+`, clear: () => setMinVotes(0) }
+  ].filter(Boolean) as Array<{ label: string; clear: () => void }>;
+
   const openDetail = async (id: number) => {
     if (!source) return;
     setDetail(null);
@@ -103,31 +138,33 @@ export default function BrowsePage(): JSX.Element {
           <option value="newest">Newest year</option>
           <option value="title">Title A–Z</option>
         </select>
-        <select value={genre} onChange={(event) => resetPage(() => setGenre(event.target.value))}>
-          <option value="">All genres</option>
-          {options.genres.map((item) => <option key={item}>{item}</option>)}
-        </select>
-        <select value={tag} disabled={!options.tags?.length}
-          onChange={(event) => resetPage(() => setTag(event.target.value))}>
-          <option value="">All tags</option>
-          {options.tags?.map((item) => <option key={item}>{item}</option>)}
-        </select>
-        <select value={language} onChange={(event) => resetPage(() => setLanguage(event.target.value))}>
-          <option value="">All languages</option>
-          {options.languages?.map((item) => <option key={item}>{item}</option>)}
-        </select>
-        <select value={minRating} onChange={(event) => resetPage(() => setMinRating(Number(event.target.value)))}>
-          <option value="0">Any rating</option><option value="3">3★ and up</option>
-          <option value="4">4★ and up</option><option value="4.5">4.5★ and up</option>
-        </select>
-        <select value={minVotes} onChange={(event) => resetPage(() => setMinVotes(Number(event.target.value)))}>
-          <option value="0">Any vote count</option><option value="10">10+ votes</option>
-          <option value="100">100+ votes</option><option value="1000">1,000+ votes</option>
-        </select>
+        <button className="browse-lucky" disabled={!source || luckyLoading} onClick={feelingLucky}>
+          <Shuffle size={16} /> {luckyLoading ? 'Choosing…' : 'Feeling lucky'}
+        </button>
+        <details className="browse-advanced">
+          <summary><SlidersHorizontal size={16} /> More filters</summary>
+          <div>
+            <select value={genre} onChange={(event) => resetPage(() => setGenre(event.target.value))}>
+              <option value="">All genres</option>{options.genres.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <select value={tag} disabled={!options.tags?.length} onChange={(event) => resetPage(() => setTag(event.target.value))}>
+              <option value="">All tags</option>{options.tags?.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <select value={language} onChange={(event) => resetPage(() => setLanguage(event.target.value))}>
+              <option value="">All languages</option>{options.languages?.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <select value={minRating} onChange={(event) => resetPage(() => setMinRating(Number(event.target.value)))}>
+              <option value="0">Any rating</option><option value="3">3★ and up</option><option value="4">4★ and up</option><option value="4.5">4.5★ and up</option>
+            </select>
+            <select value={minVotes} onChange={(event) => resetPage(() => setMinVotes(Number(event.target.value)))}>
+              <option value="0">Any vote count</option><option value="10">10+ votes</option><option value="100">100+ votes</option><option value="1000">1,000+ votes</option>
+            </select>
+          </div>
+        </details>
       </section>
-      {author && <div className="browse-active-filter">
-        <span>Author: {author}</span>
-        <button onClick={() => resetPage(() => setAuthor(''))}>Clear</button>
+      {activeFilters.length > 0 && <div className="browse-active-filters" aria-label="Active filters">
+        {activeFilters.map((filter) => <button key={filter.label} onClick={() => resetPage(filter.clear)}>{filter.label}<X size={12} /></button>)}
+        <button className="clear-all" onClick={clearAll}>Clear all</button>
       </div>}
 
       {!tagSupported && <p className="browse-notice">Tag filtering is unavailable in this static snapshot, so the selected tag was not applied.</p>}
@@ -137,8 +174,8 @@ export default function BrowsePage(): JSX.Element {
         {items.map((novel) => <BrowseCard key={novel.id} novel={novel} onOpen={() => openDetail(novel.id)} />)}
       </section>
       {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
-      {loading && <p className="browse-loading">Loading catalog…</p>}
-      {hasMore && !loading && <button className="browse-more" onClick={() => setPage((value) => value + 1)}>Load more novels</button>}
+      {loading && <div className="browse-loading" role="status"><span /> Loading {page > 1 ? 'more novels' : 'catalog'}…</div>}
+      {hasMore && !loading && <div className="browse-pagination"><button className="browse-more" onClick={() => setPage((value) => value + 1)}>Load {PAGE_SIZE} more</button><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>}
 
       {(detailLoading || detail) && <div className="browse-modal-backdrop" onMouseDown={() => setDetail(null)}>
         <article className="browse-modal" onMouseDown={(event) => event.stopPropagation()}>

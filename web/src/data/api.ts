@@ -1,4 +1,5 @@
 import {
+  BrowseNovel,
   BrowseRequest,
   BrowseResponse,
   DatasetManifest,
@@ -101,5 +102,14 @@ export class ApiDataSource implements RecommendationDataSource {
       }
       throw error;
     });
+  }
+
+  async getRandomNovel(request: BrowseRequest, randomValue = Math.random()): Promise<BrowseNovel> {
+    const count = await this.browseNovels({ ...request, page: 1, page_size: 1 });
+    if (!count.total) throw new DataSourceError('No novels match the active filters.');
+    const page = Math.min(count.total, Math.floor(Math.max(0, Math.min(0.999999, randomValue)) * count.total) + 1);
+    const result = await this.browseNovels({ ...request, page, page_size: 1 });
+    if (!result.items[0]) throw new DataSourceError('The selected novel is unavailable.');
+    return result.items[0];
   }
 }

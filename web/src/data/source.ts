@@ -1,4 +1,5 @@
 import {
+  BrowseNovel,
   BrowseRequest,
   BrowseResponse,
   DatasetManifest,
@@ -18,6 +19,7 @@ export interface RecommendationDataSource {
   getNovel(id: number): Promise<NovelDetail>;
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse>;
   browseNovels(request: BrowseRequest): Promise<BrowseResponse>;
+  getRandomNovel(request: BrowseRequest, randomValue?: number): Promise<BrowseNovel>;
 }
 
 export class DataSourceError extends Error {
