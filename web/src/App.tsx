@@ -24,7 +24,7 @@ import {
   DataMode,
   RecommendationDataSource
 } from './data';
-import { LocalUserProfile, ProfileEntry } from './profile';
+import { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
@@ -287,6 +287,30 @@ export default function App(): JSX.Element {
       updated_at: new Date().toISOString()
     });
     const next = { ...current, feedback };
+    await saveLocalProfile(next);
+    setProfile(next);
+  };
+
+  const setReadingStatus = async (rec: Recommendation, status: ReadingStatus | '') => {
+    const current = profile || {
+      profile_id: crypto.randomUUID(),
+      parser_version: 1,
+      dataset_version: dataset?.dataset_version || 'unknown',
+      imported_at: new Date().toISOString(),
+      source_fingerprints: [],
+      entries: [],
+      curated_lists: [],
+      feedback: []
+    };
+    const entries = current.entries.filter((entry) => entry.novel_id !== rec.target_id && entry.slug !== rec.slug);
+    if (status) entries.push({
+      novel_id: rec.target_id,
+      slug: rec.slug,
+      imported_title: rec.title,
+      status,
+      source_file: 'recommendation'
+    });
+    const next = { ...current, entries };
     await saveLocalProfile(next);
     setProfile(next);
   };
@@ -671,7 +695,7 @@ export default function App(): JSX.Element {
                 key={rec.target_id || index}
                 className="novel-card"
                 onClick={(event) => {
-                  if (!(event.target as HTMLElement).closest('button, a, summary')) window.location.href = novelPageUrl(rec.target_id, data.seed_novel.id);
+                  if (!(event.target as HTMLElement).closest('button, a, summary, select, label')) void openNovelDetail(rec);
                 }}
               >
                 <div className="card-content">
@@ -756,17 +780,37 @@ export default function App(): JSX.Element {
                   </div>
 
                   <div className="feedback-actions">
-                    <Button variant="ghost" className="btn-feedback" onClick={() => openNovelDetail(rec)}><BookOpen size={14} aria-hidden="true" /> Quick look</Button>
-                    <Button variant="ghost" className="btn-feedback" onClick={() => useProfileEntryAsSeed({
+                    <Button variant="primary" className="card-primary-action" onClick={() => useProfileEntryAsSeed({
                       novel_id: rec.target_id,
                       slug: rec.slug,
                       imported_title: rec.title,
                       status: profileEntries.get(rec.target_id)?.status || 'reading',
                       source_file: 'recommendation'
                     })}><Sparkles size={14} aria-hidden="true" /> More like this</Button>
-                    <Button variant="ghost" className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'} onClick={() => setNovelFeedback(rec, 'love')}><Heart size={14} aria-hidden="true" /> Love</Button>
-                    <Button variant="ghost" className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'read' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'read'} onClick={() => setNovelFeedback(rec, 'read')}><BookOpen size={14} aria-hidden="true" /> Read</Button>
-                    <Button variant="ghost" className="btn-feedback" onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={14} aria-hidden="true" /> Not for me</Button>
+                    <label className="card-reading-status">
+                      <span className="sr-only">Reading status for {rec.title}</span>
+                      <BookOpen size={15} aria-hidden="true" />
+                      <select value={profileEntries.get(rec.target_id)?.status || ''}
+                        aria-label={`Reading status for ${rec.title}`}
+                        onChange={(event) => setReadingStatus(rec, event.target.value as ReadingStatus | '')}>
+                        <option value="">Add to library</option>
+                        <option value="reading">Reading</option>
+                        <option value="completed">Completed</option>
+                        <option value="plan_to_read">Plan to read</option>
+                      </select>
+                    </label>
+                    <div className="card-preference-actions">
+                      <Tooltip content="Love this recommendation">
+                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`}
+                          aria-label={`Love ${rec.title}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'}
+                          onClick={() => setNovelFeedback(rec, 'love')}><Heart size={16} aria-hidden="true" /></Button>
+                      </Tooltip>
+                      <Tooltip content="Hide recommendations like this">
+                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'not_for_me' ? 'selected' : ''}`}
+                          aria-label={`${rec.title} is not for me`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'not_for_me'}
+                          onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={16} aria-hidden="true" /></Button>
+                      </Tooltip>
+                    </div>
                   </div>
                 </div>
               </Card>
