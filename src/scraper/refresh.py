@@ -100,7 +100,7 @@ def prepare_artifact(
             """
             INSERT INTO crawl_queue
                 (url, type, item_id, priority, phase, status)
-            VALUES (?, 'rec_list', ?, 95, 'discovery', 'pending')
+            VALUES (?, 'rec_list', ?, 15, 'discovery', 'pending')
             """,
             [
                 (f"https://www.novelupdates.com/viewlist/{list_id}/", list_id)

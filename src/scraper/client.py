@@ -14,8 +14,7 @@ DEFAULT_BROWSER_PROFILE = Path(CACHE_DIR).parent / "browser-profile"
 
 BLOCK_MARKERS = (
     "cf-browser-verification",
-    "cf-chl-",
-    "challenge-platform",
+    "cf-chl-bypass",
     "<title>just a moment",
     "verify you are human",
     "unusual traffic from your computer network",
@@ -72,6 +71,8 @@ class BrowserSessionTransport:
                 str(self.profile_dir),
                 headless=headless,
                 locale="en-US",
+                args=["--disable-blink-features=AutomationControlled"],
+                ignore_default_args=["--enable-automation"],
             )
         except Exception as exc:
             self._playwright.stop()
@@ -124,6 +125,35 @@ class BrowserSessionTransport:
         self._playwright.stop()
 
 
+class CurlCffiTransport:
+    def __init__(self, headers: Dict[str, str], impersonate: str = "chrome124"):
+        from curl_cffi import requests
+        self.headers = headers
+        self.impersonate = impersonate
+        self.session = requests.Session(impersonate=self.impersonate)
+
+    def fetch(
+        self,
+        url: str,
+        *,
+        post_data: Optional[Dict] = None,
+        timeout: float = 30.0,
+    ) -> Tuple[Optional[str], int]:
+        try:
+            if post_data:
+                r = self.session.post(url, data=post_data, headers=self.headers, timeout=timeout)
+            else:
+                r = self.session.get(url, headers=self.headers, timeout=timeout)
+            return r.text, r.status_code
+        except Exception as e:
+            print(f"[CurlCffiTransport Error] {url}: {e}")
+            return None, 500
+
+    def close(self) -> None:
+        if hasattr(self, "session"):
+            self.session.close()
+
+
 class UrllibTransport:
     def __init__(self, headers: Dict[str, str]):
         self.headers = headers
@@ -164,13 +194,19 @@ class ScraperClient:
         os.makedirs(self.cache_dir, exist_ok=True)
         self.headers = {
             "User-Agent": (
-                "NovelUpdatesRecommender/1.0 "
-                "(personal local indexer; conservative cached crawler)"
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             ),
             "Accept-Language": "en-US,en;q=0.9",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         }
-        self.transport = transport or UrllibTransport(self.headers)
+        if transport:
+            self.transport = transport
+        else:
+            try:
+                self.transport = CurlCffiTransport(self.headers)
+            except Exception:
+                self.transport = UrllibTransport(self.headers)
 
     def _get_cache_key(self, url: str, post_data: Optional[Dict] = None) -> str:
         key_str = url

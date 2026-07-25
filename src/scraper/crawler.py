@@ -95,7 +95,7 @@ class Crawler:
                     f"https://www.novelupdates.com/viewlist/{list_id}/",
                     "rec_list",
                     item_id=list_id,
-                    priority=45,
+                    priority=15,
                 )
                 after = sum(self.repo.queue_counts().values())
                 discovered += max(0, after - before)
@@ -183,7 +183,7 @@ class Crawler:
         robots.parse(robots_text.splitlines())
         disallowed = next(
             (
-                row["url"]
+                row[0]
                 for row in self.repo.conn.execute(
                     """
                     SELECT url FROM crawl_queue
@@ -191,7 +191,7 @@ class Crawler:
                     ORDER BY priority DESC, id ASC
                     """
                 )
-                if not robots.can_fetch(self.client.headers["User-Agent"], row["url"])
+                if not robots.can_fetch(self.client.headers["User-Agent"], row[0])
             ),
             None,
         )

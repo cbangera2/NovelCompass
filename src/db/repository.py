@@ -221,11 +221,11 @@ class Repository:
                 """
                 SELECT * FROM crawl_queue
                 WHERE status = 'pending' AND attempts < ?
-                ORDER BY CASE phase
-                    WHEN 'discovery' THEN 0
-                    WHEN 'new_novel' THEN 1
+                ORDER BY priority DESC, CASE phase
+                    WHEN 'new_novel' THEN 0
+                    WHEN 'discovery' THEN 1
                     ELSE 2
-                END, priority DESC, id ASC
+                END, id ASC
                 LIMIT 1
                 """,
                 (max_attempts,),
