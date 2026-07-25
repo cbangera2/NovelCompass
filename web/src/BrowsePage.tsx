@@ -5,7 +5,8 @@ import { BrowseNovel, BrowseSort, FilterOptions, NovelDetail } from './types';
 import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { Button, FieldGroup, Select } from './ui';
+import { FieldGroup, Select } from './ui';
+import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { novelPageUrl } from './novelLinks';
 
@@ -173,7 +174,7 @@ export default function BrowsePage(): JSX.Element {
         <p>Explore every title in this snapshot. Popularity uses reading-list counts; highest rated uses the published rating and vote count.</p>
       </header>
 
-      <section className="browse-controls" aria-label="Catalog filters">
+      <Card className="browse-controls" aria-label="Catalog filters">
         <label className="browse-search"><Search size={17} /><input value={query}
           onChange={(event) => resetPage(() => setQuery(event.target.value))}
           placeholder="Search titles, aliases, or authors…" /></label>
@@ -184,9 +185,9 @@ export default function BrowsePage(): JSX.Element {
           <option value="newest">Newest year</option>
           <option value="title">Title A–Z</option>
         </Select>
-        <Button variant="primary" className="browse-lucky" disabled={!source || luckyLoading} onClick={feelingLucky}>
+        <DSButton variant="primary" className="browse-lucky" disabled={!source || luckyLoading} onClick={feelingLucky}>
           <Shuffle size={16} /> {luckyLoading ? 'Choosing…' : 'Feeling lucky'}
-        </Button>
+        </DSButton>
         <details className="browse-advanced">
           <summary><SlidersHorizontal size={16} /> More filters</summary>
           <FieldGroup label="Catalog metadata">
@@ -207,25 +208,28 @@ export default function BrowsePage(): JSX.Element {
             </Select>
           </FieldGroup>
         </details>
-      </section>
+      </Card>
       {activeFilters.length > 0 && <div className="browse-active-filters" aria-label="Active filters">
-        {activeFilters.map((filter) => <Button variant="ghost" key={filter.label} onClick={() => resetPage(filter.clear)}>{filter.label}<X size={12} /></Button>)}
-        <Button variant="ghost" className="clear-all" onClick={clearAll}>Clear all</Button>
+        {activeFilters.map((filter) => <DSButton variant="ghost" key={filter.label} onClick={() => resetPage(filter.clear)}>{filter.label}<X size={12} /></DSButton>)}
+        <DSButton variant="ghost" className="clear-all" onClick={clearAll}>Clear all</DSButton>
       </div>}
 
       {!tagSupported && <p className="browse-notice">Tag filtering is unavailable in this static snapshot, so the selected tag was not applied.</p>}
-      <div className="browse-heading"><div><BookOpen /><h2>Novels</h2></div><span>{hasLoaded ? `${total.toLocaleString()} matches` : 'Catalog status unavailable'}</span></div>
+      <div className="browse-results-header">
+        <CardHeader title="Novels" eyebrow="Catalog results" description={hasLoaded ? `${total.toLocaleString()} matches in this snapshot` : 'Loading catalog status'} />
+      </div>
       {error && <p className="browse-error">{error}</p>}
-      <section className="browse-grid">
-        {items.map((novel) => <BrowseCard key={novel.id} novel={novel} />)}
+      <section className="browse-grid" aria-busy={loading && page === 1}>
+        {items.map((novel) => <BrowseCard key={novel.id} novel={novel} onQuickLook={() => openDetail(novel.id)} />)}
+        {loading && page === 1 && Array.from({ length: 6 }, (_, index) => <Card className="browse-card browse-card-skeleton" key={index}><Skeleton /><div><Skeleton /><Skeleton /><Skeleton /></div></Card>)}
       </section>
       {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
       <div ref={sentinelRef} className="browse-sentinel" aria-hidden="true" />
       <div className="browse-page-status" role="status" aria-live="polite">
         {loading && <div className="browse-loading"><span /> Loading {page > 1 ? 'more novels' : 'catalog'}…</div>}
-        {batchError && <div className="browse-batch-error"><span>{batchError}</span><Button onClick={retryBatch}>Retry loading more</Button></div>}
+        {batchError && <div className="browse-batch-error"><span>{batchError}</span><DSButton onClick={retryBatch}>Retry loading more</DSButton></div>}
         {hasMore && !loading && !batchError && !observerSupported && (
-          <div className="browse-pagination"><Button className="browse-more" onClick={requestNextPage}>Load {PAGE_SIZE} more</Button><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>
+          <div className="browse-pagination"><DSButton className="browse-more" onClick={requestNextPage}>Load {PAGE_SIZE} more</DSButton><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>
         )}
         {hasMore && observerSupported && !batchError && <span className="sr-only">More novels load automatically as you scroll.</span>}
         {hasLoaded && !hasMore && items.length > 0 && <p className="browse-end">End of results · {items.length.toLocaleString()} novels shown</p>}
@@ -258,20 +262,20 @@ export default function BrowsePage(): JSX.Element {
   );
 }
 
-function BrowseCard({ novel }: { novel: BrowseNovel }) {
+function BrowseCard({ novel, onQuickLook }: { novel: BrowseNovel; onQuickLook: () => void }) {
   const { settings } = useDisplaySettings();
   const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
-  return <article className="browse-card">
+  return <Card className="browse-card">
     <a className="browse-cover" href={novelPageUrl(novel.id)}>
       {novel.cover_url ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
     </a>
     <div>
       <a className="browse-title" href={novelPageUrl(novel.id)}>{title}</a>
       <p>{novel.author ? <a href={browseFacetUrl('author', novel.author)}>{novel.author}</a> : 'Unknown author'}</p>
-      <div className="browse-meta"><span><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></span>
-        <span><Users size={14} /> {novel.reading_list_count.toLocaleString()}</span></div>
+      <div className="browse-meta"><Badge tone="amber"><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></Badge>
+        <Badge><Users size={14} /> {novel.reading_list_count.toLocaleString()}</Badge></div>
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
-      <footer><a href={novelPageUrl(novel.id)}>View novel</a><a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`${title} on Novel Updates`}><ExternalLink size={15} /></a></footer>
+      <footer><DSButton variant="ghost" onClick={onQuickLook}>Quick look</DSButton><a href={novelPageUrl(novel.id)}>View novel</a><a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`${title} on Novel Updates`}><ExternalLink size={15} /></a></footer>
     </div>
-  </article>;
+  </Card>;
 }

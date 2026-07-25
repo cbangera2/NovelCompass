@@ -28,7 +28,8 @@ import { LocalUserProfile, ProfileEntry } from './profile';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
-import { Button, Checkbox, FieldGroup, Select, Tooltip } from './ui';
+import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
+import { Badge, Card, DSButton as Button } from './design-system';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { novelPageUrl } from './novelLinks';
 
@@ -454,10 +455,10 @@ export default function App(): JSX.Element {
           <p>Start with a novel you loved. We trace shared tropes, reader recommendations, and curated lists to find what belongs beside it.</p>
           <div className="dataset-controls">
             {dataSource && (
-              <span className="dataset-badge" title={dataset?.dataset_version}>
+              <Badge tone={dataSource.mode === 'api' ? 'green' : 'violet'}>
                 {dataSource.mode === 'api' ? 'Live database' : 'Static snapshot'}
                 {dataset?.generated_at ? ` · ${new Date(dataset.generated_at).toLocaleDateString()}` : ''}
-              </span>
+              </Badge>
             )}
             <label className="data-mode-select">
               <span>Data source</span>
@@ -475,7 +476,7 @@ export default function App(): JSX.Element {
         </div>
       </header>
 
-      <section className="search-section" ref={searchSectionRef}>
+      <section className="search-section ds-card" ref={searchSectionRef}>
         <form onSubmit={handleSearch} className="search-input-wrapper">
           <Search className="search-icon" size={20} aria-hidden="true" />
           <div className="search-field">
@@ -493,9 +494,9 @@ export default function App(): JSX.Element {
               }}
             />
           </div>
-          <button type="submit" className="search-button" disabled={loading || !dataSource}>
+          <Button type="submit" variant="primary" className="search-button" disabled={loading || !dataSource}>
             {!dataSource ? 'Loading dataset…' : loading ? 'Finding matches…' : <><Sparkles size={16} aria-hidden="true" /> Find related</>}
-          </button>
+          </Button>
         </form>
 
         {showSuggestions && suggestions.length > 0 && (
@@ -519,7 +520,7 @@ export default function App(): JSX.Element {
         )}
       </section>
 
-      <section className="filter-panel" aria-label="Recommendation filters">
+      <Card className="filter-panel" aria-label="Recommendation filters">
         <div className="filter-panel-heading">
           <div><strong>Refine matches</strong><span>{activeFilters.length ? `${activeFilters.length} active` : 'Using balanced defaults'}</span></div>
           {activeFilters.length > 0 && <Button variant="ghost" onClick={resetFilters}>Reset all</Button>}
@@ -556,9 +557,9 @@ export default function App(): JSX.Element {
           </div>
         </div>
         {activeFilters.length > 0 && <div className="active-filter-chips" aria-label="Active filters">
-          {activeFilters.map((filter) => <span key={filter}>{filter}</span>)}
+          {activeFilters.map((filter) => <Badge tone="violet" key={filter}>{filter}</Badge>)}
         </div>}
-      </section>
+      </Card>
 
       <details className="advanced-panel">
         <summary>
@@ -579,15 +580,16 @@ export default function App(): JSX.Element {
             </div>
             <div className="genre-chips">
               {genres.map((genre) => (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   key={genre}
                   className={`genre-chip ${genreStates[genre] || ''}`}
                   onClick={() => cycleGenre(genre)}
                 >
                   {genreStates[genre] === 'include' ? '+ ' : genreStates[genre] === 'exclude' ? '− ' : ''}
                   {genre}
-                </button>
+                </Button>
               ))}
             </div>
           </section>
@@ -633,7 +635,7 @@ export default function App(): JSX.Element {
                 <h3>Relationship recipe</h3>
                 <p>Change which evidence sources matter most. Defaults are balanced for human signals.</p>
               </div>
-              <button type="button" className="reset-button" onClick={resetAdvanced}>Reset defaults</button>
+              <Button type="button" variant="ghost" className="reset-button" onClick={resetAdvanced}>Reset defaults</Button>
             </div>
             <div className="weight-grid">
               <WeightControl label="Shared tropes" hint="Tag overlap weighted by specificity" value={tagWeight} onChange={setTagWeight} />
@@ -650,7 +652,7 @@ export default function App(): JSX.Element {
 
       {data && (
         <main>
-          <div className="results-heading">
+          <Card className="results-heading">
             <CoverImage src={data.seed_novel.cover_url} alt="" variant="seed" />
             <div className="results-heading-copy">
               <span className="eyebrow">Based on your starting novel</span>
@@ -661,11 +663,11 @@ export default function App(): JSX.Element {
               </h2>
               <p><span>{data.count}</span> evidence-backed matches, ranked for fit</p>
             </div>
-          </div>
+          </Card>
 
           <div className="results-grid">
             {filteredRecommendations.slice(0, visibleCount).map((rec, index) => (
-              <article
+              <Card
                 key={rec.target_id || index}
                 className="novel-card"
                 onClick={(event) => {
@@ -736,20 +738,20 @@ export default function App(): JSX.Element {
                   </ul>
 
                   <div className="feedback-actions">
-                    <button className="btn-feedback" onClick={() => openNovelDetail(rec)}><BookOpen size={14} aria-hidden="true" /> Quick look</button>
-                    <button className="btn-feedback" onClick={() => useProfileEntryAsSeed({
+                    <Button variant="ghost" className="btn-feedback" onClick={() => openNovelDetail(rec)}><BookOpen size={14} aria-hidden="true" /> Quick look</Button>
+                    <Button variant="ghost" className="btn-feedback" onClick={() => useProfileEntryAsSeed({
                       novel_id: rec.target_id,
                       slug: rec.slug,
                       imported_title: rec.title,
                       status: profileEntries.get(rec.target_id)?.status || 'reading',
                       source_file: 'recommendation'
-                    })}><Sparkles size={14} aria-hidden="true" /> More like this</button>
-                    <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'} onClick={() => setNovelFeedback(rec, 'love')}><Heart size={14} aria-hidden="true" /> Love</button>
-                    <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'read' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'read'} onClick={() => setNovelFeedback(rec, 'read')}><BookOpen size={14} aria-hidden="true" /> Read</button>
-                    <button className="btn-feedback" onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={14} aria-hidden="true" /> Not for me</button>
+                    })}><Sparkles size={14} aria-hidden="true" /> More like this</Button>
+                    <Button variant="ghost" className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'} onClick={() => setNovelFeedback(rec, 'love')}><Heart size={14} aria-hidden="true" /> Love</Button>
+                    <Button variant="ghost" className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'read' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'read'} onClick={() => setNovelFeedback(rec, 'read')}><BookOpen size={14} aria-hidden="true" /> Read</Button>
+                    <Button variant="ghost" className="btn-feedback" onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={14} aria-hidden="true" /> Not for me</Button>
                   </div>
                 </div>
-              </article>
+              </Card>
             ))}
           </div>
 
