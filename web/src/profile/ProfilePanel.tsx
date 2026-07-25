@@ -5,7 +5,7 @@ import { DatasetManifest } from '../types';
 import { RecommendationDataSource } from '../data';
 import { parseProfileFile, PROFILE_PARSER_VERSION, withStatus } from './parser';
 import { resolveEntries } from './resolve';
-import { clearLocalProfile, loadLocalProfile, mergeProfiles, saveLocalProfile } from './store';
+import { clearLocalProfile, mergeProfiles, saveLocalProfile } from './store';
 import { ImportPreview, LocalUserProfile, ParsedProfileFile, ProfileEntry, ReadingStatus } from './types';
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
@@ -34,10 +34,6 @@ export function ProfilePanel({
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadLocalProfile().then(onProfileChange).catch(() => setMessage('Could not open local profile storage.'));
-  }, [onProfileChange]);
 
   useEffect(() => {
     if (!profile || !source || !dataset || profile.dataset_version === dataset.dataset_version) return;

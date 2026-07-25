@@ -25,6 +25,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem('novel-compass:sidebar-collapsed') === 'true');
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const dataMode = configuredDataMode();
   const staticDeployment = dataMode === 'static' || window.location.hostname.endsWith('.github.io');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
@@ -34,7 +35,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
   });
 
   useEffect(() => {
-    const refreshProfile = () => loadLocalProfile().then(setProfile).catch(() => setProfile(null));
+    const refreshProfile = () => loadLocalProfile().then(setProfile).catch(() => setProfile(null)).finally(() => setProfileLoaded(true));
     refreshProfile();
     window.addEventListener('focus', refreshProfile);
     return () => window.removeEventListener('focus', refreshProfile);
@@ -102,7 +103,7 @@ export default function AppShell({ activeView, children }: { activeView: AppView
           <a className={`shell-account ${activeView === 'profile' ? 'active' : ''}`} href={viewUrl('profile')}>
             <span className="shell-avatar"><User size={16} /></span>
             <span><strong>{profile?.username || 'Local profile'}</strong>
-              <small>{profile ? `${profile.entries.length.toLocaleString()} saved title${profile.entries.length === 1 ? '' : 's'}` : 'Private to this browser'}</small>
+              <small>{!profileLoaded ? 'Loading local library…' : profile ? `${profile.entries.length.toLocaleString()} saved title${profile.entries.length === 1 ? '' : 's'}` : 'Private to this browser'}</small>
             </span>
           </a>
           <a href="https://www.novelupdates.com/" target="_blank" rel="noopener noreferrer">

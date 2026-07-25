@@ -24,6 +24,8 @@ function appUrl(params = ''): string {
 export default function ProfilePage(): JSX.Element {
   const { settings } = useDisplaySettings();
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileLoadError, setProfileLoadError] = useState('');
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [dataset, setDataset] = useState<DatasetManifest | null>(null);
   const [query, setQuery] = useState('');
@@ -41,7 +43,10 @@ export default function ProfilePage(): JSX.Element {
   const [tasteLoading, setTasteLoading] = useState(false);
 
   useEffect(() => {
-    loadLocalProfile().then(setProfile);
+    loadLocalProfile()
+      .then(setProfile)
+      .catch(() => setProfileLoadError('Local profile storage could not be opened in this browser.'))
+      .finally(() => setProfileLoaded(true));
     createDataSource(configuredDataMode()).then(async (next) => {
       setSource(next);
       setDataset(await next.getManifest());
@@ -154,13 +159,21 @@ export default function ProfilePage(): JSX.Element {
         Appearance and title settings <span>Theme · title fallback · local only</span>
       </a>
 
-      {!profile ? (
+      {!profileLoaded ? (
+        <Card className="profile-empty" aria-live="polite">
+          <span className="profile-loading-indicator" aria-hidden="true" />
+          <h2>Loading your local library…</h2>
+          <p>Opening the profile stored for this site address.</p>
+        </Card>
+      ) : !profile ? (
         <>
           <Card className="profile-empty">
             <BookOpen size={30} />
             <h2>Bring your reading history into discovery</h2>
             <p>Use “Import my library” above to preview saved Novel Updates profile pages before anything is stored. The page stays entirely local to this browser.</p>
-            <ProfilePanel source={source} dataset={dataset} profile={profile} onProfileChange={setProfile} onUseSeed={useSeed} showPageLink={false} />
+            {profileLoadError && <p className="profile-storage-error">{profileLoadError}</p>}
+            {window.location.hostname === 'localhost' && window.location.port && window.location.port !== '3000' &&
+              <p className="profile-storage-warning">This preview uses port {window.location.port}. Browser profiles imported at localhost:3000 are stored under that separate site address.</p>}
           </Card>
           <section className="profile-empty-features" aria-label="Local profile features">
             <article><span>01</span><h3>Library</h3><p>Search Reading, Completed, and Plan-to-read titles with ratings and progress.</p></article>
