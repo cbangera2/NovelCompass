@@ -57,6 +57,26 @@ def test_health_exposes_compatibility_contract(monkeypatch):
     }
 
 
+def test_resolve_slugs_uses_exact_slug_without_title_search(monkeypatch):
+    def resolve_db():
+        conn = contract_db()
+        conn.execute(
+            """INSERT INTO novels(id, slug, title, author, rating, rating_votes)
+               VALUES (39, 'canonical-import-key', 'A Completely Different Display Title',
+                       'Author', 4.5, 120)"""
+        )
+        return conn
+
+    monkeypatch.setattr(main, "get_db", resolve_db)
+    result = main.resolve_novel_slugs(main.SlugResolveRequest(
+        slugs=["CANONICAL-IMPORT-KEY", "missing", "canonical-import-key"]
+    ))
+
+    assert len(result["results"]) == 1
+    assert result["results"][0]["id"] == 39
+    assert result["results"][0]["slug"] == "canonical-import-key"
+
+
 def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch):
     def browse_db():
         conn = contract_db()
@@ -97,6 +117,38 @@ def test_browse_uses_real_catalog_fields_for_sorting_and_pagination(monkeypatch)
     )
     assert [item["title"] for item in filtered["items"]] == ["Acclaimed"]
     assert filtered["items"][0]["genres"] == ["Fantasy"]
+
+
+def test_browse_supports_honest_hidden_gem_and_catalog_range_filters(monkeypatch):
+    def filtered_db():
+        conn = contract_db()
+        conn.executemany(
+            """INSERT INTO novels(
+                id, slug, title, rating, rating_votes, reading_list_count,
+                year, chapters_trans, status_trans
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (39, "hidden", "Hidden", 4.4, 40, 900, 2024, 120, "Completed"),
+                (40, "popular", "Popular", 4.5, 500, 9000, 2025, 300, "Ongoing"),
+            ],
+        )
+        return conn
+
+    monkeypatch.setattr(main, "get_db", filtered_db)
+    result = main.browse_novels(
+        query="", page=1, page_size=24, sort="rating", direction="desc",
+        language="", author="", genre="", tag="",
+        min_rating=4.2, max_rating=0, min_votes=10,
+        min_year=2020, max_year=2024, status="complete",
+        min_chapters=100, max_chapters=200,
+        min_readers=0, max_readers=2000,
+        include_genres="", exclude_genres="", include_tags="", exclude_tags="",
+        exclude_ids="",
+    )
+
+    assert [item["slug"] for item in result["items"]] == ["hidden"]
+    assert result["items"][0]["status_trans"] == "Completed"
+    assert result["items"][0]["chapters_trans"] == 120
 
 
 def test_evidence_uses_real_list_titles_and_labels_missing_titles_honestly():

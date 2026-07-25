@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Database, FileUp, Globe2, Pause, Play, Radar, RefreshCw } from 'lucide-react';
+import { Badge, Card, CardHeader, DSButton, Separator } from './design-system';
 import './scraper-dashboard.css';
 
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
@@ -112,18 +113,18 @@ export default function ScraperDashboard() {
 
   return (
     <main className="scraper-shell">
-      <header className="scraper-hero">
-        <span className="scraper-icon"><Radar /></span>
+      <header className="scraper-hero ds-page-header">
+        <span className="scraper-icon"><Radar aria-hidden="true" /></span>
         <div>
           <p className="eyebrow">Local data workshop</p>
           <h1>Catalog scraper</h1>
           <p>Discover missing novels first, then refresh the older snapshot in small, respectful batches.</p>
         </div>
-        <span className={`run-state ${status?.running ? 'running' : ''}`}>
+        <Badge tone={status?.running ? 'green' : 'neutral'}>
           {status?.running
             ? 'Batch running'
             : `${status?.artifact.artifact_status || 'Loading'} artifact`}
-        </span>
+        </Badge>
       </header>
 
       <section className="scraper-grid metrics">
@@ -135,22 +136,25 @@ export default function ScraperDashboard() {
       </section>
 
       <section className="scraper-grid panels">
-        <article className="scraper-panel controls">
-          <div className="panel-heading"><Database /><div><h2>Safe controls</h2><p>One bounded batch can run at a time.</p></div></div>
-          <button className="secondary" disabled={busy || status?.running} onClick={() =>
+        <Card className="scraper-panel controls">
+          <CardHeader eyebrow="Bounded execution" title="Safe controls" description="One bounded batch can run at a time."
+            action={<Database size={19} aria-hidden="true" />} />
+          <DSButton variant="outline" disabled={busy || status?.running} onClick={() =>
             act(() => post('/api/scraper/seed-discovery'), 'Discovery pages added to the queue.')
-          }><RefreshCw size={17} /> Seed missing-novel discovery</button>
-          <label>Pages in next batch
+          }><RefreshCw size={17} /> Seed missing-novel discovery</DSButton>
+          <div className="control-grid">
+          <label><span>Pages in next batch</span>
             <input type="number" min="1" max="100" value={maxItems}
               onChange={(event) => setMaxItems(Math.max(1, Math.min(100, Number(event.target.value))))} />
           </label>
-          <label>Request transport
+          <label><span>Request transport</span>
             <select value={transport} disabled={busy || status?.running}
               onChange={(event) => setTransport(event.target.value as 'urllib' | 'browser')}>
               <option value="urllib">Standard HTTP (default)</option>
               <option value="browser">Saved browser session</option>
             </select>
           </label>
+          </div>
           {transport === 'browser' && <div className="browser-session">
             <div className="browser-session-copy">
               <Globe2 size={18} />
@@ -168,33 +172,33 @@ export default function ScraperDashboard() {
               </div>
             </div>
             <div className="button-row">
-              <button className="secondary" disabled={busy || status?.running || status?.browser_session.setup_running}
+              <DSButton variant="outline" disabled={busy || status?.running || status?.browser_session.setup_running}
                 onClick={() => act(
                   () => post('/api/scraper/browser-session/open'),
                   'Browser setup is launching. Complete the site steps manually.'
                 )}>
                 <Globe2 size={17} /> Open setup browser
-              </button>
-              <button className="secondary" disabled={busy || !status?.browser_session.setup_running}
+              </DSButton>
+              <DSButton variant="outline" disabled={busy || !status?.browser_session.setup_running}
                 onClick={() => act(
                   () => post('/api/scraper/browser-session/finish'),
                   'Session save requested. Wait for the browser to close.'
                 )}>
                 Finish session setup
-              </button>
+              </DSButton>
             </div>
             <small>Private profile: {status?.browser_session.profile || 'Loading…'}</small>
           </div>}
           <div className="button-row">
-            <button disabled={busy || status?.running || status?.browser_session.setup_running} onClick={() =>
+            <DSButton variant="primary" disabled={busy || status?.running || status?.browser_session.setup_running} onClick={() =>
               act(
                 () => post('/api/scraper/run', { max_items: maxItems, transport }),
                 `Started a ${transport === 'browser' ? 'browser-session' : 'standard HTTP'} batch of up to ${maxItems} pages.`
               )
-            }><Play size={17} /> Run batch</button>
-            <button className="danger" disabled={busy || !status?.running} onClick={() =>
+            }><Play size={17} /> Run batch</DSButton>
+            <DSButton className="danger" variant="outline" disabled={busy || !status?.running} onClick={() =>
               act(() => post('/api/scraper/pause'), 'Stop requested; the current request will finish safely.')
-            }><Pause size={17} /> Stop safely</button>
+            }><Pause size={17} /> Stop safely</DSButton>
           </div>
           {message && <p className="dashboard-message">{message}</p>}
           {status?.last_worker_result?.status === 'failed' && <p className="dashboard-error">
@@ -203,10 +207,12 @@ export default function ScraperDashboard() {
           {status?.safety && <p className="safety-note"><AlertTriangle size={16} />
             Requests retain a {status.safety.request_delay_seconds}s delay and stop automatically on HTTP {status.safety.stops_on_http.join(', ')}.
           </p>}
-        </article>
+        </Card>
 
-        <article className="scraper-panel">
-          <div className="panel-heading"><Radar /><div><h2>Latest run</h2><p>{latest ? `Run #${latest.id}` : 'No runs recorded'}</p></div></div>
+        <Card className="scraper-panel">
+          <CardHeader eyebrow="Run telemetry" title="Latest run" description={latest ? `Run #${latest.id}` : 'No runs recorded'}
+            action={<Radar size={19} aria-hidden="true" />} />
+          <Separator />
           {latest ? <dl className="run-detail">
             <div><dt>Status</dt><dd>{latest.status}</dd></div>
             <div><dt>Network pages</dt><dd>{latest.pages_scraped}</dd></div>
@@ -216,11 +222,14 @@ export default function ScraperDashboard() {
             <div className="wide"><dt>Stopped because</dt><dd>{latest.stop_reason || '—'}</dd></div>
             <div className="wide"><dt>Last heartbeat</dt><dd>{latest.heartbeat_at}</dd></div>
           </dl> : <p className="empty">Run a small batch when you are ready.</p>}
-        </article>
+        </Card>
       </section>
 
-      <section className="scraper-panel import-panel">
-        <div className="panel-heading"><FileUp /><div><h2>Import captured pages</h2><p>Use a HAR or saved HTML when the live site presents a bot challenge.</p></div></div>
+      <Card className="scraper-panel import-panel">
+        <CardHeader eyebrow="Offline recovery" title="Import captured pages"
+          description="Use a HAR or saved HTML when the live site presents a bot challenge."
+          action={<FileUp size={19} aria-hidden="true" />} />
+        <Separator />
         <div className="import-grid">
           <label>Captured file
             <input type="file" accept=".har,.html,.htm,application/json,text/html"
@@ -233,9 +242,9 @@ export default function ScraperDashboard() {
             <input type="url" placeholder="https://www.novelupdates.com/series/..."
               value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
           </label>
-          <button disabled={busy || !importFile} onClick={() =>
+          <DSButton variant="primary" disabled={busy || !importFile} onClick={() =>
             act(uploadImport, 'Offline capture processed.')
-          }><FileUp size={17} /> Import locally</button>
+          }><FileUp size={17} /> Import locally</DSButton>
         </div>
         <p className="safety-note"><AlertTriangle size={16} />
           The importer reads only successful Novel Updates HTML responses. It never replays cookies or headers and never stores the raw HAR.
@@ -245,11 +254,14 @@ export default function ScraperDashboard() {
             <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{importResult[key] || 0}</dd></div>
           )}
         </dl>}
-      </section>
+      </Card>
 
-      <section className="scraper-panel error-panel">
-        <div className="panel-heading"><AlertTriangle /><div><h2>Recent queue issues</h2><p>No credentials or raw pages are shown here.</p></div></div>
-        {(counts.blocked || 0) > 0 && <button className="secondary retry-blocked" disabled={busy || status?.running}
+      <Card className="scraper-panel error-panel">
+        <CardHeader eyebrow="Needs attention" title="Recent queue issues"
+          description="No credentials or raw pages are shown here."
+          action={<AlertTriangle size={19} aria-hidden="true" />} />
+        <Separator />
+        {(counts.blocked || 0) > 0 && <DSButton variant="outline" className="retry-blocked" disabled={busy || status?.running}
           onClick={() => {
             if (!window.confirm(`Retry ${counts.blocked} blocked queue item(s)? Use this only after preparing a working browser session or otherwise resolving the block.`)) return;
             void act(
@@ -258,15 +270,15 @@ export default function ScraperDashboard() {
             );
           }}>
           <RefreshCw size={17} /> Retry blocked items
-        </button>}
+        </DSButton>}
         {status?.recent_errors.length ? <div className="error-list">{status.recent_errors.map((item, index) =>
           <div key={`${item.url}-${index}`}><span>{item.status}</span><strong>{item.type}</strong><code>{item.last_error}</code><small>{item.updated_at}</small></div>
         )}</div> : <p className="empty">No recorded queue errors.</p>}
-      </section>
+      </Card>
     </main>
   );
 }
 
 function Metric({ label, value, accent, warn }: { label: string; value: number; accent?: boolean; warn?: boolean }) {
-  return <article className={`metric ${accent ? 'accent' : ''} ${warn ? 'warn' : ''}`}><strong>{value.toLocaleString()}</strong><span>{label}</span></article>;
+  return <Card className={`metric ${accent ? 'accent' : ''} ${warn ? 'warn' : ''}`}><strong>{value.toLocaleString()}</strong><span>{label}</span></Card>;
 }

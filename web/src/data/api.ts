@@ -64,13 +64,31 @@ export class ApiDataSource implements RecommendationDataSource {
 
   async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {
     const result = new Map<string, NovelSearchResult>();
+    const exact = await apiFetch<{ results: NovelSearchResult[] }>('/api/resolve-slugs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slugs: items.map((item) => item.slug) })
+    }).catch(() => ({ results: [] }));
+    const exactBySlug = new Map((exact.results || []).map((novel) => [novel.slug.toLowerCase(), novel]));
+    items.forEach((item) => {
+      const novel = exactBySlug.get(item.slug.toLowerCase());
+      if (novel) result.set(item.slug.toLowerCase(), novel);
+    });
+
+    const unresolved = items.filter((item) => !result.has(item.slug.toLowerCase()));
     let cursor = 0;
-    const workers = Array.from({ length: Math.min(6, items.length) }, async () => {
-      while (cursor < items.length) {
-        const item = items[cursor++];
+    const workers = Array.from({ length: Math.min(6, unresolved.length) }, async () => {
+      while (cursor < unresolved.length) {
+        const item = unresolved[cursor++];
         const matches = await this.searchNovels(item.title, 12).catch(() => []);
-        const exact = matches.find((novel) => novel.slug.toLowerCase() === item.slug.toLowerCase());
-        if (exact) result.set(item.slug.toLowerCase(), exact);
+        const normalizedTitle = item.title.toLocaleLowerCase().normalize('NFKD').replace(/\p{Diacritic}/gu, '').trim();
+        const fallback = matches.find((novel) =>
+          novel.title.toLocaleLowerCase().normalize('NFKD').replace(/\p{Diacritic}/gu, '').trim() === normalizedTitle ||
+          (novel.associated_names || []).some((alias) =>
+            alias.toLocaleLowerCase().normalize('NFKD').replace(/\p{Diacritic}/gu, '').trim() === normalizedTitle
+          )
+        );
+        if (fallback) result.set(item.slug.toLowerCase(), fallback);
       }
     });
     await Promise.all(workers);

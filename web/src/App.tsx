@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent, useMemo, useRef } from 'react';
 import {
   BookOpen,
+  Check,
   ExternalLink,
   Heart,
   Search,
@@ -10,6 +11,7 @@ import {
   Users,
   X
 } from 'lucide-react';
+import { Menu } from '@base-ui/react/menu';
 import {
   DatasetManifest,
   RecommendResponse,
@@ -24,12 +26,15 @@ import {
   DataMode,
   RecommendationDataSource
 } from './data';
-import { LocalUserProfile, ProfileEntry } from './profile';
+import { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
-import { Button, Checkbox, FieldGroup, Select, Tooltip } from './ui';
+import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
+import { Badge, Card, DSButton as Button } from './design-system';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
+import { novelPageUrl } from './novelLinks';
+import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 5,
@@ -42,6 +47,14 @@ const DEFAULT_NOVEL: NovelSearchResult = {
 };
 
 export default function App(): JSX.Element {
+  const savedFilters = loadFilterSnapshot('discover', {
+    hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
+    requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
+    minYear: 0, maxYear: 0, genreStates: {} as Record<string, 'include' | 'exclude'>,
+    includeTagsText: '', excludeTagsText: '', tagWeight: .8, directRecWeight: 1.2,
+    listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60
+  });
+  const savedNumber = (value: unknown, fallback: number) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   const { settings } = useDisplaySettings();
   const searchSectionRef = useRef<HTMLElement>(null);
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
@@ -56,26 +69,28 @@ export default function App(): JSX.Element {
   const [suggestions, setSuggestions] = useState<NovelSearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [hiddenGemMode, setHiddenGemMode] = useState(false);
-  const [excludeHarem, setExcludeHarem] = useState(false);
-  const [excludeBL, setExcludeBL] = useState(false);
-  const [excludeYuri, setExcludeYuri] = useState(false);
-  const [requireCompleted, setRequireCompleted] = useState(false);
-  const [language, setLanguage] = useState('');
-  const [minRating, setMinRating] = useState(0);
-  const [minRatingVotes, setMinRatingVotes] = useState(0);
-  const [maxReaders, setMaxReaders] = useState(0);
-  const [minYear, setMinYear] = useState(0);
-  const [maxYear, setMaxYear] = useState(0);
-  const [genreStates, setGenreStates] = useState<Record<string, 'include' | 'exclude'>>({});
-  const [includeTagsText, setIncludeTagsText] = useState('');
-  const [excludeTagsText, setExcludeTagsText] = useState('');
-  const [tagWeight, setTagWeight] = useState(0.8);
-  const [directRecWeight, setDirectRecWeight] = useState(1.2);
-  const [listWeight, setListWeight] = useState(1);
-  const [structuralWeight, setStructuralWeight] = useState(0.6);
-  const [hiddenGemStrength, setHiddenGemStrength] = useState(0.3);
-  const [maxResults, setMaxResults] = useState(60);
+  const [hiddenGemMode, setHiddenGemMode] = useState(Boolean(savedFilters.hiddenGemMode));
+  const [excludeHarem, setExcludeHarem] = useState(Boolean(savedFilters.excludeHarem));
+  const [excludeBL, setExcludeBL] = useState(Boolean(savedFilters.excludeBL));
+  const [excludeYuri, setExcludeYuri] = useState(Boolean(savedFilters.excludeYuri));
+  const [requireCompleted, setRequireCompleted] = useState(Boolean(savedFilters.requireCompleted));
+  const [language, setLanguage] = useState(String(savedFilters.language || ''));
+  const [minRating, setMinRating] = useState(savedNumber(savedFilters.minRating, 0));
+  const [minRatingVotes, setMinRatingVotes] = useState(savedNumber(savedFilters.minRatingVotes, 0));
+  const [maxReaders, setMaxReaders] = useState(savedNumber(savedFilters.maxReaders, 0));
+  const [minYear, setMinYear] = useState(savedNumber(savedFilters.minYear, 0));
+  const [maxYear, setMaxYear] = useState(savedNumber(savedFilters.maxYear, 0));
+  const [genreStates, setGenreStates] = useState<Record<string, 'include' | 'exclude'>>(() =>
+    Object.fromEntries(Object.entries(savedFilters.genreStates).filter(([, value]) => value === 'include' || value === 'exclude'))
+  );
+  const [includeTagsText, setIncludeTagsText] = useState(String(savedFilters.includeTagsText || ''));
+  const [excludeTagsText, setExcludeTagsText] = useState(String(savedFilters.excludeTagsText || ''));
+  const [tagWeight, setTagWeight] = useState(savedNumber(savedFilters.tagWeight, .8));
+  const [directRecWeight, setDirectRecWeight] = useState(savedNumber(savedFilters.directRecWeight, 1.2));
+  const [listWeight, setListWeight] = useState(savedNumber(savedFilters.listWeight, 1));
+  const [structuralWeight, setStructuralWeight] = useState(savedNumber(savedFilters.structuralWeight, .6));
+  const [hiddenGemStrength, setHiddenGemStrength] = useState(savedNumber(savedFilters.hiddenGemStrength, .3));
+  const [maxResults, setMaxResults] = useState(savedNumber(savedFilters.maxResults, 60));
   const [genres, setGenres] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -97,6 +112,14 @@ export default function App(): JSX.Element {
   useEffect(() => {
     loadLocalProfile().then(setProfile).catch(() => setProfile(null));
   }, []);
+
+  useEffect(() => {
+    saveFilterSnapshot('discover', { hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted,
+      language, minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
+      excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults });
+  }, [hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language, minRating,
+    minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
+    tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
 
   useEffect(() => {
     let cancelled = false;
@@ -289,6 +312,30 @@ export default function App(): JSX.Element {
     setProfile(next);
   };
 
+  const setReadingStatus = async (rec: Recommendation, status: ReadingStatus | '') => {
+    const current = profile || {
+      profile_id: crypto.randomUUID(),
+      parser_version: 1,
+      dataset_version: dataset?.dataset_version || 'unknown',
+      imported_at: new Date().toISOString(),
+      source_fingerprints: [],
+      entries: [],
+      curated_lists: [],
+      feedback: []
+    };
+    const entries = current.entries.filter((entry) => entry.novel_id !== rec.target_id && entry.slug !== rec.slug);
+    if (status) entries.push({
+      novel_id: rec.target_id,
+      slug: rec.slug,
+      imported_title: rec.title,
+      status,
+      source_file: 'recommendation'
+    });
+    const next = { ...current, entries };
+    await saveLocalProfile(next);
+    setProfile(next);
+  };
+
   const openNovelDetail = async (novel: Recommendation) => {
     const source = dataSourceRef.current;
     if (!source) return;
@@ -453,10 +500,10 @@ export default function App(): JSX.Element {
           <p>Start with a novel you loved. We trace shared tropes, reader recommendations, and curated lists to find what belongs beside it.</p>
           <div className="dataset-controls">
             {dataSource && (
-              <span className="dataset-badge" title={dataset?.dataset_version}>
+              <Badge tone={dataSource.mode === 'api' ? 'green' : 'violet'}>
                 {dataSource.mode === 'api' ? 'Live database' : 'Static snapshot'}
                 {dataset?.generated_at ? ` · ${new Date(dataset.generated_at).toLocaleDateString()}` : ''}
-              </span>
+              </Badge>
             )}
             <label className="data-mode-select">
               <span>Data source</span>
@@ -474,7 +521,7 @@ export default function App(): JSX.Element {
         </div>
       </header>
 
-      <section className="search-section" ref={searchSectionRef}>
+      <section className="search-section ds-card" ref={searchSectionRef}>
         <form onSubmit={handleSearch} className="search-input-wrapper">
           <Search className="search-icon" size={20} aria-hidden="true" />
           <div className="search-field">
@@ -492,33 +539,49 @@ export default function App(): JSX.Element {
               }}
             />
           </div>
-          <button type="submit" className="search-button" disabled={loading || !dataSource}>
+          <Button type="submit" variant="primary" className="search-button" disabled={loading || !dataSource}>
             {!dataSource ? 'Loading dataset…' : loading ? 'Finding matches…' : <><Sparkles size={16} aria-hidden="true" /> Find related</>}
-          </button>
+          </Button>
         </form>
 
         {showSuggestions && suggestions.length > 0 && (
           <div className="suggestions" role="listbox" aria-label="Novel matches">
             {suggestions.map((novel) => (
-              <button
-                type="button"
-                className="suggestion"
-                key={novel.id}
-                onClick={() => chooseNovel(novel)}
-              >
-                <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
-                <span className="suggestion-copy">
-                  <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
-                  <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
-                </span>
-                <span className="select-label">Select</span>
-              </button>
+              <div className="suggestion-row" key={novel.id}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={selectedNovel?.id === novel.id}
+                  className="suggestion"
+                  onClick={() => chooseNovel(novel)}
+                >
+                  <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
+                  <span className="suggestion-copy">
+                    <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
+                    <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
+                  </span>
+                  <span className="select-label">Select</span>
+                </button>
+                <div className="suggestion-links">
+                  <Tooltip content="View details">
+                    <a href={novelPageUrl(novel.id)} aria-label={`View details for ${novel.title}`}>
+                      <BookOpen size={16} aria-hidden="true" />
+                    </a>
+                  </Tooltip>
+                  <Tooltip content="Open on Novel Updates">
+                    <a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer"
+                      aria-label={`Open ${novel.title} on Novel Updates`}>
+                      <ExternalLink size={16} aria-hidden="true" />
+                    </a>
+                  </Tooltip>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </section>
 
-      <section className="filter-panel" aria-label="Recommendation filters">
+      <Card className="filter-panel" aria-label="Recommendation filters">
         <div className="filter-panel-heading">
           <div><strong>Refine matches</strong><span>{activeFilters.length ? `${activeFilters.length} active` : 'Using balanced defaults'}</span></div>
           {activeFilters.length > 0 && <Button variant="ghost" onClick={resetFilters}>Reset all</Button>}
@@ -555,9 +618,9 @@ export default function App(): JSX.Element {
           </div>
         </div>
         {activeFilters.length > 0 && <div className="active-filter-chips" aria-label="Active filters">
-          {activeFilters.map((filter) => <span key={filter}>{filter}</span>)}
+          {activeFilters.map((filter) => <Badge tone="violet" key={filter}>{filter}</Badge>)}
         </div>}
-      </section>
+      </Card>
 
       <details className="advanced-panel">
         <summary>
@@ -578,15 +641,16 @@ export default function App(): JSX.Element {
             </div>
             <div className="genre-chips">
               {genres.map((genre) => (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   key={genre}
                   className={`genre-chip ${genreStates[genre] || ''}`}
                   onClick={() => cycleGenre(genre)}
                 >
                   {genreStates[genre] === 'include' ? '+ ' : genreStates[genre] === 'exclude' ? '− ' : ''}
                   {genre}
-                </button>
+                </Button>
               ))}
             </div>
           </section>
@@ -632,7 +696,7 @@ export default function App(): JSX.Element {
                 <h3>Relationship recipe</h3>
                 <p>Change which evidence sources matter most. Defaults are balanced for human signals.</p>
               </div>
-              <button type="button" className="reset-button" onClick={resetAdvanced}>Reset defaults</button>
+              <Button type="button" variant="ghost" className="reset-button" onClick={resetAdvanced}>Reset defaults</Button>
             </div>
             <div className="weight-grid">
               <WeightControl label="Shared tropes" hint="Tag overlap weighted by specificity" value={tagWeight} onChange={setTagWeight} />
@@ -649,105 +713,165 @@ export default function App(): JSX.Element {
 
       {data && (
         <main>
-          <div className="results-heading">
+          <Card className="results-heading">
             <CoverImage src={data.seed_novel.cover_url} alt="" variant="seed" />
             <div className="results-heading-copy">
               <span className="eyebrow">Based on your starting novel</span>
-              <h2>
-                <a href={data.seed_novel.novelupdates_url} target="_blank" rel="noopener noreferrer">
-                  {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}<ExternalLink size={15} aria-hidden="true" />
-                </a>
-              </h2>
+              <div className="seed-title-row">
+                <h2><a href={novelPageUrl(data.seed_novel.id)}>
+                  {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
+                </a></h2>
+                <Tooltip content="Open on Novel Updates">
+                  <a className="seed-external-link" href={data.seed_novel.novelupdates_url} target="_blank"
+                    rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on Novel Updates`}>
+                    <ExternalLink size={15} aria-hidden="true" />
+                  </a>
+                </Tooltip>
+              </div>
               <p><span>{data.count}</span> evidence-backed matches, ranked for fit</p>
             </div>
-          </div>
+          </Card>
 
           <div className="results-grid">
             {filteredRecommendations.slice(0, visibleCount).map((rec, index) => (
-              <article
+              <Card
                 key={rec.target_id || index}
                 className="novel-card"
                 onClick={(event) => {
-                  if (!(event.target as HTMLElement).closest('button, a')) openNovelDetail(rec);
+                  if (!(event.target as HTMLElement).closest('button, a, summary, select, label')) void openNovelDetail(rec);
                 }}
               >
                 <div className="card-content">
-                  <div className="card-top">
-                    <div className="card-cover">
-                      <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
-                      <span className="card-rank">#{index + 1}</span>
+                  <div className="card-main">
+                    <div className="card-primary">
+                      <div className="card-top">
+                        <div className="card-cover">
+                          <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
+                          <span className="card-rank">#{index + 1}</span>
+                        </div>
+
+                        <div className="card-summary">
+                          <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
+                          <h3 className="novel-title">
+                            <a href={novelPageUrl(rec.target_id, data.seed_novel.id)}>
+                              {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
+                            </a>
+                            <Tooltip content="Open this title on Novel Updates">
+                            <a
+                              className="card-external-link"
+                              href={rec.novelupdates_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Open ${rec.title} on Novel Updates`}
+                            >
+                              <ExternalLink size={14} aria-hidden="true" />
+                            </a>
+                            </Tooltip>
+                          </h3>
+                          <div className="novel-author">{rec.author
+                            ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
+                            : 'Unknown author'}</div>
+
+                          <div className="novel-meta">
+                            <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
+                            <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
+                          </div>
+                          <div className="card-badges">
+                            {profileEntries.get(rec.target_id) && (
+                              <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
+                                {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
+                                {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
+                              </span>
+                            )}
+                            {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
+                            {rec.status_trans && <span>{rec.status_trans}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="evidence-label">Why it matches</div>
+                      <ul className="evidence-list">
+                        {rec.evidence_bullets.map((bullet, i) => (
+                          <li key={i} className="evidence-item">
+                            <span className="evidence-bullet" aria-hidden="true">✓</span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
 
-                    <div className="card-summary">
-                      <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
-                      <h3 className="novel-title">
-                        <button type="button" onClick={() => openNovelDetail(rec)}>
-                          {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
-                        </button>
-                        <Tooltip content="Open this title on Novel Updates">
-                        <a
-                          className="card-external-link"
-                          href={rec.novelupdates_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Open ${rec.title} on Novel Updates`}
-                        >
-                          <ExternalLink size={14} aria-hidden="true" />
-                        </a>
-                        </Tooltip>
-                      </h3>
-                      <div className="novel-author">{rec.author
-                        ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
-                        : 'Unknown author'}</div>
-
-                      <div className="novel-meta">
-                        <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
-                        <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
-                      </div>
-                      <div className="card-badges">
-                        {profileEntries.get(rec.target_id) && (
-                          <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
-                            {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
-                            {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
-                          </span>
-                        )}
-                        {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
-                        {rec.status_trans && <span>{rec.status_trans}</span>}
-                      </div>
-                      {rec.shared_tags.length > 0 && (
+                    {rec.shared_tags.length > 0 && (
+                      <aside className="card-tag-rail" aria-label="Shared tropes">
+                        <span className="card-tag-label">Shared tropes</span>
                         <div className="detail-chips card-tag-links">
-                          {rec.shared_tags.slice(0, 4).map((tag) => (
+                          {rec.shared_tags.slice(0, 3).map((tag) => (
                             <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
                           ))}
                         </div>
-                      )}
-                    </div>
+                        {rec.shared_tags.length > 3 && (
+                          <details className="card-tag-more">
+                            <summary>+{rec.shared_tags.length - 3} more</summary>
+                            <div className="detail-chips">
+                              {rec.shared_tags.slice(3).map((tag) => (
+                                <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </aside>
+                    )}
                   </div>
 
-                  <div className="evidence-label">Why it matches</div>
-                  <ul className="evidence-list">
-                    {rec.evidence_bullets.map((bullet, i) => (
-                      <li key={i} className="evidence-item">
-                        <span className="evidence-bullet" aria-hidden="true">✓</span>
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-
                   <div className="feedback-actions">
-                    <button className="btn-feedback" onClick={() => useProfileEntryAsSeed({
+                    <Button variant="primary" className="card-primary-action" onClick={() => useProfileEntryAsSeed({
                       novel_id: rec.target_id,
                       slug: rec.slug,
                       imported_title: rec.title,
                       status: profileEntries.get(rec.target_id)?.status || 'reading',
                       source_file: 'recommendation'
-                    })}><Sparkles size={14} aria-hidden="true" /> More like this</button>
-                    <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'} onClick={() => setNovelFeedback(rec, 'love')}><Heart size={14} aria-hidden="true" /> Love</button>
-                    <button className={`btn-feedback ${feedbackByNovel.get(rec.target_id) === 'read' ? 'selected' : ''}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'read'} onClick={() => setNovelFeedback(rec, 'read')}><BookOpen size={14} aria-hidden="true" /> Read</button>
-                    <button className="btn-feedback" onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={14} aria-hidden="true" /> Not for me</button>
+                    })}><Sparkles size={14} aria-hidden="true" /> Similar</Button>
+                    <Menu.Root>
+                      <Tooltip content="Set reading status">
+                        <Menu.Trigger className="card-icon-action"
+                          aria-label={`Set reading status for ${rec.title}`}>
+                          <BookOpen size={16} aria-hidden="true" />
+                        </Menu.Trigger>
+                      </Tooltip>
+                      <Menu.Portal>
+                        <Menu.Positioner sideOffset={6} align="end" className="reading-menu-positioner">
+                          <Menu.Popup className="reading-menu">
+                            {([
+                              ['', 'Add'],
+                              ['reading', 'Reading'],
+                              ['completed', 'Completed'],
+                              ['plan_to_read', 'Plan']
+                            ] as const).map(([status, label]) => (
+                              <Menu.Item key={status || 'add'} className="reading-menu-item"
+                                onClick={() => setReadingStatus(rec, status)}>
+                                <span>{label}</span>
+                                {(profileEntries.get(rec.target_id)?.status || '') === status &&
+                                  <Check size={14} aria-hidden="true" />}
+                              </Menu.Item>
+                            ))}
+                          </Menu.Popup>
+                        </Menu.Positioner>
+                      </Menu.Portal>
+                    </Menu.Root>
+                    <div className="card-preference-actions">
+                      <Tooltip content="Love this recommendation">
+                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`}
+                          aria-label={`Love ${rec.title}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'}
+                          onClick={() => setNovelFeedback(rec, 'love')}><Heart size={16} aria-hidden="true" /></Button>
+                      </Tooltip>
+                      <Tooltip content="Hide recommendations like this">
+                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'not_for_me' ? 'selected' : ''}`}
+                          aria-label={`${rec.title} is not for me`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'not_for_me'}
+                          onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={16} aria-hidden="true" /></Button>
+                      </Tooltip>
+                    </div>
                   </div>
                 </div>
-              </article>
+              </Card>
             ))}
           </div>
 
