@@ -6,10 +6,11 @@ Build analytics only from normalized local profile fields and catalog metadata
 that the active API or static snapshot can return. Do not present a saved
 profile page as an activity history.
 
-Recharts is not justified for the current scope. Two modest charts can be
-rendered with semantic HTML, CSS, and a small accessible SVG without adding a
-charting dependency to every visitor's bundle. Reconsider a lazy-loaded chart
-library only after several complex charts are supported by real data.
+Recharts v3 is used for the polished visualization layer, but the analytics
+module is lazy-loaded from the Profile page so Discover and Browse do not pay
+its initial bundle cost. The visual language follows the restrained Shadcn
+chart-area-gradient pattern: CSS chart tokens, subtle fills, horizontal grids,
+minimal axes, and compact tooltip content. Semantic tables remain authoritative.
 
 ## Feasibility matrix
 
@@ -76,6 +77,5 @@ The Profile page provides:
    enough support and their formula is inspectable.
 4. Add curator consensus only after sourced list memberships and curator
    identity/provenance are validated.
-5. Re-evaluate lazy-loaded Recharts when the data supports timelines,
-   comparisons, or multiple series that native primitives cannot express
-   clearly.
+5. Keep Recharts isolated to the lazy analytics chunk and monitor its compressed
+   size before adding more chart types.

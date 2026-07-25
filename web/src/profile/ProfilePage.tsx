@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { configuredDataMode, createDataSource, RecommendationDataSource } from '../data';
 import { DatasetManifest, NovelDetail, NovelSearchResult } from '../types';
@@ -7,7 +7,7 @@ import { loadLocalProfile } from './store';
 import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { browseFacetUrl } from '../metadataLinks';
-import { ProfileAnalytics } from './ProfileAnalytics';
+const ProfileAnalytics = lazy(() => import('./ProfileAnalytics'));
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
@@ -202,12 +202,14 @@ export default function ProfilePage(): JSX.Element {
             <div><strong>{profile.entries.filter((entry) => entry.novel_id != null).length.toLocaleString()}</strong><span>Matched</span></div>
           </section>
 
-          <ProfileAnalytics
-            profile={profile}
-            source={source}
-            datasetVersion={dataset?.dataset_version || profile.dataset_version}
-            onOpenNovel={openDetailById}
-          />
+          <Suspense fallback={<section className="profile-analytics"><p className="analytics-state">Loading analytics module…</p></section>}>
+            <ProfileAnalytics
+              profile={profile}
+              source={source}
+              datasetVersion={dataset?.dataset_version || profile.dataset_version}
+              onOpenNovel={openDetailById}
+            />
+          </Suspense>
 
           {(profile.feedback?.length || 0) > 0 && (
             <section className="profile-feedback-summary">

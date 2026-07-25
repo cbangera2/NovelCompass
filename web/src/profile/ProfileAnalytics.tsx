@@ -1,11 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis
+} from 'recharts';
 import { NovelDetail } from '../types';
 import { RecommendationDataSource } from '../data';
 import { LocalUserProfile } from './types';
 
 const SAMPLE_LIMIT = 40;
 
-export function ProfileAnalytics({
+function AnalyticsTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0]?.payload || {};
+  return <div className="analytics-tooltip">
+    <strong>{item.title || item.language || item.label || label}</strong>
+    {item.count != null && <span>{item.count} titles</span>}
+    {item.rating != null && <span>Rating {item.rating}</span>}
+    {item.readers != null && <span>{Number(item.readers).toLocaleString()} readers</span>}
+    {item.hidden && <span>Potential hidden gem</span>}
+  </div>;
+}
+
+export default function ProfileAnalytics({
   profile,
   source,
   datasetVersion,
@@ -21,6 +48,15 @@ export function ProfileAnalytics({
   const [failed, setFailed] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
 
   useEffect(() => {
     if (!source) return;
@@ -59,8 +95,17 @@ export function ProfileAnalytics({
     return [...counts.entries()].sort((a, b) => a[0] - b[0]);
   }, [profile]);
   const scatter = details.filter((detail) => detail.rating > 0);
-  const maxReaders = Math.max(1, ...scatter.map((detail) => detail.reading_list_count));
   const hiddenGem = (detail: NovelDetail) => detail.rating >= 4.2 && detail.reading_list_count < 2000;
+  const scatterData = scatter.map((detail) => ({
+    id: detail.id,
+    title: detail.title,
+    rating: detail.rating,
+    readers: detail.reading_list_count,
+    readerScale: Math.log10(detail.reading_list_count + 1),
+    hidden: hiddenGem(detail)
+  }));
+  const languageData = languages.map(([language, count]) => ({ language, count }));
+  const ratingData = ratingCounts.map(([rating, count]) => ({ label: `${rating}★`, count }));
 
   return (
     <section className="profile-analytics" aria-labelledby="analytics-title">
@@ -80,34 +125,56 @@ export function ProfileAnalytics({
           <article className="analytics-card">
             <h3>Language distribution</h3>
             <p>Language metadata among successfully loaded sample titles.</p>
-            <div className="language-bars">
-              {languages.map(([language, count]) => <div key={language}>
-                <span>{language}</span><i><b style={{ width: `${(count / details.length) * 100}%` }} /></i><strong>{count}</strong>
-              </div>)}
+            <div className="analytics-chart analytics-chart-bars" aria-hidden="true">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={languageData} layout="vertical" margin={{ top: 6, right: 18, bottom: 6, left: 12 }}>
+                  <defs><linearGradient id="languageGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="var(--accent)" /><stop offset="100%" stopColor="var(--green)" /></linearGradient></defs>
+                  <CartesianGrid horizontal={false} stroke="var(--border)" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={{ stroke: 'var(--border-strong)' }} />
+                  <YAxis type="category" dataKey="language" width={88} tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <ChartTooltip content={<AnalyticsTooltip />} cursor={{ fill: 'var(--accent-soft)' }} />
+                  <Bar dataKey="count" name="Titles" fill="url(#languageGradient)" radius={[0, 6, 6, 0]} isAnimationActive={!reducedMotion} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
             <table><caption>Language distribution data</caption><tbody>{languages.map(([language, count]) => <tr key={language}><th>{language}</th><td>{count}</td><td>{Math.round(count / details.length * 100)}%</td></tr>)}</tbody></table>
           </article>
           <article className="analytics-card">
             <h3>Personal rating summary</h3>
             <p>{ratingCounts.reduce((sum, [, count]) => sum + count, 0)} entries have an explicit imported rating; unrated entries are excluded.</p>
-            <div className="rating-bars">{ratingCounts.map(([rating, count]) => <div key={rating}><span>{rating}★</span><i style={{ height: `${Math.max(8, count / Math.max(1, ...ratingCounts.map(([, value]) => value)) * 100)}%` }} /><strong>{count}</strong></div>)}</div>
+            <div className="analytics-chart analytics-chart-bars" aria-hidden="true">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={ratingData} margin={{ top: 8, right: 10, bottom: 4, left: -18 }}>
+                  <defs><linearGradient id="ratingGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.42} /><stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.03} /></linearGradient></defs>
+                  <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+                  <XAxis dataKey="label" tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={{ stroke: 'var(--border-strong)' }} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <ChartTooltip content={<AnalyticsTooltip />} cursor={{ fill: 'var(--accent-soft)' }} />
+                  <Area type="monotone" dataKey="count" name="Rated titles" stroke="var(--chart-1)" strokeWidth={2} fill="url(#ratingGradient)" isAnimationActive={!reducedMotion} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <table><caption>Personal rating distribution data</caption><thead><tr><th>Rating</th><th>Titles</th></tr></thead><tbody>{ratingCounts.map(([rating, count]) => <tr key={rating}><th>{rating}★</th><td>{count}</td></tr>)}</tbody></table>
           </article>
         </div>
         <article className="analytics-card scatter-card">
           <h3>Rating vs. readers</h3>
           <p>Gold points meet the transparent potential-hidden-gem rule: rating ≥ 4.2 and fewer than 2,000 readers. This is not a calibrated quality score.</p>
-          <svg viewBox="0 0 760 300" role="img" aria-labelledby="scatter-title scatter-desc">
-            <title id="scatter-title">Ratings and reading-list counts for sampled novels</title>
-            <desc id="scatter-desc">Horizontal position represents reading-list count on a logarithmic scale. Vertical position represents published rating from zero to five.</desc>
-            <line x1="52" y1="260" x2="740" y2="260" /><line x1="52" y1="20" x2="52" y2="260" />
-            {scatter.map((detail) => {
-              const x = 52 + (Math.log10(detail.reading_list_count + 1) / Math.log10(maxReaders + 1)) * 688;
-              const y = 260 - (detail.rating / 5) * 230;
-              return <circle key={detail.id} cx={x} cy={y} r="6" className={hiddenGem(detail) ? 'hidden-gem' : ''}
-                tabIndex={0} role="button" aria-label={`${detail.title}: rating ${detail.rating}, ${detail.reading_list_count} readers${hiddenGem(detail) ? ', potential hidden gem' : ''}`}
-                onClick={() => onOpenNovel(detail.id)} onKeyDown={(event) => (event.key === 'Enter' || event.key === ' ') && onOpenNovel(detail.id)} />;
-            })}
-          </svg>
+          <div className="analytics-chart analytics-chart-scatter" aria-hidden="true">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 18, right: 24, bottom: 26, left: 4 }}>
+                <CartesianGrid stroke="var(--border)" />
+                <XAxis type="number" dataKey="readerScale" name="Readers (log scale)" tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                  tickFormatter={(value) => Math.round(Math.pow(10, Number(value))).toLocaleString()} label={{ value: 'Readers · logarithmic scale', position: 'bottom', fill: 'var(--muted)', fontSize: 11 }} />
+                <YAxis type="number" dataKey="rating" name="Rating" domain={[0, 5]} tick={{ fill: 'var(--muted)', fontSize: 10 }} width={34} />
+                <ChartTooltip content={<AnalyticsTooltip />} cursor={{ strokeDasharray: '3 3', stroke: 'var(--border-strong)' }} />
+                <Legend verticalAlign="top" height={28} formatter={() => 'Sampled profile titles · gold indicates potential hidden gem'} wrapperStyle={{ color: 'var(--muted)', fontSize: 11 }} />
+                <Scatter name="Titles" data={scatterData} isAnimationActive={!reducedMotion} onClick={(point: any) => onOpenNovel(point.id)}>
+                  {scatterData.map((point) => <Cell key={point.id} fill={point.hidden ? '#d89113' : 'var(--accent)'} stroke="var(--surface)" strokeWidth={2} />)}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
           <div className="analytics-table-wrap"><table><caption>Plotted novel data</caption><thead><tr><th>Novel</th><th>Rating</th><th>Readers</th><th>Classification</th></tr></thead><tbody>
             {scatter.map((detail) => <tr key={detail.id}><th><button onClick={() => onOpenNovel(detail.id)}>{detail.title}</button></th><td>{detail.rating}</td><td>{detail.reading_list_count.toLocaleString()}</td><td>{hiddenGem(detail) ? 'Potential hidden gem' : 'Other sample title'}</td></tr>)}
           </tbody></table></div>
