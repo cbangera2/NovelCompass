@@ -19,7 +19,7 @@ import { Palette, Film } from 'lucide-react';
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
-  const { selectedTypes, toggleType } = useMediaFilterState();
+  const { selectedTypes, toggleType, isAllSelected, scopeSentence } = useMediaFilterState();
   const { mode: dataMode } = useDataModePreference();
   const initialParams = new URLSearchParams(window.location.search);
   const saved = loadFilterSnapshot('browse', {
@@ -290,9 +290,13 @@ export default function BrowsePage(): JSX.Element {
   return (
     <main className="browse-shell">
       <header className="browse-hero">
-        <p className="eyebrow">The complete catalog</p>
+        <p className="eyebrow">{isAllSelected ? 'The complete catalog' : `Browsing ${scopeSentence}`}</p>
         <h1>Browse your next world.</h1>
-        <p>Explore every title in this snapshot. Popularity uses reading-list counts; highest rated uses the published rating and vote count.</p>
+        <p>
+          {isAllSelected
+            ? 'Explore every title in this snapshot. Popularity uses list counts; highest rated uses the published rating and vote count.'
+            : `Showing ${scopeSentence} from this snapshot. Toggle formats above to change scope — the same selection applies to search and recommendations.`}
+        </p>
       </header>
 
       <nav className="browse-presets" aria-label="Catalog views">

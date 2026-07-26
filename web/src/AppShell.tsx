@@ -213,7 +213,7 @@ export default function AppShell({
 }
 
 function SidebarMediaGroup() {
-  const { isSelected, toggleType } = useMediaFilterState();
+  const { isSelected, toggleType, isAllSelected, scopeLabel } = useMediaFilterState();
   const choices: Array<{ type: MediaTypeChoice; label: string; note: string; icon: any }> = [
     { type: 'novel', label: 'Light Novels', note: 'Web & Light novels', icon: Book },
     { type: 'manga', label: 'Manga & Comics', note: 'Manga, Manhwa, Manhua', icon: ImageIcon },
@@ -222,7 +222,12 @@ function SidebarMediaGroup() {
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Catalog Media</SidebarGroupLabel>
+      <SidebarGroupLabel>Formats</SidebarGroupLabel>
+      <p className="sidebar-format-hint">
+        {isAllSelected
+          ? 'All formats · scopes search, browse, and recommendations'
+          : `Looking at ${scopeLabel} · search, browse, and recs`}
+      </p>
       <SidebarMenu>
         {choices.map(({ type, label, note, icon: Icon }) => {
           const active = isSelected(type);
@@ -238,7 +243,7 @@ function SidebarMediaGroup() {
                   <strong>{label}</strong>
                   <small>{note}</small>
                 </span>
-                {active && <Badge tone="violet">Active</Badge>}
+                {active && !isAllSelected && <Badge tone="violet">On</Badge>}
               </SidebarMenuButton>
             </SidebarMenuItem>
           );
@@ -257,6 +262,8 @@ function GlobalNovelSearch({
   mobile?: boolean;
   compact?: boolean;
 }) {
+  const { selectedTypes, searchPlaceholder: scopedPlaceholder, scopeLabel, isAllSelected } =
+    useMediaFilterState();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NovelSearchResult[]>([]);
   const [recent, setRecent] = useState<NovelSearchResult[]>(() => {
@@ -321,7 +328,8 @@ function GlobalNovelSearch({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+    // Re-run when format scope changes so results stay inside the active modalities.
+  }, [query, selectedTypes]);
 
   const choose = (novel: NovelSearchResult) => {
     const next = [novel, ...recent.filter((item) => item.id !== novel.id)].slice(0, 5);
@@ -339,8 +347,10 @@ function GlobalNovelSearch({
           ref={inputRef}
           type="search"
           value={query}
-          placeholder="Search titles…"
-          aria-label="Search the catalog"
+          placeholder={scopedPlaceholder}
+          aria-label={
+            isAllSelected ? 'Search the catalog' : `Search the catalog (${scopeLabel})`
+          }
           aria-expanded={open}
           onFocus={() => setOpen(true)}
           onChange={(event) => {
@@ -368,9 +378,17 @@ function GlobalNovelSearch({
       {open && hasPanelContent && (
         <div className="shell-search-results">
           <div className="shell-search-result-list">
-            {loading && <p className="shell-search-state">Searching catalog…</p>}
+            {loading && (
+              <p className="shell-search-state">
+                {isAllSelected ? 'Searching catalog…' : `Searching ${scopeLabel}…`}
+              </p>
+            )}
             {!loading && query.trim().length >= 2 && results.length === 0 && (
-              <p className="shell-search-state">No matching titles</p>
+              <p className="shell-search-state">
+                {isAllSelected
+                  ? 'No matching titles'
+                  : `No matching titles in ${scopeLabel}`}
+              </p>
             )}
             {!loading && query.trim().length < 2 && recent.length > 0 && (
               <p className="shell-search-heading">
@@ -423,7 +441,7 @@ function GlobalNovelSearch({
       <button
         className={mobile ? 'shell-mobile-search-trigger' : 'shell-compact-search-trigger'}
         type="button"
-        aria-label="Search titles"
+        aria-label={isAllSelected ? 'Search titles' : `Search ${scopeLabel}`}
         aria-expanded={open}
         onClick={() => {
           setOpen((value) => !value);

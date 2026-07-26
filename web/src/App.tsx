@@ -94,7 +94,15 @@ export function getDefaultSeed(types: string[]): NovelSearchResult {
 }
 
 export default function App(): JSX.Element {
-  const { selectedTypes } = useMediaFilterState();
+  const {
+    selectedTypes,
+    mediaParam,
+    scopeSentence,
+    searchPlaceholder: seedSearchPlaceholder,
+    includeOtherFormats,
+    setIncludeOtherFormats,
+    isAllSelected,
+  } = useMediaFilterState();
   const savedFilters = loadFilterSnapshot('discover', {
     hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
     requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
@@ -281,7 +289,9 @@ export default function App(): JSX.Element {
           rec_list: listWeight,
           structural: structuralWeight
         },
-        hidden_gem_strength: hiddenGemStrength
+        hidden_gem_strength: hiddenGemStrength,
+        // Format scope: default same-format pool; opt-in to allow other modalities.
+        media_type: includeOtherFormats || !mediaParam ? 'all' : mediaParam,
       };
 
       const json = await source.getRecommendations(payload);
@@ -342,28 +352,6 @@ export default function App(): JSX.Element {
   }, [dataSource]);
 
   useEffect(() => {
-    if (!autoRefreshReadyRef.current || !dataSource) return;
-    const currentSeedType = (
-      selectedNovel?.media_type ||
-      (selectedNovel && selectedNovel.id >= 3000000
-        ? 'anime'
-        : selectedNovel && selectedNovel.id >= 2000000
-        ? 'manga'
-        : 'novel')
-    ).toLowerCase();
-    const matchesSelected =
-      selectedTypes.includes(currentSeedType as any) ||
-      selectedTypes.includes('all' as any);
-
-    if (!matchesSelected) {
-      const fallbackSeed = getDefaultSeed(selectedTypes);
-      chooseNovel(fallbackSeed);
-      fetchRecommendations(fallbackSeed);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTypes]);
-
-  useEffect(() => {
     if (!dataSource) return;
     const restore = async () => {
       const route = parseDiscoverRoute(new URLSearchParams(window.location.search), { ...savedFilters, genreStates: savedFilters.genreStates });
@@ -403,7 +391,8 @@ export default function App(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataSource, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
     minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
-    excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults, routeRevision]);
+    excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength,
+    maxResults, routeRevision, mediaParam, includeOtherFormats]);
 
   const chooseNovel = (novel: NovelSearchResult) => {
     setSelectedNovel(novel);
@@ -602,6 +591,8 @@ export default function App(): JSX.Element {
     if (excludeHarem) active.push('No harem');
     if (excludeBL) active.push('No BL');
     if (excludeYuri) active.push('No yuri');
+    if (!isAllSelected && !includeOtherFormats) active.push(`Formats: ${scopeSentence}`);
+    if (!isAllSelected && includeOtherFormats) active.push('Cross-format recs');
     if (language) active.push(language);
     if (minRating) active.push(`${minRating}+ rating`);
     if (minRatingVotes) active.push(`${minRatingVotes}+ votes`);
@@ -612,7 +603,7 @@ export default function App(): JSX.Element {
     active.push(...Object.entries(genreStates).map(([genre, state]) => `${state === 'include' ? '+' : '−'}${genre}`));
     if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) active.push('Custom ranking');
     return active;
-  }, [hideLibraryTitles, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
+  }, [hideLibraryTitles, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, isAllSelected, includeOtherFormats, scopeSentence, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
 
   const filteredRecommendations = useMemo(() => (data?.recommendations || [])
     .filter((rec) => feedbackByNovel.get(rec.target_id) !== 'not_for_me')
@@ -654,7 +645,14 @@ export default function App(): JSX.Element {
         <div>
           <div className="eyebrow">Relationship-first discovery</div>
           <h1>Find your next obsession.</h1>
-          <p>Start with a title you loved. We trace shared tropes, recommendations, and related works to find what belongs beside it.</p>
+          <p>
+            Start with a title you loved. We trace shared tropes, recommendations, and related works
+            {isAllSelected
+              ? ' across the full catalog.'
+              : includeOtherFormats
+                ? ` from your seed, including titles outside ${scopeSentence}.`
+                : ` among ${scopeSentence}.`}
+          </p>
           <div className="dataset-controls">
             {dataSource && (
               <Badge tone={dataSource.mode === 'api' ? 'green' : 'violet'}>
@@ -689,7 +687,7 @@ export default function App(): JSX.Element {
               id="novel-search"
               type="text"
               autoComplete="off"
-              placeholder="Search title or alternate name..."
+              placeholder={seedSearchPlaceholder}
               value={query}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               onChange={(e) => {
@@ -763,6 +761,17 @@ export default function App(): JSX.Element {
             {profile && <Checkbox label="Unread only" checked={hideLibraryTitles} onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)} />}
             <Checkbox label="Hidden gems" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.currentTarget.checked)} />
             <Checkbox label="Completed" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.currentTarget.checked)} />
+            <Checkbox
+              label="Include other formats"
+              description={
+                isAllSelected
+                  ? 'All formats are already in scope via the format switcher.'
+                  : 'Allow recommendations outside the formats selected in the sidebar.'
+              }
+              checked={includeOtherFormats}
+              disabled={isAllSelected}
+              onChange={(e) => setIncludeOtherFormats(e.currentTarget.checked)}
+            />
           </FieldGroup>
           <FieldGroup label="Leave out">
             <Checkbox label="Harem" checked={excludeHarem} onChange={(e) => setExcludeHarem(e.currentTarget.checked)} />

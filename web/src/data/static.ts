@@ -550,7 +550,11 @@ export class StaticDataSource implements RecommendationDataSource {
         author: card.author,
         cover_url: card.cover_url,
         slug: card.slug,
-        novelupdates_url: novelUpdatesUrl(card.id),
+        novelupdates_url: card.novelupdates_url || novelUpdatesUrl(card.id),
+        external_url: card.external_url,
+        media_type: card.media_type,
+        source: card.source,
+        external_id: card.external_id,
         language: card.language,
         rating: card.rating,
         rating_votes: card.rating_votes,
@@ -702,6 +706,14 @@ function passesFilters(
   if (request.exclude_genres?.some((genre) => genreSet.has(normalize(genre)))) return false;
   if (request.include_tags?.some((tag) => !tagSet.has(normalize(tag)))) return false;
   if (request.exclude_tags?.some((tag) => tagSet.has(normalize(tag)))) return false;
+  const reqMediaTypes = (request.media_type || '')
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  if (reqMediaTypes.length && !reqMediaTypes.includes('all')) {
+    const cardType = inferMediaType(card.id, card.media_type);
+    if (!matchesMediaFilter(cardType, reqMediaTypes)) return false;
+  }
   return true;
 }
 
