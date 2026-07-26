@@ -25,7 +25,7 @@ export default function BrowsePage(): JSX.Element {
     query: '', sort: 'popular', direction: 'desc', language: '', author: '', genre: '', tag: '',
     minRating: 0, maxRating: 0, minVotes: 0, minYear: 0, maxYear: 0, status: '',
     minChapters: 0, maxChapters: 0, minReaders: 0, maxReaders: 0, includeGenres: '',
-    excludeGenres: '', includeTags: '', excludeTags: '', excludeLibrary: false, density: 'grid'
+    excludeGenres: '', includeTags: '', excludeTags: '', excludeLibrary: false, density: 'grid', mediaType: ''
   });
   const savedSort: BrowseSort = ['popular', 'rating', 'votes', 'title', 'newest'].includes(String(saved.sort))
     ? saved.sort as BrowseSort : 'popular';
@@ -74,7 +74,7 @@ export default function BrowsePage(): JSX.Element {
   const [luckyLoading, setLuckyLoading] = useState(false);
   const requestRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const loadRequestedRef.current = false;
+  const loadRequestedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;

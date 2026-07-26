@@ -16,8 +16,8 @@ export const Card = forwardRef<HTMLElement, HTMLAttributes<HTMLElement>>(functio
 export function CardHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: ReactNode; description?: ReactNode; action?: ReactNode }) {
   return <header className="ds-card-header"><div>{eyebrow && <span>{eyebrow}</span>}<h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>;
 }
-export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'violet' | 'green' | 'amber'; children: ReactNode }) {
-  return <span className={`ds-badge ds-badge-${tone}`}>{children}</span>;
+export function Badge({ tone = 'neutral', style, children }: { tone?: 'neutral' | 'violet' | 'green' | 'amber' | 'blue'; style?: React.CSSProperties; children: ReactNode }) {
+  return <span className={`ds-badge ds-badge-${tone}`} style={style}>{children}</span>;
 }
 export function Separator() { return <hr className="ds-separator" />; }
 export function Skeleton({ className = '' }: { className?: string }) { return <span className={`ds-skeleton ${className}`} aria-hidden="true" />; }

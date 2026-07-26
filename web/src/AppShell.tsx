@@ -22,7 +22,7 @@ import {
 } from './profile/store';
 import { downloadProfileBackup } from './profile/transfer';
 import { ProfileImportDialog } from './profile/ProfileImportDialog';
-import { Badge } from './design-system';
+import { Badge, DSButton } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
 import type { NovelSearchResult } from './types';
@@ -161,6 +161,7 @@ export default function AppShell({
               })}
             </SidebarMenu>
           </SidebarGroup>
+          <SidebarMediaGroup />
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
@@ -212,6 +213,42 @@ export default function AppShell({
   );
 }
 
+function SidebarMediaGroup() {
+  const { isSelected, toggleType } = useMediaFilterState();
+  const choices: Array<{ type: MediaTypeChoice; label: string; note: string; icon: any }> = [
+    { type: 'novel', label: 'Light Novels', note: 'Web & Light novels', icon: Book },
+    { type: 'manga', label: 'Manga & Comics', note: 'Manga, Manhwa, Manhua', icon: ImageIcon },
+    { type: 'anime', label: 'Anime & Series', note: 'TV, Movies, OVAs', icon: Film },
+  ];
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>Catalog Media</SidebarGroupLabel>
+      <SidebarMenu>
+        {choices.map(({ type, label, note, icon: Icon }) => {
+          const active = isSelected(type);
+          return (
+            <SidebarMenuItem key={type}>
+              <SidebarMenuButton
+                active={active}
+                tooltip={label}
+                onClick={() => toggleType(type)}
+              >
+                <Icon size={18} />
+                <span>
+                  <strong>{label}</strong>
+                  <small>{note}</small>
+                </span>
+                {active && <Badge tone="violet">Active</Badge>}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          );
+        })}
+      </SidebarMenu>
+    </SidebarGroup>
+  );
+}
+
 function MediaFilterBar() {
   const { isSelected, toggleType, setTypes, isAllSelected } = useMediaFilterState();
 
@@ -222,33 +259,33 @@ function MediaFilterBar() {
   ];
 
   return (
-    <div className="shell-media-selector" aria-label="Media format filters">
-      <button
-        type="button"
-        className={`media-chip ${isAllSelected ? 'active' : ''}`}
+    <nav className="shell-media-selector" aria-label="Media format filters">
+      <DSButton
+        variant={isAllSelected ? 'primary' : 'ghost'}
+        className="media-pill"
         onClick={() => setTypes(['novel', 'manga', 'anime'])}
         title="Show all media formats"
       >
         All Media
-      </button>
-      <div className="media-chip-group">
+      </DSButton>
+      <div className="media-pill-group">
         {choices.map(({ type, label, icon: Icon }) => {
           const active = isSelected(type);
           return (
-            <button
+            <DSButton
               key={type}
-              type="button"
-              className={`media-chip ${active ? 'active' : ''}`}
+              variant={active ? 'primary' : 'ghost'}
+              className={`media-pill ${active ? 'active' : ''}`}
               aria-pressed={active}
               onClick={() => toggleType(type)}
             >
               <Icon size={14} aria-hidden="true" />
               <span>{label}</span>
-            </button>
+            </DSButton>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
 

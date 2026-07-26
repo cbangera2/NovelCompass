@@ -118,19 +118,24 @@ export function SidebarMenuButton({
   tooltip,
   children,
   className = '',
+  onClick,
 }: {
   asChild?: boolean;
   active?: boolean;
   tooltip?: string;
   children: ReactNode;
   className?: string;
+  onClick?: (event: React.MouseEvent) => void;
 }) {
   const { collapsed, setMobileOpen } = useSidebar();
   const common = {
     className: `sidebar-menu-button ${active ? 'active' : ''} ${className}`,
     'aria-current': active ? ('page' as const) : undefined,
     title: collapsed ? tooltip : undefined,
-    onClick: () => setMobileOpen(false),
+    onClick: (e: React.MouseEvent) => {
+      if (onClick) onClick(e);
+      setMobileOpen(false);
+    },
   };
   if (asChild) {
     const child = Children.only(children);
