@@ -1,7 +1,18 @@
+function resolveFormatKey(id: number, mediaType?: string): 'novel' | 'manga' | 'anime' {
+  const mt = (mediaType || '').toLowerCase();
+  if (mt === 'anime' || (!mt && id >= 3_000_000)) return 'anime';
+  if (
+    ['manga', 'manhwa', 'manhua', 'comic'].includes(mt) ||
+    (!mt && id >= 2_000_000 && id < 3_000_000)
+  ) {
+    return 'manga';
+  }
+  // novel / light_novel / web_novel, or unknown low IDs
+  return 'novel';
+}
+
 export function itemPageUrl(id: number, from?: number, mediaType?: string): string {
-  const isAnime = mediaType === 'anime' || id >= 3000000;
-  const isManga = mediaType === 'manga' || (id >= 2000000 && id < 3000000);
-  const view = isAnime ? 'anime' : isManga ? 'manga' : 'novel';
+  const view = resolveFormatKey(id, mediaType);
   const params = new URLSearchParams({ view, id: String(id) });
   if (from && from !== id) params.set('from', String(from));
   return `${import.meta.env.BASE_URL}?${params.toString()}`;
@@ -15,14 +26,13 @@ export interface MediaBadgeInfo {
 }
 
 export function getMediaBadgeInfo(item: { id: number; media_type?: string; source?: string }): MediaBadgeInfo {
-  const isAnime = item.media_type === 'anime' || item.id >= 3000000;
-  const isManga = item.media_type === 'manga' || (item.id >= 2000000 && item.id < 3000000);
-  const isLN = item.media_type === 'light_novel' || item.media_type === 'ln';
+  const mt = (item.media_type || '').toLowerCase();
+  const formatKey = resolveFormatKey(item.id, item.media_type);
+  const isLN = mt === 'light_novel' || mt === 'ln';
+  const formatLabel =
+    formatKey === 'anime' ? 'Anime' : formatKey === 'manga' ? 'Manga' : isLN ? 'LN' : 'Novel';
 
-  const formatKey = isAnime ? 'anime' : isManga ? 'manga' : 'novel';
-  const formatLabel = isAnime ? 'Anime' : isManga ? 'Manga' : isLN ? 'LN' : 'Novel';
-
-  const isAniList = item.source === 'anilist' || item.id >= 2000000;
+  const isAniList = item.source === 'anilist' || item.id >= 2_000_000;
   const sourceKey = isAniList ? 'anilist' : 'novelupdates';
   const sourceLabel = isAniList ? 'AniList' : 'NovelUpdates';
 

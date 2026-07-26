@@ -1,6 +1,7 @@
 import os
 import json
 import hashlib
+import re
 import sqlite3
 import random
 import secrets
@@ -48,6 +49,65 @@ def novelupdates_url(novel_id: int, slug: Optional[str]) -> str:
     slug. Novel Updates redirects this numeric URL to the current series URL.
     """
     return f"https://www.novelupdates.com/?p={novel_id}"
+
+
+def anilist_url(external_id: Optional[str], media_type: Optional[str] = None, novel_id: int = 0) -> str:
+    """Build the canonical AniList URL for a media entry."""
+    kind = "anime" if (media_type == "anime" or novel_id >= 3_000_000) else "manga"
+    return f"https://anilist.co/{kind}/{external_id}"
+
+
+def media_type_sql_filter(
+    media_type: str,
+    column: str = "COALESCE(media_type, 'novel')",
+) -> tuple[Optional[str], list[Any]]:
+    """Parse comma-separated media_type filters into a SQL clause.
+
+    Matches browse/search multi-select behavior used by the web UI, which sends
+    values like ``novel,manga,anime`` when multiple catalog media chips are active.
+    """
+    if not media_type or media_type == "all":
+        return None, []
+    requested = [t.strip().lower() for t in media_type.split(",") if t.strip()]
+    if not requested or "all" in requested:
+        return None, []
+
+    conditions: list[str] = []
+    params: list[Any] = []
+    for t in requested:
+        if t == "manga":
+            conditions.append(f"{column} IN ('manga', 'manhwa', 'manhua', 'comic')")
+        elif t == "novel":
+            conditions.append(f"{column} IN ('novel', 'light_novel', 'web_novel')")
+        elif t == "anime":
+            conditions.append(f"{column} = 'anime'")
+        else:
+            conditions.append(f"{column} = ?")
+            params.append(t)
+    if not conditions:
+        return None, []
+    return f"({' OR '.join(conditions)})", params
+
+
+def normalize_search_query(query: str) -> str:
+    """Lowercase and strip punctuation so ``Too Many Losing Heroines!`` matches aliases."""
+    text = (query or "").casefold()
+    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def search_token_clause(column_exprs: list[str], tokens: list[str]) -> tuple[str, list[Any]]:
+    """Require every token to appear in at least one of the provided text columns."""
+    if not tokens:
+        return "1=0", []
+    params: list[Any] = []
+    token_groups: list[str] = []
+    for token in tokens:
+        needle = f"%{token}%"
+        ors = " OR ".join(f"{expr} LIKE ?" for expr in column_exprs)
+        token_groups.append(f"({ors})")
+        params.extend([needle] * len(column_exprs))
+    return " AND ".join(token_groups), params
 
 
 def parse_associated_names(value: Optional[str]) -> List[str]:
@@ -155,7 +215,17 @@ def novel_search_result(row: sqlite3.Row) -> Dict[str, Any]:
     row_dict = dict(row) if isinstance(row, sqlite3.Row) else {}
     nid = row[0]
     slug = row[2] if len(row) > 2 else ""
-    external_url = row_dict.get("external_url") or (f"https://anilist.co/manga/{row_dict.get('external_id')}" if row_dict.get("source") == "anilist" and row_dict.get("external_id") else novelupdates_url(nid, slug))
+    media_type = row_dict.get("media_type") or (
+        "anime" if nid >= 3_000_000 else "manga" if nid >= 2_000_000 else "novel"
+    )
+    source = row_dict.get("source") or ("anilist" if nid >= 2_000_000 else "novelupdates")
+    external_id = row_dict.get("external_id") or str(nid)
+    if row_dict.get("external_url"):
+        external_url = row_dict["external_url"]
+    elif source == "anilist" and external_id:
+        external_url = anilist_url(external_id, media_type, nid)
+    else:
+        external_url = novelupdates_url(nid, slug)
     return {
         "id": nid,
         "title": row[1],
@@ -167,9 +237,9 @@ def novel_search_result(row: sqlite3.Row) -> Dict[str, Any]:
         "rating": row[5],
         "rating_votes": row[6],
         "associated_names": parse_associated_names(row[7]) if len(row) > 7 else [],
-        "media_type": row_dict.get("media_type") or ("manga" if nid >= 2000000 else "novel"),
-        "source": row_dict.get("source") or ("anilist" if nid >= 2000000 else "novelupdates"),
-        "external_id": row_dict.get("external_id") or str(nid),
+        "media_type": media_type,
+        "source": source,
+        "external_id": external_id,
     }
 
 
@@ -218,14 +288,29 @@ def search_novels(
     conn = get_db()
     try:
         cur = conn.cursor()
-        where = ["(title LIKE ? OR slug LIKE ? OR associated_names LIKE ?)"]
-        params = [f"%{q}%", f"%{q}%", f"%{q}%"]
-        if media_type and media_type != "all":
-            if media_type == "manga":
-                where.append("COALESCE(media_type, 'novel') IN ('manga', 'manhwa', 'manhua', 'comic')")
-            else:
-                where.append("COALESCE(media_type, 'novel') = ?")
-                params.append(media_type)
+        where: list[str] = []
+        params: list[Any] = []
+
+        # Prefer token match after stripping punctuation so "Too Many Losing Heroines!"
+        # also hits "Makeine: Too Many Losing Heroines" / romaji aliases without bangs.
+        normalized = normalize_search_query(q)
+        tokens = [tok for tok in normalized.split() if tok]
+        if tokens:
+            token_sql, token_params = search_token_clause(
+                ["title", "slug", "associated_names", "author"],
+                tokens,
+            )
+            where.append(f"({token_sql})")
+            params.extend(token_params)
+        else:
+            needle = f"%{q.strip()}%"
+            where.append("(title LIKE ? OR slug LIKE ? OR associated_names LIKE ?)")
+            params.extend([needle, needle, needle])
+
+        type_clause, type_params = media_type_sql_filter(media_type)
+        if type_clause:
+            where.append(type_clause)
+            params.extend(type_params)
         if source and source != "all":
             where.append("COALESCE(source, 'novelupdates') = ?")
             params.append(source)
@@ -335,22 +420,12 @@ def browse_novels(
         if language:
             where.append("LOWER(n.language) = LOWER(?)")
             params.append(language)
-        if media_type and media_type != "all":
-            requested_types = [t.strip().lower() for t in media_type.split(",") if t.strip()]
-            if "all" not in requested_types and requested_types:
-                type_conditions = []
-                for t in requested_types:
-                    if t == "manga":
-                        type_conditions.append("COALESCE(n.media_type, 'novel') IN ('manga', 'manhwa', 'manhua', 'comic')")
-                    elif t == "novel":
-                        type_conditions.append("COALESCE(n.media_type, 'novel') IN ('novel', 'light_novel', 'web_novel')")
-                    elif t == "anime":
-                        type_conditions.append("COALESCE(n.media_type, 'novel') = 'anime'")
-                    else:
-                        type_conditions.append("COALESCE(n.media_type, 'novel') = ?")
-                        params.append(t)
-                if type_conditions:
-                    where.append(f"({' OR '.join(type_conditions)})")
+        type_clause, type_params = media_type_sql_filter(
+            media_type, column="COALESCE(n.media_type, 'novel')"
+        )
+        if type_clause:
+            where.append(type_clause)
+            params.extend(type_params)
         if source and source != "all":
             where.append("COALESCE(n.source, 'novelupdates') = LOWER(?)")
             params.append(source)

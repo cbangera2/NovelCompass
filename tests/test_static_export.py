@@ -62,7 +62,11 @@ class StaticExportTest(unittest.TestCase):
             catalog = json.loads((root / "out/catalog.json").read_text())
             self.assertEqual(catalog["fields"], list(CATALOG_FIELDS))
             self.assertEqual(catalog["rows"][0][1], "one")
-            self.assertEqual(catalog["rows"][0][-1], [0])
+            fields = catalog["fields"]
+            row0 = catalog["rows"][0]
+            self.assertEqual(row0[fields.index("genre_ids")], [0])
+            self.assertEqual(row0[fields.index("media_type")], "novel")
+            self.assertEqual(row0[fields.index("source")], "novelupdates")
             self.assertEqual(catalog["aliases"], [[1, ["Uno"]]])
             self.assertEqual(catalog["genres"], ["Fantasy"])
             self.assertEqual(catalog["tags"], ["Academy"])

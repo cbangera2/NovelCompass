@@ -1,7 +1,25 @@
 import pytest
 import sqlite3
-from src.engine.normalization import SourceNormalizer, normalize_database_sources
+from src.engine.normalization import (
+    SourceNormalizer,
+    normalize_anilist_rating,
+    normalize_database_sources,
+)
 from src.db.schema import SCHEMA_SQL
+
+
+def test_normalize_anilist_rating_quantile_alignment():
+    """AniList averageScore is 0-100; map to NU-like 1-5 by rank, not /20."""
+    assert normalize_anilist_rating(0) == 0.0
+    assert normalize_anilist_rating(50) == 3.0
+    assert normalize_anilist_rating(72) == 4.15  # AL median ~ NU median
+    assert normalize_anilist_rating(80) == 4.5  # between 78->4.40 and 83->4.65
+    assert normalize_anilist_rating(85) == 4.71  # strong AL score, not a mid NU 4.25
+    assert normalize_anilist_rating(92) == 4.87
+    assert normalize_anilist_rating(100) == 5.0
+    # Linear /20 would map 80 -> 4.0; quantile mapping should rank higher.
+    assert normalize_anilist_rating(80) > 4.0
+
 
 def test_source_normalizer_percentile():
     items = [

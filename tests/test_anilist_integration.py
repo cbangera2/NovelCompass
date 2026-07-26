@@ -60,7 +60,7 @@ def test_map_anilist_media():
     assert mapped["title"] == "Chainsaw Man"
     assert mapped["media_type"] == "manga"
     assert mapped["source"] == "anilist"
-    assert mapped["rating"] == 4.25
+    assert mapped["rating"] == 4.71  # quantile-aligned, not score/20
     assert mapped["reading_list_count"] == 15000  # 150000 * 0.1
     assert mapped["rating_votes"] == 45000  # favourites count
     assert mapped["author"] == "Tatsuki Fujimoto"
@@ -94,7 +94,7 @@ def test_anilist_ingester_db(memory_db):
     assert row["title"] == "Berserk"
     assert row["media_type"] == "manga"
     assert row["source"] == "anilist"
-    assert row["rating"] == 4.6
+    assert row["rating"] == 4.87
 
 def test_hard_filter_media_type(memory_db):
     repo = Repository(memory_db)
@@ -143,9 +143,33 @@ def test_map_anilist_anime():
     assert mapped["title"] == "Frieren: Beyond Journey's End"
     assert mapped["media_type"] == "anime"
     assert mapped["source"] == "anilist"
-    assert mapped["rating"] == 4.55
+    assert mapped["rating"] == 4.85
     assert "Madhouse" in mapped["author"]
     assert mapped["external_url"] == "https://anilist.co/anime/154587"
+
+
+def test_map_anilist_light_novel_stays_distinct_from_manga():
+    raw_media = {
+        "id": 135276,
+        "type": "MANGA",
+        "title": {
+            "english": "Too Many Losing Heroines!",
+            "romaji": "Make Heroine ga Oosugiru!",
+            "userPreferred": "Make Heroine ga Oosugiru!",
+        },
+        "format": "NOVEL",
+        "status": "RELEASING",
+        "countryOfOrigin": "JP",
+        "averageScore": 80,
+        "popularity": 50000,
+        "recommendations": {"nodes": []},
+        "relations": {"edges": []},
+    }
+    mapped = map_anilist_media(raw_media)
+    assert mapped["media_type"] == "light_novel"
+    assert mapped["title"] == "Too Many Losing Heroines!"
+    assert "Make Heroine ga Oosugiru!" in mapped["associated_names"]
+    assert mapped["id"] == 2_000_000 + 135276
 
 def test_hard_filter_multi_media_types(memory_db):
     repo = Repository(memory_db)
@@ -188,3 +212,78 @@ def test_api_browse_media_type(tmp_path, monkeypatch):
     assert res_anime.json()["total"] == 1
     assert res_anime.json()["items"][0]["title"] == "Frieren Anime"
     assert res_anime.json()["items"][0]["media_type"] == "anime"
+
+
+def test_api_search_multi_media_and_fuzzy_punctuation(tmp_path, monkeypatch):
+    """UI sends comma-separated media types; punctuation should not block matches."""
+    db_file = str(tmp_path / "test_search.db")
+    conn = init_db(db_file)
+    repo = Repository(conn)
+    repo.upsert_novel({
+        "id": 46924,
+        "title": "Too Many Losing Heroines!",
+        "slug": "too-many-losing-heroines",
+        "associated_names": ["Makeine"],
+        "media_type": "novel",
+        "source": "novelupdates",
+        "reading_list_count": 100,
+    })
+    repo.upsert_manga({
+        "id": 2_135_276,
+        "title": "Too Many Losing Heroines!",
+        "slug": "anilist-135276-too-many-losing-heroines",
+        "associated_names": ["Make Heroine ga Oosugiru!"],
+        "media_type": "light_novel",
+        "source": "anilist",
+        "external_id": "135276",
+        "external_url": "https://anilist.co/manga/135276",
+        "reading_list_count": 80,
+    })
+    repo.upsert_manga({
+        "id": 2_147_664,
+        "title": "Too Many Losing Heroines! @comic",
+        "slug": "anilist-147664-comic",
+        "associated_names": ["Make Heroine ga Oosugiru! @comic"],
+        "media_type": "manga",
+        "source": "anilist",
+        "external_id": "147664",
+        "reading_list_count": 70,
+    })
+    repo.upsert_manga({
+        "id": 3_171_457,
+        "title": "Makeine: Too Many Losing Heroines!",
+        "slug": "anilist-anime-171457",
+        "associated_names": ["Make Heroine ga Oosugiru!"],
+        "media_type": "anime",
+        "source": "anilist",
+        "external_id": "171457",
+        "external_url": "https://anilist.co/anime/171457",
+        "reading_list_count": 200,
+    })
+    conn.close()
+
+    monkeypatch.setattr("src.api.main.get_db", lambda: init_db(db_file))
+    client = TestClient(app)
+
+    # Default UI selection joins all media types — previously matched nothing.
+    multi = client.get(
+        "/api/search",
+        params={"q": "Too Many Losing Heroines!", "limit": 20, "media_type": "novel,manga,anime"},
+    )
+    assert multi.status_code == 200
+    multi_ids = {item["id"] for item in multi.json()["results"]}
+    assert multi_ids == {46924, 2_135_276, 2_147_664, 3_171_457}
+
+    # Punctuation / casing should not matter.
+    fuzzy = client.get(
+        "/api/search",
+        params={"q": "too many losing heroines", "limit": 20, "media_type": "all"},
+    )
+    assert {item["id"] for item in fuzzy.json()["results"]} == multi_ids
+
+    anime_only = client.get(
+        "/api/search",
+        params={"q": "losing heroines", "limit": 20, "media_type": "anime"},
+    )
+    assert [item["id"] for item in anime_only.json()["results"]] == [3_171_457]
+    assert anime_only.json()["results"][0]["external_url"].endswith("/anime/171457")

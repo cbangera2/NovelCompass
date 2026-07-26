@@ -10,6 +10,47 @@ relative to the empirical distribution of its origin source.
 from typing import Any, Dict, List
 
 
+def normalize_anilist_rating(score_100: float) -> float:
+    """
+    Normalizes AniList 0-100 score to NovelUpdates equivalent 1.0-5.0 scale.
+    
+    AniList ratings have a tighter distribution (median ~72, 80+ is top 15%, 85+ is top 5%).
+    NovelUpdates ratings have a higher median (~4.15, 4.5+ is top 15%, 4.7+ is top 5%).
+    
+    Piecewise linear quantile alignment:
+      < 50 -> 2.50
+      50   -> 3.00
+      65   -> 3.70
+      72   -> 4.15 (AniList Median -> NU Median)
+      78   -> 4.40
+      83   -> 4.65 (AniList Top 10% -> NU Top 10%)
+      88   -> 4.80 (AniList Top 3%  -> NU Top 3%)
+      100  -> 5.00
+    """
+    if not score_100 or score_100 <= 0:
+        return 0.0
+
+    points = [
+        (0.0, 1.00),
+        (50.0, 3.00),
+        (65.0, 3.70),
+        (72.0, 4.15),
+        (78.0, 4.40),
+        (83.0, 4.65),
+        (88.0, 4.80),
+        (100.0, 5.00),
+    ]
+
+    for i in range(len(points) - 1):
+        x0, y0 = points[i]
+        x1, y1 = points[i + 1]
+        if x0 <= score_100 <= x1:
+            t = (score_100 - x0) / (x1 - x0)
+            return round(y0 + t * (y1 - y0), 2)
+
+    return 5.0
+
+
 class SourceNormalizer:
     """
     Quantile / Percentile Normalizer for multi-source datasets.

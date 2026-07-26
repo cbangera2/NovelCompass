@@ -79,6 +79,7 @@ CHANNELS = ("tag", "direct_rec", "rec_list", "structural", "vector")
 CATALOG_FIELDS = (
     "id", "slug", "title", "author", "cover", "rating", "votes", "readers",
     "year", "language_id", "status_id", "translated_chapters", "genre_ids",
+    "media_type", "source", "external_id", "external_url",
 )
 
 
@@ -489,20 +490,29 @@ def export_static_dataset(
         details: dict[int, dict[str, Any]] = {}
         for row in novels:
             novel_id = row["id"]
+            media_type = row["media_type"] or (
+                "anime" if novel_id >= 3_000_000 else "manga" if novel_id >= 2_000_000 else "novel"
+            )
+            source = row["source"] or ("anilist" if novel_id >= 2_000_000 else "novelupdates")
+            external_id = row["external_id"] or str(novel_id)
+            if row["external_url"]:
+                ext_url = row["external_url"]
+            elif source == "anilist":
+                kind = "anime" if media_type == "anime" or novel_id >= 3_000_000 else "manga"
+                ext_url = f"https://anilist.co/{kind}/{external_id}"
+            else:
+                ext_url = f"https://www.novelupdates.com/?p={novel_id}"
             rows.append([
                 novel_id, row["slug"] or "", row["title"], row["author"] or "",
                 row["cover_url"] or "", row["rating"] or 0, row["rating_votes"] or 0,
                 row["reading_list_count"] or 0, row["year"],
                 language_ids.get(row["language"], 0), status_ids.get(row["status_trans"], 0),
                 row["chapters_trans"] or 0, genre_map.get(novel_id, []),
+                media_type, source, external_id, ext_url,
             ])
             names = _decode_names(row["associated_names"])
             if names:
                 aliases.append([novel_id, names])
-            ext_url = (
-                row["external_url"]
-                or (f"https://anilist.co/manga/{row['external_id']}" if row["source"] == "anilist" and row["external_id"] else f"https://www.novelupdates.com/?p={novel_id}")
-            )
             details[novel_id] = {
                 "id": novel_id,
                 "synopsis": row["synopsis"] or "",
@@ -515,9 +525,9 @@ def export_static_dataset(
                 "rating_votes_3": row["rating_votes_3"] or 0,
                 "rating_votes_2": row["rating_votes_2"] or 0,
                 "rating_votes_1": row["rating_votes_1"] or 0,
-                "media_type": row["media_type"] or ("manga" if novel_id >= 2000000 else "novel"),
-                "source": row["source"] or ("anilist" if novel_id >= 2000000 else "novelupdates"),
-                "external_id": row["external_id"] or str(novel_id),
+                "media_type": media_type,
+                "source": source,
+                "external_id": external_id,
                 "external_url": ext_url,
                 "direct_recommendation_count": direct_counts.get(novel_id, 0),
                 "related_series_count": related_counts.get(novel_id, 0),

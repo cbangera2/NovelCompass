@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any, Dict, List, Optional
 from src.db.repository import Repository
 from src.scraper.anilist_client import AniListClient
+from src.engine.normalization import normalize_anilist_rating
 
 ANILIST_ID_OFFSET = 2_000_000
 ANILIST_MANGA_ID_OFFSET = 2_000_000
@@ -49,11 +50,13 @@ def map_anilist_media(media: Dict[str, Any]) -> Dict[str, Any]:
     native = titles.get("native")
     user_preferred = titles.get("userPreferred")
 
-    primary_title = user_preferred or english or romaji or f"AniList Media {anilist_id}"
+    # Prefer English for display so franchise search matches NovelUpdates titles;
+    # romaji / native / userPreferred stay in associated_names for alias search.
+    primary_title = english or user_preferred or romaji or f"AniList Media {anilist_id}"
     slug = f"{prefix}-{anilist_id}-{slugify(primary_title)[:50]}"
 
     associated_names = []
-    for name in [english, romaji, native]:
+    for name in [english, romaji, native, user_preferred]:
         if name and name not in associated_names:
             associated_names.append(name)
     for syn in media.get("synonyms") or []:
@@ -80,10 +83,15 @@ def map_anilist_media(media: Dict[str, Any]) -> Dict[str, Any]:
     author_str = ", ".join(authors) if authors else "Unknown"
 
     # Format / Country / Type -> media_type
+    # AniList stores light novels under type=MANGA with format=NOVEL; keep them
+    # distinct from comic manga so multi-source franchise search can surface LN +
+    # manga + anime as separate catalog rows.
     raw_format = (media.get("format") or "").lower()
     country = (media.get("countryOfOrigin") or "").upper()
     if media_raw_type == "ANIME" or raw_format in ["tv", "tv_short", "movie", "special", "ova", "ona", "anime"]:
         media_type = "anime"
+    elif raw_format == "novel":
+        media_type = "light_novel"
     elif raw_format == "manhwa" or country == "KR":
         media_type = "manhwa"
     elif raw_format == "manhua" or country == "CN":
@@ -91,9 +99,9 @@ def map_anilist_media(media: Dict[str, Any]) -> Dict[str, Any]:
     else:
         media_type = "manga"
 
-    # Score (0-100 -> 0.0-5.0)
+    # Score (0-100 quantile mapped -> 1.0-5.0)
     score_100 = media.get("averageScore") or media.get("meanScore") or 0
-    rating = round(score_100 / 20.0, 2)
+    rating = normalize_anilist_rating(score_100)
     popularity = media.get("popularity") or 0
     favourites = media.get("favourites") or 0
 

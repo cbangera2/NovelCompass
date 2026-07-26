@@ -92,7 +92,32 @@ const DEFAULT_WEIGHTS: Record<string, number> = {
 };
 
 function normalize(value: string): string {
-  return value.toLocaleLowerCase().normalize('NFKD').replace(/\p{Diacritic}/gu, '').trim();
+  return value
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    // Drop punctuation so "Too Many Losing Heroines!" matches "Too Many Losing Heroines"
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inferMediaType(id: number, mediaType?: string | null): string {
+  if (mediaType) return String(mediaType).toLowerCase();
+  if (id >= 3_000_000) return 'anime';
+  if (id >= 2_000_000) return 'manga';
+  return 'novel';
+}
+
+function matchesMediaFilter(cardType: string, requested: string[]): boolean {
+  if (!requested.length || requested.includes('all')) return true;
+  for (const reqT of requested) {
+    if (reqT === 'manga' && ['manga', 'manhwa', 'manhua', 'comic'].includes(cardType)) return true;
+    if (reqT === 'novel' && ['novel', 'light_novel', 'web_novel'].includes(cardType)) return true;
+    if (reqT === 'anime' && cardType === 'anime') return true;
+    if (reqT === cardType) return true;
+  }
+  return false;
 }
 
 function joinUrl(base: string, path: string): string {
@@ -155,6 +180,10 @@ export class StaticDataSource implements RecommendationDataSource {
           const id = Number(at(row, 'id'));
           const languageValue = at(row, 'language') ?? this.languages[Number(at(row, 'language_id'))] ?? '';
           const statusValue = at(row, 'status_trans') ?? this.statuses[Number(at(row, 'status_id'))] ?? '';
+          const mediaType = inferMediaType(id, at(row, 'media_type') as string | undefined);
+          const source = String(at(row, 'source') || (id >= 2_000_000 ? 'anilist' : 'novelupdates'));
+          const externalId = String(at(row, 'external_id') || id);
+          const externalUrl = String(at(row, 'external_url') || '') || undefined;
           this.cards.set(id, {
             id,
             slug: String(at(row, 'slug') || ''),
@@ -169,7 +198,11 @@ export class StaticDataSource implements RecommendationDataSource {
             status_trans: String(statusValue || ''),
             chapters_trans: Number(at(row, 'translated_chapters') ?? at(row, 'chapters_trans') ?? 0),
             genre_ids: (at(row, 'genre_ids') as number[]) || [],
-            novelupdates_url: novelUpdatesUrl(id)
+            media_type: mediaType,
+            source,
+            external_id: externalId,
+            external_url: externalUrl,
+            novelupdates_url: externalUrl || novelUpdatesUrl(id)
           });
     }
     for (const [id, aliases] of catalog.aliases || []) this.aliases.set(id, aliases);
@@ -252,17 +285,27 @@ export class StaticDataSource implements RecommendationDataSource {
     await this.loadBootstrapCatalog();
     const needle = normalize(query);
     if (!needle) return [];
+    const tokens = needle.split(/\s+/).filter(Boolean);
+    let selectedTypes: string[] = [];
+    try {
+      const { getSelectedMediaTypes } = await import('../mediaFilterState');
+      selectedTypes = getSelectedMediaTypes().map((t) => t.toLowerCase());
+    } catch {
+      selectedTypes = [];
+    }
     const results = [...this.cards.values()]
       .map((card) => {
+        const cardType = inferMediaType(card.id, card.media_type);
+        if (!matchesMediaFilter(cardType, selectedTypes)) return { card, score: Infinity };
         const title = normalize(card.title);
         const author = normalize(card.author);
         const aliases = (this.aliases.get(card.id) || []).map(normalize);
+        const haystack = [title, ...aliases, author].join(' ');
         let score = title === needle ? 0 : title.startsWith(needle) ? 1 : aliases.some((item) => item === needle) ? 2
           : aliases.some((item) => item.startsWith(needle)) ? 3 : title.includes(needle) ? 4
           : aliases.some((item) => item.includes(needle)) ? 5 : author.includes(needle) ? 6 : Infinity;
-        if (!Number.isFinite(score)) {
-          const tokens = needle.split(/\s+/);
-          if (tokens.every((token) => title.includes(token))) score = 7;
+        if (!Number.isFinite(score) && tokens.length && tokens.every((token) => haystack.includes(token))) {
+          score = 7;
         }
         return { card, score };
       })
@@ -352,7 +395,11 @@ export class StaticDataSource implements RecommendationDataSource {
       id,
       title: card.title,
       slug: card.slug,
-      novelupdates_url: novelUpdatesUrl(id),
+      novelupdates_url: card.external_url || card.novelupdates_url || novelUpdatesUrl(id),
+      external_url: detail.external_url || card.external_url,
+      media_type: detail.media_type || card.media_type,
+      source: detail.source || card.source,
+      external_id: detail.external_id || card.external_id,
       associated_names: detail.associated_names || this.aliases.get(id) || [],
       author: card.author,
       language: card.language,
@@ -558,17 +605,8 @@ export class StaticDataSource implements RecommendationDataSource {
     }
     const reqMediaTypes = (request.media_type || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
     const items = [...this.cards.values()].filter((card) => {
-      const cardType = (card.media_type || (card.id >= 3000000 ? 'anime' : card.id >= 2000000 ? 'manga' : 'novel')).toLowerCase();
-      if (reqMediaTypes.length > 0 && !reqMediaTypes.includes('all')) {
-        let matched = false;
-        for (const reqT of reqMediaTypes) {
-          if (reqT === 'manga' && ['manga', 'manhwa', 'manhua', 'comic'].includes(cardType)) { matched = true; break; }
-          if (reqT === 'novel' && ['novel', 'light_novel', 'web_novel'].includes(cardType)) { matched = true; break; }
-          if (reqT === 'anime' && cardType === 'anime') { matched = true; break; }
-          if (reqT === cardType) { matched = true; break; }
-        }
-        if (!matched) return false;
-      }
+      const cardType = inferMediaType(card.id, card.media_type);
+      if (!matchesMediaFilter(cardType, reqMediaTypes)) return false;
       if (query && !normalize(`${card.title} ${card.author} ${(this.aliases.get(card.id) || []).join(' ')}`).includes(query)) return false;
       if (request.language && normalize(card.language) !== normalize(request.language)) return false;
       if (request.author && normalize(card.author) !== normalize(request.author)) return false;
