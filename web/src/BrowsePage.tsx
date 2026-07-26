@@ -13,9 +13,12 @@ import { novelPageUrl } from './novelLinks';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
+import { useMediaFilterState } from './mediaFilterState';
+
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
+  const { selectedTypes: globalMediaTypes } = useMediaFilterState();
   const { mode: dataMode } = useDataModePreference();
   const initialParams = new URLSearchParams(window.location.search);
   const saved = loadFilterSnapshot('browse', {
@@ -30,6 +33,7 @@ export default function BrowsePage(): JSX.Element {
   const savedDensity: 'grid' | 'list' = saved.density === 'list' ? 'list' : 'grid';
   const initialString = (urlKey: string, savedKey: keyof typeof saved) => initialParams.has(urlKey) ? initialParams.get(urlKey) || '' : String(saved[savedKey] || '');
   const initialNumber = (key: string, savedKey: keyof typeof saved) => initialParams.has(key) ? Number(initialParams.get(key) || 0) : Number(saved[savedKey] || 0);
+  const [mediaType, setMediaType] = useState(initialString('media_type', 'mediaType'));
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
@@ -70,7 +74,7 @@ export default function BrowsePage(): JSX.Element {
   const [luckyLoading, setLuckyLoading] = useState(false);
   const requestRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const loadRequestedRef = useRef(false);
+  const loadRequestedRef.current = false;
 
   useEffect(() => {
     let cancelled = false;
@@ -88,10 +92,10 @@ export default function BrowsePage(): JSX.Element {
   useEffect(() => {
     saveFilterSnapshot('browse', { query, sort, direction, language, author, genre, tag, minRating, maxRating,
       minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders,
-      includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density });
+      includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density, mediaType });
   }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear,
     status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags,
-    excludeTags, excludeLibrary, density]);
+    excludeTags, excludeLibrary, density, mediaType]);
 
   useEffect(() => {
     loadLocalProfile().then((profile) => setLibraryIds(
@@ -115,6 +119,7 @@ export default function BrowsePage(): JSX.Element {
           include_genres: includeGenres, exclude_genres: excludeGenres,
           include_tags: includeTags, exclude_tags: excludeTags,
           exclude_ids: excludeLibrary ? libraryIds.join(',') : '', direction,
+          media_type: mediaType || globalMediaTypes.join(','),
           page, page_size: PAGE_SIZE
         });
         if (requestId !== requestRef.current) return;
@@ -137,7 +142,7 @@ export default function BrowsePage(): JSX.Element {
       }
     }, page === 1 ? 240 : 0);
     return () => window.clearTimeout(timer);
-  }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, libraryIds, page, retryToken]);
+  }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, libraryIds, page, retryToken, mediaType, globalMediaTypes]);
 
   const resetPage = (action: () => void) => {
     action();
@@ -291,6 +296,9 @@ export default function BrowsePage(): JSX.Element {
       </header>
 
       <nav className="browse-presets" aria-label="Catalog views">
+        <DSButton variant={mediaType === '' ? 'primary' : 'ghost'} onClick={() => resetPage(() => setMediaType(''))}>All Media</DSButton>
+        <DSButton variant={mediaType === 'novel' ? 'primary' : 'ghost'} onClick={() => resetPage(() => setMediaType('novel'))}>Novels Only</DSButton>
+        <DSButton variant={mediaType === 'manga' ? 'primary' : 'ghost'} onClick={() => resetPage(() => setMediaType('manga'))}>Manga Only</DSButton>
         <DSButton variant="ghost" onClick={() => applyPreset('rated')}>Top rated</DSButton>
         <DSButton variant="ghost" onClick={() => applyPreset('popular')}>Most read</DSButton>
         <DSButton variant="ghost" onClick={() => applyPreset('hidden')} title="Rating ≥ 4.2, 10+ votes, fewer than 2,000 readers">Hidden gems</DSButton>
@@ -301,6 +309,11 @@ export default function BrowsePage(): JSX.Element {
         <label className="browse-search"><Search size={17} /><input value={query}
           onChange={(event) => resetPage(() => setQuery(event.target.value))}
           placeholder="Search titles, aliases, or authors…" /></label>
+        <Select label="Media Type" value={mediaType} onChange={(event) => resetPage(() => setMediaType(event.target.value))}>
+          <option value="">All Media</option>
+          <option value="novel">Novels</option>
+          <option value="manga">Manga / Comics</option>
+        </Select>
         <Select label="Sort" value={sort} onChange={(event) => resetPage(() => setSort(event.target.value as BrowseSort))}>
           <option value="popular">Most popular</option>
           <option value="rating">Highest rated</option>
@@ -402,18 +415,23 @@ function BrowseCard({ novel }: { novel: BrowseNovel }) {
     <div>
       <a className="browse-title" href={novelPageUrl(novel.id)}>{title}</a>
       <p>{novel.author ? <a href={browseFacetUrl('author', novel.author)}>{novel.author}</a> : 'Unknown author'}</p>
-      <div className="browse-meta"><Badge tone="amber"><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></Badge>
-        <Badge><Users size={14} /> {novel.reading_list_count.toLocaleString()}</Badge></div>
+      <div className="browse-meta">
+        <Badge tone={novel.source === 'anilist' ? 'blue' : 'amber'} style={{ textTransform: 'capitalize' }}>
+          {novel.media_type || (novel.id >= 2000000 ? 'manga' : 'novel')}
+        </Badge>
+        <Badge tone="amber"><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></Badge>
+        <Badge><Users size={14} /> {novel.reading_list_count.toLocaleString()}</Badge>
+      </div>
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
       <footer className="browse-card-actions">
         <span>{novel.year || 'Year unknown'}{novel.chapters_trans ? ` · ${novel.chapters_trans} ch.` : ''}</span>
-        <Tooltip content="Find similar novels">
-          <DSButton as="a" variant="ghost" className="browse-icon-action" href={`${import.meta.env.BASE_URL}?seed=${novel.id}`} aria-label={`Find novels similar to ${title}`}>
+        <Tooltip content="Find similar titles">
+          <DSButton as="a" variant="ghost" className="browse-icon-action" href={`${import.meta.env.BASE_URL}?seed=${novel.id}`} aria-label={`Find titles similar to ${title}`}>
             <Sparkles size={16} aria-hidden="true" />
           </DSButton>
         </Tooltip>
-        <Tooltip content="Open on Novel Updates">
-          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} on Novel Updates`}>
+        <Tooltip content={`Open on ${novel.source === 'anilist' ? 'AniList' : 'Novel Updates'}`}>
+          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.external_url || novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} externally`}>
             <ExternalLink size={16} aria-hidden="true" />
           </DSButton>
         </Tooltip>

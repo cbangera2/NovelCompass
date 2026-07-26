@@ -421,3 +421,51 @@ async def import_saved_pages(request: Request):
         }
     finally:
         conn.close()
+
+
+class AniListSyncRequest(BaseModel):
+    pages: int = Field(default=1, ge=1, le=10)
+    per_page: int = Field(default=20, ge=1, le=50)
+    query: Optional[str] = None
+    media_type: Literal["manga", "anime", "all"] = "manga"
+
+
+@router.post("/anilist/sync")
+def sync_anilist_media(req: AniListSyncRequest, request: Request):
+    _require_local(request)
+    from src.scraper.anilist_ingester import AniListIngester
+    from src.api.main import get_db
+    conn = get_db()
+    try:
+        ingester = AniListIngester(conn)
+        ingested_ids = []
+        sync_types = ["manga", "anime"] if req.media_type == "all" else [req.media_type]
+
+        for m_type in sync_types:
+            if req.query and req.query.strip():
+                for p in range(1, req.pages + 1):
+                    if m_type == "anime":
+                        ids = ingester.sync_anime_by_query(req.query.strip(), page=p, per_page=req.per_page)
+                    else:
+                        ids = ingester.sync_manga_by_query(req.query.strip(), page=p, per_page=req.per_page)
+                    ingested_ids.extend(ids)
+            else:
+                for p in range(1, req.pages + 1):
+                    if m_type == "anime":
+                        ids = ingester.sync_popular_anime(page=p, per_page=req.per_page)
+                    else:
+                        ids = ingester.sync_popular_manga(page=p, per_page=req.per_page)
+                    ingested_ids.extend(ids)
+
+        media_count = conn.execute(
+            "SELECT COUNT(*) FROM novels WHERE COALESCE(source, 'novelupdates') = 'anilist'"
+        ).fetchone()[0]
+        return {
+            "success": True,
+            "ingested_count": len(ingested_ids),
+            "ingested_ids": ingested_ids,
+            "total_anilist_media": media_count,
+            "message": f"Successfully ingested {len(ingested_ids)} AniList {req.media_type} items across {req.pages} page(s).",
+        }
+    finally:
+        conn.close()

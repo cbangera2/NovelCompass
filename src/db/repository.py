@@ -81,6 +81,120 @@ class Repository:
                 genre_id = cur.fetchone()[0]
                 cur.execute("INSERT OR IGNORE INTO novel_genres (novel_id, genre_id) VALUES (?, ?)", (novel_id, genre_id))
 
+            # Upsert source_records tracking
+            source_key = novel_data.get("source", "novelupdates")
+            external_id = str(novel_data.get("external_id") or novel_id)
+            cur.execute(
+                """
+                INSERT INTO source_records (source_key, external_id, novel_id, raw_media_type, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(source_key, external_id) DO UPDATE SET
+                    novel_id=excluded.novel_id,
+                    raw_media_type=excluded.raw_media_type,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                (source_key, external_id, novel_id, novel_data.get("media_type", "novel")),
+            )
+
+            return novel_id
+
+    def upsert_manga(self, manga_data: Dict[str, Any]) -> int:
+        if not manga_data.get("id"):
+            raise ValueError("Manga ID is required")
+        if not manga_data.get("title"):
+            raise ValueError("Manga title is required")
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute("""
+                INSERT INTO novels (
+                    id, slug, title, associated_names, author, language, synopsis,
+                    rating, rating_votes, rating_votes_5, rating_votes_4, rating_votes_3,
+                    rating_votes_2, rating_votes_1, reading_list_count, chapters_orig,
+                    chapters_trans, status_trans, year, cover_url, media_type, source,
+                    external_id, external_url, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET
+                    slug=COALESCE(excluded.slug, novels.slug),
+                    title=excluded.title,
+                    associated_names=excluded.associated_names,
+                    author=excluded.author,
+                    language=excluded.language,
+                    synopsis=excluded.synopsis,
+                    rating=excluded.rating,
+                    rating_votes=excluded.rating_votes,
+                    rating_votes_5=excluded.rating_votes_5,
+                    rating_votes_4=excluded.rating_votes_4,
+                    rating_votes_3=excluded.rating_votes_3,
+                    rating_votes_2=excluded.rating_votes_2,
+                    rating_votes_1=excluded.rating_votes_1,
+                    reading_list_count=excluded.reading_list_count,
+                    chapters_orig=excluded.chapters_orig,
+                    chapters_trans=excluded.chapters_trans,
+                    status_trans=excluded.status_trans,
+                    year=excluded.year,
+                    cover_url=excluded.cover_url,
+                    media_type=excluded.media_type,
+                    source=excluded.source,
+                    external_id=excluded.external_id,
+                    external_url=excluded.external_url,
+                    updated_at=CURRENT_TIMESTAMP
+            """, (
+                manga_data.get('id'),
+                manga_data.get('slug'),
+                manga_data.get('title'),
+                json.dumps(manga_data.get('associated_names', [])),
+                manga_data.get('author'),
+                manga_data.get('language', 'Japanese'),
+                manga_data.get('synopsis'),
+                manga_data.get('rating', 0.0),
+                manga_data.get('rating_votes', 0),
+                manga_data.get('rating_votes_5', 0),
+                manga_data.get('rating_votes_4', 0),
+                manga_data.get('rating_votes_3', 0),
+                manga_data.get('rating_votes_2', 0),
+                manga_data.get('rating_votes_1', 0),
+                manga_data.get('reading_list_count', 0),
+                manga_data.get('chapters_orig', 0),
+                manga_data.get('chapters_trans', 0),
+                manga_data.get('status_trans'),
+                manga_data.get('year'),
+                manga_data.get('cover_url'),
+                manga_data.get('media_type', 'manga'),
+                manga_data.get('source', 'anilist'),
+                str(manga_data.get('external_id') or manga_data.get('id')),
+                manga_data.get('external_url')
+            ))
+            novel_id = manga_data.get('id') or cur.lastrowid
+
+            cur.execute("DELETE FROM novel_tags WHERE novel_id = ?", (novel_id,))
+            for tag_name in manga_data.get('tags', []):
+                cur.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag_name,))
+                cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+                tag_row = cur.fetchone()
+                if tag_row:
+                    cur.execute("INSERT OR IGNORE INTO novel_tags (novel_id, tag_id) VALUES (?, ?)", (novel_id, tag_row[0]))
+
+            cur.execute("DELETE FROM novel_genres WHERE novel_id = ?", (novel_id,))
+            for genre_name in manga_data.get('genres', []):
+                cur.execute("INSERT OR IGNORE INTO genres (name) VALUES (?)", (genre_name,))
+                cur.execute("SELECT id FROM genres WHERE name = ?", (genre_name,))
+                genre_row = cur.fetchone()
+                if genre_row:
+                    cur.execute("INSERT OR IGNORE INTO novel_genres (novel_id, genre_id) VALUES (?, ?)", (novel_id, genre_row[0]))
+
+            # Upsert source_records tracking
+            cur.execute(
+                """
+                INSERT INTO source_records (source_key, external_id, novel_id, raw_media_type, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(source_key, external_id) DO UPDATE SET
+                    novel_id=excluded.novel_id,
+                    raw_media_type=excluded.raw_media_type,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                ('anilist', str(manga_data.get('external_id') or novel_id), novel_id, manga_data.get('media_type', 'manga')),
+            )
+
             return novel_id
 
     def replace_novel_relationships(

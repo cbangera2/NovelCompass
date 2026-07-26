@@ -13,6 +13,10 @@ export interface Recommendation {
   cover_url?: string;
   slug: string;
   novelupdates_url: string;
+  external_url?: string;
+  media_type?: string;
+  source?: string;
+  external_id?: string;
   language: string;
   rating: number;
   rating_votes: number;
@@ -48,6 +52,8 @@ export interface RecommendRequest {
   hidden_gem_strength?: number;
   min_chapters?: number;
   require_completed?: boolean;
+  media_type?: string;
+  source?: string;
 }
 
 export interface DatasetManifest {
@@ -76,6 +82,8 @@ export interface FilterOptions {
   genres: string[];
   tags?: string[];
   languages?: string[];
+  media_types?: string[];
+  sources?: string[];
 }
 
 export interface DataSourceStatus {
@@ -95,11 +103,15 @@ export interface NovelSearchResult {
   title: string;
   slug: string;
   novelupdates_url: string;
+  external_url?: string;
   author: string;
   cover_url?: string;
   rating: number;
   rating_votes: number;
   associated_names?: string[];
+  media_type?: string;
+  source?: string;
+  external_id?: string;
 }
 
 export interface NovelDetail {
@@ -107,6 +119,7 @@ export interface NovelDetail {
   title: string;
   slug: string;
   novelupdates_url: string;
+  external_url?: string;
   associated_names: string[];
   author?: string;
   language?: string;
@@ -121,6 +134,9 @@ export interface NovelDetail {
   cover_url?: string;
   genres: string[];
   tags: string[];
+  media_type?: string;
+  source?: string;
+  external_id?: string;
   direct_recommendation_count: number;
   related_series_count: number;
   recommendation_list_count: number;
@@ -154,6 +170,8 @@ export interface BrowseRequest {
   exclude_tags?: string;
   exclude_ids?: string;
   direction?: BrowseSortDirection;
+  media_type?: string;
+  source?: string;
 }
 
 export interface BrowseNovel extends NovelSearchResult {

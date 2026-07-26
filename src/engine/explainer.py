@@ -15,10 +15,12 @@ class EvidenceExplainer:
     ) -> Dict[str, Any]:
         cur = self.conn.cursor()
 
-        # Target novel metadata
+        # Target novel/manga metadata
         cur.execute("""
             SELECT title, rating, rating_votes, reading_list_count, status_trans,
-                   chapters_trans, author, cover_url, slug, language
+                   chapters_trans, author, cover_url, slug, language,
+                   COALESCE(media_type, 'novel'), COALESCE(source, 'novelupdates'),
+                   external_id, external_url
             FROM novels WHERE id = ?
         """, (target_id,))
         t_row = cur.fetchone()
@@ -27,7 +29,8 @@ class EvidenceExplainer:
 
         (
             title, rating, rating_votes, rlist_count, status_trans,
-            chapters_trans, author, cover_url, slug, language
+            chapters_trans, author, cover_url, slug, language,
+            media_type, source, external_id, external_url
         ) = t_row
 
         # Shared tags
@@ -97,10 +100,15 @@ class EvidenceExplainer:
             if co_lists[0]['comment']:
                 evidence_bullets.append(f"Curator comment: \"{co_lists[0]['comment'][:120]}\"")
 
+        target_url = external_url or f"https://www.novelupdates.com/?p={target_id}"
         return {
             'target_id': target_id,
             'title': title,
-            'novelupdates_url': f"https://www.novelupdates.com/?p={target_id}",
+            'novelupdates_url': target_url,
+            'external_url': target_url,
+            'media_type': media_type,
+            'source': source,
+            'external_id': external_id,
             'author': author,
             'cover_url': cover_url,
             'slug': slug,

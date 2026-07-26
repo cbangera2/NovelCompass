@@ -556,7 +556,19 @@ export class StaticDataSource implements RecommendationDataSource {
         tagSupported = false;
       }
     }
+    const reqMediaTypes = (request.media_type || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
     const items = [...this.cards.values()].filter((card) => {
+      const cardType = (card.media_type || (card.id >= 3000000 ? 'anime' : card.id >= 2000000 ? 'manga' : 'novel')).toLowerCase();
+      if (reqMediaTypes.length > 0 && !reqMediaTypes.includes('all')) {
+        let matched = false;
+        for (const reqT of reqMediaTypes) {
+          if (reqT === 'manga' && ['manga', 'manhwa', 'manhua', 'comic'].includes(cardType)) { matched = true; break; }
+          if (reqT === 'novel' && ['novel', 'light_novel', 'web_novel'].includes(cardType)) { matched = true; break; }
+          if (reqT === 'anime' && cardType === 'anime') { matched = true; break; }
+          if (reqT === cardType) { matched = true; break; }
+        }
+        if (!matched) return false;
+      }
       if (query && !normalize(`${card.title} ${card.author} ${(this.aliases.get(card.id) || []).join(' ')}`).includes(query)) return false;
       if (request.language && normalize(card.language) !== normalize(request.language)) return false;
       if (request.author && normalize(card.author) !== normalize(request.author)) return false;

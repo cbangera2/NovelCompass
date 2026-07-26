@@ -226,6 +226,55 @@ export default function ScraperDashboard() {
       </section>
 
       <Card className="scraper-panel import-panel">
+        <CardHeader eyebrow="Multi-Source Integration" title="AniList Multi-Media Ingestion"
+          description="Sync popular or searched Anime and Manga directly from AniList's public GraphQL API."
+          action={<Globe2 size={19} aria-hidden="true" />} />
+        <Separator />
+        <div className="import-grid">
+          <label>Media search query <span>(optional)</span>
+            <input type="text" placeholder="e.g. Frieren, Chainsaw Man, One Piece..."
+              value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
+          </label>
+          <label>Pages to fetch <span>(20 per page)</span>
+            <input type="number" min="1" max="5" value={maxItems}
+              onChange={(event) => setMaxItems(Math.max(1, Math.min(5, Number(event.target.value))))} />
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', gridColumn: 'span 2' }}>
+            <DSButton variant="primary" disabled={busy} onClick={() =>
+              act(async () => {
+                const res = await post('/api/scraper/anilist/sync', {
+                  pages: maxItems,
+                  per_page: 20,
+                  media_type: 'manga',
+                  query: sourceUrl.trim() || undefined
+                });
+                setImportResult({
+                  ingested_manga: res.ingested_count,
+                  total_anilist_media: res.total_anilist_media
+                });
+                return res;
+              }, `AniList Manga sync complete.`)
+            }><Play size={17} /> Sync Manga</DSButton>
+            <DSButton variant="primary" disabled={busy} onClick={() =>
+              act(async () => {
+                const res = await post('/api/scraper/anilist/sync', {
+                  pages: maxItems,
+                  per_page: 20,
+                  media_type: 'anime',
+                  query: sourceUrl.trim() || undefined
+                });
+                setImportResult({
+                  ingested_anime: res.ingested_count,
+                  total_anilist_media: res.total_anilist_media
+                });
+                return res;
+              }, `AniList Anime sync complete.`)
+            }><Play size={17} /> Sync Anime</DSButton>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="scraper-panel import-panel">
         <CardHeader eyebrow="Offline recovery" title="Import captured pages"
           description="Use a HAR or saved HTML when the live site presents a bot challenge."
           action={<FileUp size={19} aria-hidden="true" />} />
@@ -250,7 +299,7 @@ export default function ScraperDashboard() {
           The importer reads only successful Novel Updates HTML responses. It never replays cookies or headers and never stores the raw HAR.
         </p>
         {importResult && <dl className="import-results">
-          {['accepted', 'rejected', 'duplicate', 'parse_failed', 'novels_updated', 'novels_queued', 'lists_updated'].map(key =>
+          {Object.keys(importResult).map(key =>
             <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{importResult[key] || 0}</dd></div>
           )}
         </dl>}

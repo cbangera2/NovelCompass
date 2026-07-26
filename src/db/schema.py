@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS novels (
     status_trans TEXT,
     year INTEGER,
     cover_url TEXT,
+    media_type TEXT DEFAULT 'novel',
+    source TEXT DEFAULT 'novelupdates',
+    external_id TEXT,
+    external_url TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -150,6 +154,25 @@ CREATE INDEX IF NOT EXISTS idx_rec_list_items_novel ON rec_list_items(novel_id);
 CREATE INDEX IF NOT EXISTS idx_direct_recs_target ON direct_recs(target_novel_id);
 CREATE INDEX IF NOT EXISTS idx_related_series_target ON related_series(target_novel_id);
 CREATE INDEX IF NOT EXISTS idx_novel_tags_tag_novel ON novel_tags(tag_id, novel_id);
+
+CREATE TABLE IF NOT EXISTS sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    base_url TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS source_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_key TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    novel_id INTEGER,
+    raw_media_type TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (source_key, external_id),
+    FOREIGN KEY (novel_id) REFERENCES novels(id) ON DELETE CASCADE
+);
 """
 
 def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
@@ -171,6 +194,20 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
             col = f"rating_votes_{star}"
             if col not in novel_cols:
                 conn.execute(f"ALTER TABLE novels ADD COLUMN {col} INTEGER DEFAULT 0")
+
+        # Multi-source and multi-media migrations
+        for name, declaration in (
+            ("media_type", "TEXT DEFAULT 'novel'"),
+            ("source", "TEXT DEFAULT 'novelupdates'"),
+            ("external_id", "TEXT"),
+            ("external_url", "TEXT"),
+        ):
+            if name not in novel_cols:
+                conn.execute(f"ALTER TABLE novels ADD COLUMN {name} {declaration}")
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_novels_media_type ON novels(media_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_novels_source ON novels(source)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_novels_external_id ON novels(source, external_id)")
 
         existing = {
             row["name"] for row in conn.execute("PRAGMA table_info(scrape_runs)")
@@ -206,6 +243,38 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
                 value TEXT NOT NULL
             )
             """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                base_url TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS source_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_key TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                novel_id INTEGER,
+                raw_media_type TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (source_key, external_id),
+                FOREIGN KEY (novel_id) REFERENCES novels(id) ON DELETE CASCADE
+            )
+            """
+        )
+        # Register default sources
+        conn.execute(
+            "INSERT OR IGNORE INTO sources (key, display_name, base_url) VALUES ('novelupdates', 'Novel Updates', 'https://www.novelupdates.com')"
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO sources (key, display_name, base_url) VALUES ('anilist', 'AniList', 'https://anilist.co')"
         )
     return conn
 

@@ -12,6 +12,8 @@ import {
   User,
   X,
 } from 'lucide-react';
+import { useMediaFilterState, MediaTypeChoice } from './mediaFilterState';
+import { Film, Image as ImageIcon, Book } from 'lucide-react';
 import type { LocalUserProfile } from './profile/types';
 import {
   clearLocalProfile,
@@ -186,6 +188,7 @@ export default function AppShell({
       </Sidebar>
       <SidebarInset>
         <header className="shell-desktop-header">
+          <MediaFilterBar />
           <GlobalNovelSearch compact={activeView === 'discover' || activeView === 'browse'} />
           <AccountMenu profile={profile} profileLabel={profileLabel} />
         </header>
@@ -206,6 +209,46 @@ export default function AppShell({
         </footer>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function MediaFilterBar() {
+  const { isSelected, toggleType, setTypes, isAllSelected } = useMediaFilterState();
+
+  const choices: Array<{ type: MediaTypeChoice; label: string; icon: any }> = [
+    { type: 'novel', label: 'Light Novels', icon: Book },
+    { type: 'manga', label: 'Manga', icon: ImageIcon },
+    { type: 'anime', label: 'Anime', icon: Film },
+  ];
+
+  return (
+    <div className="shell-media-selector" aria-label="Media format filters">
+      <button
+        type="button"
+        className={`media-chip ${isAllSelected ? 'active' : ''}`}
+        onClick={() => setTypes(['novel', 'manga', 'anime'])}
+        title="Show all media formats"
+      >
+        All Media
+      </button>
+      <div className="media-chip-group">
+        {choices.map(({ type, label, icon: Icon }) => {
+          const active = isSelected(type);
+          return (
+            <button
+              key={type}
+              type="button"
+              className={`media-chip ${active ? 'active' : ''}`}
+              aria-pressed={active}
+              onClick={() => toggleType(type)}
+            >
+              <Icon size={14} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

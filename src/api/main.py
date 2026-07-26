@@ -143,6 +143,8 @@ class RecommendRequest(BaseModel):
     hidden_gem_strength: float = 0.3
     min_chapters: int = 0
     require_completed: bool = False
+    media_type: str = "all"
+    source: str = "all"
 
 
 class SlugResolveRequest(BaseModel):
@@ -150,16 +152,24 @@ class SlugResolveRequest(BaseModel):
 
 
 def novel_search_result(row: sqlite3.Row) -> Dict[str, Any]:
+    row_dict = dict(row) if isinstance(row, sqlite3.Row) else {}
+    nid = row[0]
+    slug = row[2] if len(row) > 2 else ""
+    external_url = row_dict.get("external_url") or (f"https://anilist.co/manga/{row_dict.get('external_id')}" if row_dict.get("source") == "anilist" and row_dict.get("external_id") else novelupdates_url(nid, slug))
     return {
-        "id": row[0],
+        "id": nid,
         "title": row[1],
-        "slug": row[2],
-        "novelupdates_url": novelupdates_url(row[0], row[2]),
+        "slug": slug,
+        "novelupdates_url": external_url,
+        "external_url": external_url,
         "author": row[3],
         "cover_url": row[4],
         "rating": row[5],
         "rating_votes": row[6],
         "associated_names": parse_associated_names(row[7]) if len(row) > 7 else [],
+        "media_type": row_dict.get("media_type") or ("manga" if nid >= 2000000 else "novel"),
+        "source": row_dict.get("source") or ("anilist" if nid >= 2000000 else "novelupdates"),
+        "external_id": row_dict.get("external_id") or str(nid),
     }
 
 
@@ -199,18 +209,37 @@ def resolve_novel_slugs(request: SlugResolveRequest):
 
 
 @app.get("/api/search")
-def search_novels(q: str = Query(..., min_length=1), limit: int = 10):
+def search_novels(
+    q: str = Query(..., min_length=1),
+    limit: int = 10,
+    media_type: str = "all",
+    source: str = "all",
+):
     conn = get_db()
     try:
         cur = conn.cursor()
-        cur.execute("""
+        where = ["(title LIKE ? OR slug LIKE ? OR associated_names LIKE ?)"]
+        params = [f"%{q}%", f"%{q}%", f"%{q}%"]
+        if media_type and media_type != "all":
+            if media_type == "manga":
+                where.append("COALESCE(media_type, 'novel') IN ('manga', 'manhwa', 'manhua', 'comic')")
+            else:
+                where.append("COALESCE(media_type, 'novel') = ?")
+                params.append(media_type)
+        if source and source != "all":
+            where.append("COALESCE(source, 'novelupdates') = ?")
+            params.append(source)
+
+        params.append(limit)
+        cur.execute(f"""
             SELECT id, title, slug, author, cover_url, rating, rating_votes,
-                   associated_names
+                   associated_names, COALESCE(media_type, 'novel') as media_type,
+                   COALESCE(source, 'novelupdates') as source, external_id, external_url
             FROM novels
-            WHERE title LIKE ? OR slug LIKE ? OR associated_names LIKE ?
+            WHERE {" AND ".join(where)}
             ORDER BY reading_list_count DESC, rating_votes DESC
             LIMIT ?
-        """, (f"%{q}%", f"%{q}%", f"%{q}%", limit))
+        """, params)
 
         results = [novel_search_result(row) for row in cur.fetchall()]
 
@@ -245,6 +274,8 @@ def browse_novels(
     exclude_tags: str = "",
     exclude_ids: str = "",
     direction: str = Query("desc", pattern="^(asc|desc)$"),
+    media_type: str = "",
+    source: str = "",
 ):
     """Browse the complete SQLite catalog with stable, honest metadata sorts."""
     max_rating = max_rating if isinstance(max_rating, (int, float)) else 0
@@ -304,6 +335,25 @@ def browse_novels(
         if language:
             where.append("LOWER(n.language) = LOWER(?)")
             params.append(language)
+        if media_type and media_type != "all":
+            requested_types = [t.strip().lower() for t in media_type.split(",") if t.strip()]
+            if "all" not in requested_types and requested_types:
+                type_conditions = []
+                for t in requested_types:
+                    if t == "manga":
+                        type_conditions.append("COALESCE(n.media_type, 'novel') IN ('manga', 'manhwa', 'manhua', 'comic')")
+                    elif t == "novel":
+                        type_conditions.append("COALESCE(n.media_type, 'novel') IN ('novel', 'light_novel', 'web_novel')")
+                    elif t == "anime":
+                        type_conditions.append("COALESCE(n.media_type, 'novel') = 'anime'")
+                    else:
+                        type_conditions.append("COALESCE(n.media_type, 'novel') = ?")
+                        params.append(t)
+                if type_conditions:
+                    where.append(f"({' OR '.join(type_conditions)})")
+        if source and source != "all":
+            where.append("COALESCE(n.source, 'novelupdates') = LOWER(?)")
+            params.append(source)
         if author:
             where.append("LOWER(n.author) = LOWER(?)")
             params.append(author)
@@ -353,7 +403,10 @@ def browse_novels(
             f"""
             SELECT DISTINCT n.id, n.title, n.slug, n.author, n.cover_url,
                    n.rating, n.rating_votes, n.reading_list_count,
-                   n.language, n.year, n.status_trans, n.chapters_trans
+                   n.language, n.year, n.status_trans, n.chapters_trans,
+                   COALESCE(n.media_type, 'novel') as media_type,
+                   COALESCE(n.source, 'novelupdates') as source,
+                   n.external_id, n.external_url
             {from_sql}
             ORDER BY {order}, n.id ASC
             LIMIT ? OFFSET ?
@@ -379,7 +432,8 @@ def browse_novels(
                 "id": row["id"],
                 "title": row["title"],
                 "slug": row["slug"] or "",
-                "novelupdates_url": novelupdates_url(row["id"], row["slug"]),
+                "novelupdates_url": row["external_url"] or (f"https://anilist.co/manga/{row['external_id']}" if row["source"] == "anilist" and row["external_id"] else novelupdates_url(row["id"], row["slug"])),
+                "external_url": row["external_url"] or (f"https://anilist.co/manga/{row['external_id']}" if row["source"] == "anilist" and row["external_id"] else novelupdates_url(row["id"], row["slug"])),
                 "author": row["author"] or "",
                 "cover_url": row["cover_url"],
                 "rating": row["rating"] or 0,
@@ -390,6 +444,9 @@ def browse_novels(
                 "status_trans": row["status_trans"] or "",
                 "chapters_trans": row["chapters_trans"] or 0,
                 "genres": genre_map[row["id"]],
+                "media_type": row["media_type"] or ("manga" if row["id"] >= 2000000 else "novel"),
+                "source": row["source"] or ("anilist" if row["id"] >= 2000000 else "novelupdates"),
+                "external_id": row["external_id"] or str(row["id"]),
             }
             for row in rows
         ]
@@ -471,12 +528,15 @@ def get_novel_detail(novel_id: int):
             SELECT id, title, slug, associated_names, author, language, synopsis,
                    rating, rating_votes, rating_votes_5, rating_votes_4, rating_votes_3,
                    rating_votes_2, rating_votes_1, reading_list_count, chapters_orig,
-                   chapters_trans, status_trans, year, cover_url
+                   chapters_trans, status_trans, year, cover_url,
+                   COALESCE(media_type, 'novel') as media_type,
+                   COALESCE(source, 'novelupdates') as source,
+                   external_id, external_url
             FROM novels
             WHERE id = ?
         """, (novel_id,)).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail=f"Novel {novel_id} not found.")
+            raise HTTPException(status_code=404, detail=f"Item {novel_id} not found.")
 
         genres = [
             genre_row[0] for genre_row in conn.execute("""
@@ -504,6 +564,8 @@ def get_novel_detail(novel_id: int):
                  WHERE source_novel_id = ? OR target_novel_id = ?),
                 (SELECT COUNT(*) FROM rec_list_items WHERE novel_id = ?)
         """, (novel_id, novel_id, novel_id, novel_id, novel_id)).fetchone()
+
+        ext_url = row["external_url"] or (f"https://anilist.co/manga/{row['external_id']}" if row["source"] == "anilist" and row["external_id"] else novelupdates_url(row["id"], row["slug"]))
 
         return {
             "id": row["id"],
@@ -535,7 +597,11 @@ def get_novel_detail(novel_id: int):
             "cover_url": row["cover_url"],
             "genres": genres,
             "tags": tags,
-            "novelupdates_url": novelupdates_url(row["id"], row["slug"]),
+            "novelupdates_url": ext_url,
+            "external_url": ext_url,
+            "media_type": row["media_type"] or ("manga" if row["id"] >= 2000000 else "novel"),
+            "source": row["source"] or ("anilist" if row["id"] >= 2000000 else "novelupdates"),
+            "external_id": row["external_id"] or str(row["id"]),
             "direct_recommendation_count": counts[0],
             "related_series_count": counts[1],
             "recommendation_list_count": counts[2],
@@ -686,7 +752,27 @@ def recommendation_options():
                 ORDER BY COUNT(*) DESC
             """)
         ]
-        return {"genres": genres, "popular_tags": popular_tags, "languages": languages}
+        media_types = [
+            row[0] for row in conn.execute("""
+                SELECT COALESCE(media_type, 'novel') FROM novels
+                GROUP BY COALESCE(media_type, 'novel')
+                ORDER BY COUNT(*) DESC
+            """)
+        ]
+        sources = [
+            row[0] for row in conn.execute("""
+                SELECT COALESCE(source, 'novelupdates') FROM novels
+                GROUP BY COALESCE(source, 'novelupdates')
+                ORDER BY COUNT(*) DESC
+            """)
+        ]
+        return {
+            "genres": genres,
+            "popular_tags": popular_tags,
+            "languages": languages,
+            "media_types": media_types,
+            "sources": sources,
+        }
     finally:
         conn.close()
 
@@ -744,6 +830,8 @@ def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
         'max_year': req.max_year,
         'require_completed': req.require_completed,
         'min_chapters': req.min_chapters,
+        'media_type': req.media_type,
+        'source': req.source,
         'exclude_novel_ids': [seed_id]
     }
 

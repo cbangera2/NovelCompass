@@ -361,7 +361,10 @@ def export_static_dataset(
             """SELECT id, slug, title, author, cover_url, rating, rating_votes,
                       reading_list_count, year, language, status_trans,
                       chapters_trans, chapters_orig, synopsis, associated_names,
-                      rating_votes_5, rating_votes_4, rating_votes_3, rating_votes_2, rating_votes_1
+                      rating_votes_5, rating_votes_4, rating_votes_3, rating_votes_2, rating_votes_1,
+                      COALESCE(media_type, 'novel') as media_type,
+                      COALESCE(source, 'novelupdates') as source,
+                      external_id, external_url
                FROM novels ORDER BY id"""
         ).fetchall()
         if catalog_limit is not None:
@@ -428,6 +431,7 @@ def export_static_dataset(
             names = _decode_names(row["associated_names"])
             if names:
                 aliases.append([novel_id, names])
+            ext_url = row["external_url"] or (f"https://anilist.co/manga/{row['external_id']}" if row["source"] == "anilist" and row["external_id"] else f"https://www.novelupdates.com/?p={novel_id}")
             details[novel_id] = {
                 "id": novel_id,
                 "synopsis": row["synopsis"] or "",
@@ -440,10 +444,14 @@ def export_static_dataset(
                 "rating_votes_3": row["rating_votes_3"] or 0,
                 "rating_votes_2": row["rating_votes_2"] or 0,
                 "rating_votes_1": row["rating_votes_1"] or 0,
+                "media_type": row["media_type"] or ("manga" if novel_id >= 2000000 else "novel"),
+                "source": row["source"] or ("anilist" if novel_id >= 2000000 else "novelupdates"),
+                "external_id": row["external_id"] or str(novel_id),
+                "external_url": ext_url,
                 "direct_recommendation_count": direct_counts.get(novel_id, 0),
                 "related_series_count": related_counts.get(novel_id, 0),
                 "recommendation_list_count": list_counts.get(novel_id, 0),
-                "novelupdates_url": f"https://www.novelupdates.com/?p={novel_id}",
+                "novelupdates_url": ext_url,
             }
 
         catalog = {

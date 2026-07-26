@@ -56,8 +56,10 @@ export class ApiDataSource implements RecommendationDataSource {
   }
 
   async searchNovels(query: string, limit: number, signal?: AbortSignal): Promise<NovelSearchResult[]> {
+    const { getSelectedMediaTypes } = await import('../mediaFilterState');
+    const mediaType = getSelectedMediaTypes().join(',');
     const body = await apiFetch<{ results: NovelSearchResult[] }>(
-      `/api/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      `/api/search?q=${encodeURIComponent(query)}&limit=${limit}&media_type=${encodeURIComponent(mediaType)}`,
       { signal }
     );
     return body.results || [];
