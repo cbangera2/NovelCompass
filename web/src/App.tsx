@@ -1114,6 +1114,19 @@ export default function App(): JSX.Element {
                     <h2><a href={novelPageUrl(data.seed_novel.id, undefined, data.seed_novel.media_type)}>
                       {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
                     </a></h2>
+                    {(() => {
+                      const seedBadge = getMediaBadgeInfo(data.seed_novel);
+                      return (
+                        <span className="suggestion-badges" style={{ marginLeft: '0.35rem' }}>
+                          <span className={`search-badge source-badge ${seedBadge.sourceKey}`}>
+                            {seedBadge.sourceLabel}
+                          </span>
+                          <span className={`search-badge format-badge ${seedBadge.formatKey}`}>
+                            {seedBadge.formatLabel}
+                          </span>
+                        </span>
+                      );
+                    })()}
                     <Tooltip content={`Open on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
                       <a className="seed-external-link" href={data.seed_novel.external_url || externalMediaUrl(data.seed_novel.id, data.seed_novel.source, data.seed_novel.external_id, data.seed_novel.media_type) || data.seed_novel.novelupdates_url} target="_blank"
                         rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
@@ -1154,61 +1167,69 @@ export default function App(): JSX.Element {
           </Card>
 
           <div className="results-grid">
-            {filteredRecommendations.slice(0, visibleCount).map((rec, index) => (
-              <Card
-                key={rec.target_id || index}
-                className="novel-card"
-                onClick={(event) => {
-                  if (!(event.target as HTMLElement).closest('button, a, summary, select, label')) void openNovelDetail(rec);
-                }}
-              >
-                <div className="card-content">
-                  <div className="card-main">
-                    <div className="card-primary">
-                      <div className="card-top">
-                        <div className="card-cover">
-                          <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
-                          <span className="card-rank">#{index + 1}</span>
-                        </div>
-
-                        <div className="card-summary">
-                          <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
-                          <h3 className="novel-title">
-                            <a href={novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type)}>
-                              {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
-                            </a>
-                            <Tooltip content={`Open on ${sourceDisplayName(rec.source, rec.target_id)}`}>
-                            <a
-                              className="card-external-link"
-                              href={rec.external_url || externalMediaUrl(rec.target_id, rec.source, rec.external_id, rec.media_type) || rec.novelupdates_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Open ${rec.title} on ${sourceDisplayName(rec.source, rec.target_id)}`}
-                            >
-                              <ExternalLink size={14} aria-hidden="true" />
-                            </a>
-                            </Tooltip>
-                          </h3>
-                          <div className="novel-author">{rec.author
-                            ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
-                            : 'Unknown author'}</div>
-
-                          <div className="novel-meta">
-                            <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
-                            <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
+            {filteredRecommendations.slice(0, visibleCount).map((rec, index) => {
+              const badge = getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type, source: rec.source });
+              return (
+                <Card
+                  key={rec.target_id || index}
+                  className="novel-card"
+                  onClick={(event) => {
+                    if (!(event.target as HTMLElement).closest('button, a, summary, select, label')) void openNovelDetail(rec);
+                  }}
+                >
+                  <div className="card-content">
+                    <div className="card-main">
+                      <div className="card-primary">
+                        <div className="card-top">
+                          <div className="card-cover">
+                            <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
+                            <span className="card-rank">#{index + 1}</span>
                           </div>
-                          <div className="card-badges">
-                            {profileEntries.get(rec.target_id) && (
-                              <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
-                                {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
-                                {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
+
+                          <div className="card-summary">
+                            <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
+                            <h3 className="novel-title">
+                              <a href={novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type)}>
+                                {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
+                              </a>
+                              <Tooltip content={`Open on ${sourceDisplayName(rec.source, rec.target_id)}`}>
+                              <a
+                                className="card-external-link"
+                                href={rec.external_url || externalMediaUrl(rec.target_id, rec.source, rec.external_id, rec.media_type) || rec.novelupdates_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Open ${rec.title} on ${sourceDisplayName(rec.source, rec.target_id)}`}
+                              >
+                                <ExternalLink size={14} aria-hidden="true" />
+                              </a>
+                              </Tooltip>
+                            </h3>
+                            <div className="novel-author">{rec.author
+                              ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
+                              : 'Unknown author'}</div>
+
+                            <div className="novel-meta">
+                              <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
+                              <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
+                            </div>
+                            <div className="card-badges">
+                              <span className={`search-badge source-badge ${badge.sourceKey}`}>
+                                {badge.sourceLabel}
                               </span>
-                            )}
-                            {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
-                            {rec.status_trans && <span>{rec.status_trans}</span>}
+                              <span className={`search-badge format-badge ${badge.formatKey}`}>
+                                {badge.formatLabel}
+                              </span>
+                              {profileEntries.get(rec.target_id) && (
+                                <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
+                                  {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
+                                  {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
+                                </span>
+                              )}
+                              {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
+                              {rec.status_trans && <span>{rec.status_trans}</span>}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
                       <div className="evidence-label">Why it matches</div>
                       <ul className="evidence-list">
@@ -1295,8 +1316,9 @@ export default function App(): JSX.Element {
                   </div>
                 </div>
               </Card>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
           <div className="results-sentinel" ref={resultsSentinelRef}>
             <p aria-live="polite">
@@ -1376,9 +1398,22 @@ function NovelDetailDialog({
             <div className="detail-hero">
               <CoverImage src={detail.cover_url} alt={`Cover of ${displayNovelTitle(detail.title, detail.associated_names, titlePreference)}`} variant="detail" />
               <div className="detail-heading">
-                <span className="eyebrow">{detail.language
-                  ? <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a>
-                  : 'Catalog title'}{detail.year ? ` · ${detail.year}` : ''}</span>
+                {(() => {
+                  const detailBadge = getMediaBadgeInfo(detail);
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
+                      <span className={`search-badge source-badge ${detailBadge.sourceKey}`}>
+                        {detailBadge.sourceLabel}
+                      </span>
+                      <span className={`search-badge format-badge ${detailBadge.formatKey}`}>
+                        {detailBadge.formatLabel}
+                      </span>
+                      <span className="eyebrow" style={{ margin: 0 }}>{detail.language
+                        ? <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a>
+                        : 'Catalog title'}{detail.year ? ` · ${detail.year}` : ''}</span>
+                    </div>
+                  );
+                })()}
                 <h2 id="novel-detail-title">{displayNovelTitle(detail.title, detail.associated_names, titlePreference)}</h2>
                 <p className="detail-author">{detail.author
                   ? <a href={browseFacetUrl('author', detail.author)}>{detail.author}</a>

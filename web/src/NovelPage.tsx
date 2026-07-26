@@ -4,14 +4,14 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { createDataSource, externalMediaUrl, RecommendationDataSource, sourceDisplayName } from './data';
-import { Badge, Card, DSButton, Skeleton } from './design-system';
+import { Card, DSButton, Skeleton } from './design-system';
 import { browseFacetUrl } from './metadataLinks';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { LocalNovelFeedback, LocalUserProfile } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { NovelDetail, NovelInsights, Recommendation } from './types';
-import { novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import './novel-page.css';
 import { useDataModePreference } from './dataModePreference';
@@ -149,9 +149,19 @@ export default function NovelPage(): JSX.Element {
       </div>
       <div className="novel-hero-copy">
         <div className="novel-eyebrow">
-          <Badge tone={detail.source === 'anilist' ? 'blue' : 'amber'} style={{ textTransform: 'capitalize' }}>
-            {detail.media_type || (detail.id >= 2000000 ? 'Manga' : 'Novel')}
-          </Badge>
+          {(() => {
+            const badge = getMediaBadgeInfo({ id: detail.id, media_type: detail.media_type, source: detail.source });
+            return (
+              <>
+                <span className={`search-badge source-badge ${badge.sourceKey}`}>
+                  {badge.sourceLabel}
+                </span>
+                <span className={`search-badge format-badge ${badge.formatKey}`}>
+                  {badge.formatLabel}
+                </span>
+              </>
+            );
+          })()}
           {detail.status_trans && <span>{detail.status_trans}</span>}
         </div>
         <h1>{title}</h1>

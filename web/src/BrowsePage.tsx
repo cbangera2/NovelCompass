@@ -9,7 +9,7 @@ import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
@@ -435,6 +435,7 @@ export default function BrowsePage(): JSX.Element {
 function BrowseCard({ novel }: { novel: BrowseNovel }) {
   const { settings } = useDisplaySettings();
   const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
+  const badge = getMediaBadgeInfo(novel);
   const open = () => { window.location.href = novelPageUrl(novel.id, undefined, novel.media_type); };
   return <Card className="browse-card" role="link" tabIndex={0} onClick={(event) => {
     if (!(event.target as HTMLElement).closest('a, button')) open();
@@ -448,9 +449,12 @@ function BrowseCard({ novel }: { novel: BrowseNovel }) {
       <a className="browse-title" href={novelPageUrl(novel.id, undefined, novel.media_type)}>{title}</a>
       <p>{novel.author ? <a href={browseFacetUrl('author', novel.author)}>{novel.author}</a> : 'Unknown author'}</p>
       <div className="browse-meta">
-        <Badge tone={novel.source === 'anilist' ? 'blue' : 'amber'} style={{ textTransform: 'capitalize' }}>
-          {novel.media_type || (novel.id >= 2000000 ? 'manga' : 'novel')}
-        </Badge>
+        <span className={`search-badge source-badge ${badge.sourceKey}`}>
+          {badge.sourceLabel}
+        </span>
+        <span className={`search-badge format-badge ${badge.formatKey}`}>
+          {badge.formatLabel}
+        </span>
         <Badge tone="amber"><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></Badge>
         <Badge><Users size={14} /> {novel.reading_list_count.toLocaleString()}</Badge>
       </div>

@@ -781,8 +781,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .novel-meta span { align-items: center; display: inline-flex; gap: .22rem; }
 .novel-meta span:first-child { color: #f0c86c; }
 .novel-meta small { color: var(--dim); }
-.card-badges { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
-.card-badges span { background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .61rem; padding: .14rem .38rem; text-transform: capitalize; }
+.card-badges { align-items: center; display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
+.card-badges span:not(.search-badge) { background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .61rem; padding: .14rem .38rem; text-transform: capitalize; }
 .evidence-label { color: var(--dim); font-size: .62rem; font-weight: 750; letter-spacing: .1em; margin: .85rem 0 .42rem; text-transform: uppercase; }
 .evidence-list { border-top: 1px solid var(--border); height: 7.2rem; list-style: none; overflow: hidden; padding-top: .55rem; }
 .evidence-item { align-items: flex-start; color: #cac8d3; display: flex; font-size: .73rem; gap: .4rem; line-height: 1.42; margin-bottom: .34rem; }

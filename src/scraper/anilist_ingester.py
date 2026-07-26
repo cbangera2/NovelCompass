@@ -180,26 +180,31 @@ class AniListIngester:
             for rec_node in item.get("raw_recommendations") or []:
                 rec_media = rec_node.get("mediaRecommendation")
                 if rec_media and rec_media.get("id"):
+                    if rec_media.get("title"):
+                        target_item = map_anilist_media(rec_media)
+                        self.repo.upsert_manga(target_item)
                     rec_type = (rec_media.get("type") or raw_type).upper()
                     rec_offset = ANILIST_ANIME_ID_OFFSET if rec_type == "ANIME" else ANILIST_MANGA_ID_OFFSET
                     rec_target_id = rec_offset + rec_media["id"]
                     votes = rec_node.get("rating") or 1
                     direct_recs.append({"id": rec_target_id, "votes": max(1, votes)})
-            if direct_recs:
-                self.repo.replace_novel_relationships(db_id, direct_recs, [])
 
             # Ingest relations
             related_series = []
             for rel_edge in item.get("raw_relations") or []:
                 rel_node = rel_edge.get("node")
                 if rel_node and rel_node.get("id"):
+                    if rel_node.get("title"):
+                        rel_item = map_anilist_media(rel_node)
+                        self.repo.upsert_manga(rel_item)
                     rel_type_str = (rel_node.get("type") or raw_type).upper()
                     rel_offset = ANILIST_ANIME_ID_OFFSET if rel_type_str == "ANIME" else ANILIST_MANGA_ID_OFFSET
                     rel_target_id = rel_offset + rel_node["id"]
                     rel_type = (rel_edge.get("relationType") or "related").lower()
                     related_series.append({"id": rel_target_id, "relation_type": rel_type})
-            if related_series:
-                self.repo.replace_novel_relationships(db_id, [], related_series)
+
+            if direct_recs or related_series:
+                self.repo.replace_novel_relationships(db_id, direct_recs, related_series)
 
         return ingested_ids
 

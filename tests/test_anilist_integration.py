@@ -96,6 +96,101 @@ def test_anilist_ingester_db(memory_db):
     assert row["source"] == "anilist"
     assert row["rating"] == 4.87
 
+
+def test_anilist_ingester_preserves_recommendations_and_relations(memory_db):
+    """Ensure direct_recs and related_series are both persisted without stepping on each other."""
+    ingester = AniListIngester(memory_db)
+
+    # Pre-populate recommended and related targets
+    target_rec = {
+        "id": 11771,
+        "type": "ANIME",
+        "title": {"english": "Kuroko's Basketball"},
+        "format": "TV",
+        "averageScore": 84,
+        "popularity": 120000,
+        "recommendations": {"nodes": []},
+        "relations": {"edges": []},
+    }
+    target_rel = {
+        "id": 20992,
+        "type": "ANIME",
+        "title": {"english": "Haikyuu!! Second Season"},
+        "format": "TV",
+        "averageScore": 87,
+        "popularity": 130000,
+        "recommendations": {"nodes": []},
+        "relations": {"edges": []},
+    }
+    ingester.ingest_media_nodes([target_rec, target_rel])
+
+    raw_haikyuu = {
+        "id": 20464,
+        "type": "ANIME",
+        "title": {"english": "Haikyuu!!"},
+        "format": "TV",
+        "status": "FINISHED",
+        "description": "Shouyou Hinata, inspired to play volleyball...",
+        "seasonYear": 2014,
+        "countryOfOrigin": "JP",
+        "genres": ["Comedy", "Sports"],
+        "tags": [{"name": "Volleyball"}, {"name": "School"}],
+        "averageScore": 86,
+        "popularity": 180000,
+        "episodes": 25,
+        "recommendations": {
+            "nodes": [
+                {
+                    "rating": 209,
+                    "mediaRecommendation": {
+                        "id": 11771,
+                        "type": "ANIME",
+                        "title": {"english": "Kuroko's Basketball"},
+                    },
+                }
+            ]
+        },
+        "relations": {
+            "edges": [
+                {
+                    "relationType": "SEQUEL",
+                    "node": {
+                        "id": 20992,
+                        "type": "ANIME",
+                        "title": {"english": "Haikyuu!! Second Season"},
+                    },
+                }
+            ]
+        },
+    }
+
+    db_ids = ingester.ingest_media_nodes([raw_haikyuu])
+    haikyuu_id = db_ids[0]
+    assert haikyuu_id == 3_000_000 + 20464
+
+    # Both direct_recs and related_series must exist in DB
+    recs = memory_db.execute(
+        "SELECT target_novel_id, votes FROM direct_recs WHERE source_novel_id = ?",
+        (haikyuu_id,),
+    ).fetchall()
+    assert len(recs) == 1
+    assert recs[0]["target_novel_id"] == 3_000_000 + 11771
+    assert recs[0]["votes"] == 209
+
+    rels = memory_db.execute(
+        "SELECT target_novel_id, relation_type FROM related_series WHERE source_novel_id = ?",
+        (haikyuu_id,),
+    ).fetchall()
+    assert len(rels) == 1
+    assert rels[0]["target_novel_id"] == 3_000_000 + 20992
+    assert rels[0]["relation_type"] == "sequel"
+
+    # Verify CandidateGenerator sees direct_rec channel candidates
+    cand_gen = CandidateGenerator(memory_db)
+    channels = cand_gen.get_candidate_channels(haikyuu_id)
+    assert len(channels["direct_rec"]) == 1
+    assert channels["direct_rec"][0][0] == 3_000_000 + 11771
+
 def test_hard_filter_media_type(memory_db):
     repo = Repository(memory_db)
     # Novel item
