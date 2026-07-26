@@ -3,7 +3,7 @@ import {
   MessageSquare, Search, Sparkles, Star, ThumbsDown
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { createDataSource, RecommendationDataSource } from './data';
+import { createDataSource, externalMediaUrl, RecommendationDataSource, sourceDisplayName } from './data';
 import { Badge, Card, DSButton, Skeleton } from './design-system';
 import { browseFacetUrl } from './metadataLinks';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
@@ -180,8 +180,8 @@ export default function NovelPage(): JSX.Element {
         </dl>
         <div className="novel-actions">
           <DSButton as="a" variant="primary" href={`${import.meta.env.BASE_URL}?seed=${novelId}`}><Sparkles size={17} />Find similar</DSButton>
-          <DSButton as="a" variant="outline" href={detail.external_url || detail.novelupdates_url} target="_blank" rel="noopener noreferrer">
-            {detail.source === 'anilist' ? 'Open on AniList' : 'Novel Updates'} <ExternalLink size={15} />
+          <DSButton as="a" variant="outline" href={detail.external_url || externalMediaUrl(detail.id, detail.source, detail.external_id, detail.media_type)} target="_blank" rel="noopener noreferrer">
+            Open on {sourceDisplayName(detail.source, detail.id)} <ExternalLink size={15} />
           </DSButton>
         </div>
         <div className="novel-feedback" aria-label="Personal feedback">

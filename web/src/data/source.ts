@@ -35,6 +35,21 @@ export function novelUpdatesUrl(id: number): string {
   return `https://www.novelupdates.com/?p=${id}`;
 }
 
+export function externalMediaUrl(id: number, source?: string, external_id?: string, media_type?: string): string {
+  const isAniList = source === 'anilist' || id >= 2000000;
+  if (isAniList) {
+    const rawId = external_id || String(id >= 3000000 ? id - 3000000 : id >= 2000000 ? id - 2000000 : id);
+    const type = media_type === 'anime' || id >= 3000000 ? 'anime' : 'manga';
+    return `https://anilist.co/${type}/${rawId}`;
+  }
+  return `https://www.novelupdates.com/?p=${id}`;
+}
+
+export function sourceDisplayName(source?: string, id?: number): string {
+  if (source === 'anilist' || (id != null && id >= 2000000)) return 'AniList';
+  return 'Novel Updates';
+}
+
 export function bucketForNovel(id: number): string {
   return (id % 256).toString(16).padStart(2, '0');
 }

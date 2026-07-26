@@ -23,7 +23,9 @@ import {
 import {
   createDataSource,
   DataMode,
-  RecommendationDataSource
+  externalMediaUrl,
+  RecommendationDataSource,
+  sourceDisplayName
 } from './data';
 import { useDataModePreference } from './dataModePreference';
 import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile/types';
@@ -270,6 +272,10 @@ export default function App(): JSX.Element {
             title: detail.title,
             slug: detail.slug,
             novelupdates_url: detail.novelupdates_url,
+            external_url: detail.external_url,
+            media_type: detail.media_type,
+            source: detail.source,
+            external_id: detail.external_id,
             author: detail.author || '',
             cover_url: detail.cover_url,
             rating: detail.rating,
@@ -301,8 +307,11 @@ export default function App(): JSX.Element {
       let seed = DEFAULT_NOVEL;
       if (route.seed) {
         const detail = await dataSource.getNovel(route.seed).catch(() => null);
-        if (detail) seed = { id: detail.id, title: detail.title, slug: detail.slug, novelupdates_url: detail.novelupdates_url,
-          author: detail.author || '', cover_url: detail.cover_url, rating: detail.rating, rating_votes: detail.rating_votes };
+        if (detail) seed = {
+          id: detail.id, title: detail.title, slug: detail.slug, novelupdates_url: detail.novelupdates_url,
+          external_url: detail.external_url, media_type: detail.media_type, source: detail.source, external_id: detail.external_id,
+          author: detail.author || '', cover_url: detail.cover_url, rating: detail.rating, rating_votes: detail.rating_votes
+        };
       }
       chooseNovel(seed);
       setRouteRevision((value) => value + 1);
@@ -801,9 +810,9 @@ export default function App(): JSX.Element {
                 <h2><a href={novelPageUrl(data.seed_novel.id)}>
                   {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
                 </a></h2>
-                <Tooltip content="Open on Novel Updates">
-                  <a className="seed-external-link" href={data.seed_novel.novelupdates_url} target="_blank"
-                    rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on Novel Updates`}>
+                <Tooltip content={`Open on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
+                  <a className="seed-external-link" href={data.seed_novel.external_url || externalMediaUrl(data.seed_novel.id, data.seed_novel.source, data.seed_novel.external_id, data.seed_novel.media_type) || data.seed_novel.novelupdates_url} target="_blank"
+                    rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
                     <ExternalLink size={15} aria-hidden="true" />
                   </a>
                 </Tooltip>
@@ -836,13 +845,13 @@ export default function App(): JSX.Element {
                             <a href={novelPageUrl(rec.target_id, data.seed_novel.id)}>
                               {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
                             </a>
-                            <Tooltip content="Open this title on Novel Updates">
+                            <Tooltip content={`Open on ${sourceDisplayName(rec.source, rec.target_id)}`}>
                             <a
                               className="card-external-link"
-                              href={rec.novelupdates_url}
+                              href={rec.external_url || externalMediaUrl(rec.target_id, rec.source, rec.external_id, rec.media_type) || rec.novelupdates_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              aria-label={`Open ${rec.title} on Novel Updates`}
+                              aria-label={`Open ${rec.title} on ${sourceDisplayName(rec.source, rec.target_id)}`}
                             >
                               <ExternalLink size={14} aria-hidden="true" />
                             </a>

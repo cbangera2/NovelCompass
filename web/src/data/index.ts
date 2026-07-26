@@ -64,4 +64,4 @@ export function createDataSource(
 }
 
 export type { RecommendationDataSource } from './source';
-export { bucketForNovel } from './source';
+export { bucketForNovel, externalMediaUrl, sourceDisplayName } from './source';

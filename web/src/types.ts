@@ -3,6 +3,10 @@ export interface SeedNovel {
   title: string;
   slug: string;
   novelupdates_url: string;
+  external_url?: string;
+  media_type?: string;
+  source?: string;
+  external_id?: string;
   cover_url?: string;
 }
 

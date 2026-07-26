@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDownUp, BookOpen, ExternalLink, LayoutGrid, List, Search, Shuffle, SlidersHorizontal, Sparkles, Star, Users, X } from 'lucide-react';
-import { createDataSource, RecommendationDataSource } from './data';
+import { createDataSource, externalMediaUrl, RecommendationDataSource, sourceDisplayName } from './data';
 import { useDataModePreference } from './dataModePreference';
 import { stableRouteUrl } from './routeState';
 import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './types';
@@ -430,8 +430,8 @@ function BrowseCard({ novel }: { novel: BrowseNovel }) {
             <Sparkles size={16} aria-hidden="true" />
           </DSButton>
         </Tooltip>
-        <Tooltip content={`Open on ${novel.source === 'anilist' ? 'AniList' : 'Novel Updates'}`}>
-          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.external_url || novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} externally`}>
+        <Tooltip content={`Open on ${sourceDisplayName(novel.source, novel.id)}`}>
+          <DSButton as="a" variant="ghost" className="browse-icon-action" href={novel.external_url || externalMediaUrl(novel.id, novel.source, novel.external_id, novel.media_type) || novel.novelupdates_url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${title} on ${sourceDisplayName(novel.source, novel.id)}`}>
             <ExternalLink size={16} aria-hidden="true" />
           </DSButton>
         </Tooltip>
