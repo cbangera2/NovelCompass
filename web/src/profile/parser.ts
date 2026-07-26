@@ -89,12 +89,17 @@ export async function parseProfileFile(file: File): Promise<ParsedProfileFile> {
     const ratingText = clean(cells[3]?.textContent);
     const rating = /^\d(?:\.\d+)?$/.test(ratingText) ? Number(ratingText) : undefined;
     const progress = clean(cells[2]?.textContent).replace(/^\[\s*|\s*\]$/g, '') || undefined;
+    const progressMatch = progress?.match(/(\d+(?:\.\d+)?)/);
+    const progressUnits = progressMatch ? Number(progressMatch[1]) : undefined;
     entries.push({
       slug,
       imported_title: clean(anchor.getAttribute('title')) || clean(anchor.textContent),
       status: detected,
       rating,
       progress,
+      // NovelUpdates HTML is always novels; keep optional stats fields for shared analytics.
+      progress_units: progressUnits && Number.isFinite(progressUnits) ? progressUnits : undefined,
+      media_kind: 'novel',
       source_file: file.name
     });
   }

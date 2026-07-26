@@ -26,12 +26,22 @@ function entry(value: unknown, index: number): ProfileEntry {
   const rating = number(item.rating, `entries[${index}].rating`, true);
   if (!STATUSES.has(status)) throw new Error(`entries[${index}].status is not supported.`);
   if (rating != null && (rating < 1 || rating > 5)) throw new Error(`entries[${index}].rating must be between 1 and 5.`);
+  const mediaKindRaw = string(item.media_kind, `entries[${index}].media_kind`, true);
+  const media_kind =
+    mediaKindRaw === 'anime' || mediaKindRaw === 'manga' || mediaKindRaw === 'novel'
+      ? mediaKindRaw
+      : undefined;
+  // Optional AniList/enriched fields — old NovelUpdates-only backups remain valid.
   return {
     novel_id: number(item.novel_id, `entries[${index}].novel_id`, true),
     slug: string(item.slug, `entries[${index}].slug`)!,
     imported_title: string(item.imported_title, `entries[${index}].imported_title`)!,
     status, rating,
     progress: string(item.progress, `entries[${index}].progress`, true),
+    progress_units: number(item.progress_units, `entries[${index}].progress_units`, true),
+    media_kind,
+    started_on: string(item.started_on, `entries[${index}].started_on`, true),
+    finished_on: string(item.finished_on, `entries[${index}].finished_on`, true),
     source_file: string(item.source_file, `entries[${index}].source_file`)!,
   };
 }

@@ -47,6 +47,8 @@ export interface AniListGdprListRow {
   progress_volume?: number | null;
   private?: number | null;
   notes?: string | null;
+  started_on?: number | null;
+  finished_on?: number | null;
 }
 
 export interface AniListGdprExport {
@@ -75,6 +77,17 @@ export function anilistSlug(seriesType: number, seriesId: number): string {
   return seriesType === ANILIST_SERIES_TYPE.Anime
     ? `anilist-anime-${seriesId}`
     : `anilist-${seriesId}`;
+}
+
+/** AniList GDPR dates are numeric YYYYMMDD (or 0 when unset). */
+export function yyyymmddToIso(value: number | null | undefined): string | undefined {
+  if (!value || value < 10000101) return undefined;
+  const text = String(value).padStart(8, '0');
+  const year = text.slice(0, 4);
+  const month = text.slice(4, 6);
+  const day = text.slice(6, 8);
+  if (Number(month) < 1 || Number(month) > 12 || Number(day) < 1 || Number(day) > 31) return undefined;
+  return `${year}-${month}-${day}`;
 }
 
 export function mapAniListStatus(status: number): ReadingStatus {
@@ -171,8 +184,9 @@ export async function parseAniListGdprFile(file: File): Promise<ParsedProfileFil
 
     const catalogId = anilistCatalogId(seriesType, row.series_id);
     const progressParts: string[] = [];
-    if (row.progress && row.progress > 0) {
-      progressParts.push(seriesType === ANILIST_SERIES_TYPE.Anime ? `ep ${row.progress}` : `ch ${row.progress}`);
+    const progressUnits = row.progress && row.progress > 0 ? Number(row.progress) : undefined;
+    if (progressUnits) {
+      progressParts.push(seriesType === ANILIST_SERIES_TYPE.Anime ? `ep ${progressUnits}` : `ch ${progressUnits}`);
     }
     if (row.progress_volume && row.progress_volume > 0) {
       progressParts.push(`vol ${row.progress_volume}`);
@@ -188,6 +202,10 @@ export async function parseAniListGdprFile(file: File): Promise<ParsedProfileFil
       status: mapAniListStatus(row.status),
       rating: mapAniListScore(row.score, scoreType),
       progress: progressParts.length ? progressParts.join(' · ') : undefined,
+      progress_units: progressUnits,
+      media_kind: seriesType === ANILIST_SERIES_TYPE.Anime ? 'anime' : 'manga',
+      started_on: yyyymmddToIso(row.started_on),
+      finished_on: yyyymmddToIso(row.finished_on),
       source_file: file.name,
     });
   }

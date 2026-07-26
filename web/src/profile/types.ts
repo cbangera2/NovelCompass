@@ -1,5 +1,7 @@
 export type ReadingStatus = 'reading' | 'completed' | 'plan_to_read' | 'dropped' | 'paused';
 
+export type ProfileMediaKind = 'anime' | 'manga' | 'novel';
+
 export interface ProfileEntry {
   novel_id?: number;
   slug: string;
@@ -7,6 +9,14 @@ export interface ProfileEntry {
   status: ReadingStatus;
   rating?: number;
   progress?: string;
+  /** Numeric chapters/episodes parsed from progress for stats. */
+  progress_units?: number;
+  /** Coarse media kind for AniList-style overview filtering. */
+  media_kind?: ProfileMediaKind;
+  /** ISO date (YYYY-MM-DD) when the user started the title, if known. */
+  started_on?: string;
+  /** ISO date (YYYY-MM-DD) when the user finished the title, if known. */
+  finished_on?: string;
   source_file: string;
 }
 
