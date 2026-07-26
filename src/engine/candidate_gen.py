@@ -35,7 +35,7 @@ class CandidateGenerator:
     def _get_vector_data(self):
         if self._vector_cache is None:
             cur = self.conn.cursor()
-            cur.execute("SELECT id, title, synopsis FROM novels WHERE synopsis IS NOT NULL AND synopsis != ''")
+            cur.execute("SELECT id, title, synopsis FROM novels WHERE synopsis IS NOT NULL AND synopsis != '' ORDER BY id")
             candidates = cur.fetchall()
             if not candidates:
                 self._vector_cache = ([], {}, None)
@@ -82,12 +82,17 @@ class CandidateGenerator:
 
         sims = vectors.dot(seed_vec)
         
-        # Sort top indices
+        # Sort top indices using argpartition for O(N) selection
         # Mask out seed_idx so seed novel is not returned as its own candidate
         sims_copy = sims.copy()
         sims_copy[seed_idx] = -1.0
         
-        top_indices = sims_copy.argsort()[::-1][:limit]
+        if len(sims_copy) > limit:
+            top_part = np.argpartition(-sims_copy, limit)[:limit]
+            top_indices = top_part[np.argsort(-sims_copy[top_part])]
+        else:
+            top_indices = np.argsort(-sims_copy)
+
         scored = [(c_ids[i], float(sims_copy[i])) for i in top_indices if sims_copy[i] > 0]
         return scored
 

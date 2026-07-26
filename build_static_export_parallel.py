@@ -386,7 +386,7 @@ def _worker_init(db_path: str, novel_ids_list: list[int], tag_indices: dict[int,
     global _worker_index
     conn = get_connection(db_path)
     _worker_index = CompactCandidateIndex(conn, set(novel_ids_list), tag_indices)
-    # Keep connection open is fine; SQLite allows multiple readers
+    conn.close()
 
 
 def _compact_pool_worker(args: tuple[list[int], int]) -> list[tuple[int, list[list[Any]]]]:
@@ -573,7 +573,7 @@ def export_static_dataset(
 
         generator = CandidateGenerator(conn)
         ts = datetime.now().strftime("%H:%M:%S")
-        print(f"[{ts}] rich-pools: Pre-building vector matrix and caching tag maps for 24,791 titles...", flush=True)
+        print(f"[{ts}] rich-pools: Pre-building vector matrix and caching tag maps for {len(exported_ids):,} titles...", flush=True)
         _ = generator._get_vector_data()
         _ = generator._get_novel_tags_map()
         _ = generator._get_idf_dict()
