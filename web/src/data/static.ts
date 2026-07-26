@@ -400,7 +400,7 @@ export class StaticDataSource implements RecommendationDataSource {
     try {
       const shard = await detailBucketPromise;
       detail = shard[String(id)] || {};
-    } catch (error) {
+    } catch {
       try {
         detail = await jsonFetch<any>(
           joinUrl(this.baseUrl, `details/${bucket}/${id}.json`)
@@ -515,7 +515,7 @@ export class StaticDataSource implements RecommendationDataSource {
           joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
         );
       }
-    } catch (error) {
+    } catch {
       const compactPool = await this.loadCompactRecommendationPool(seedId, manifest);
       if (!compactPool) {
         throw new DataSourceError(
