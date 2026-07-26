@@ -1,6 +1,7 @@
 import math
 import sqlite3
 from typing import Dict, List, Set, Tuple
+import numpy as np
 from src.nlp.taxonomy import calculate_tag_idf, weighted_tag_similarity
 from src.nlp.embedder import SynopsisEmbedder
 
