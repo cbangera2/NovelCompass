@@ -807,7 +807,7 @@ export default function App(): JSX.Element {
             <div className="results-heading-copy">
               <span className="eyebrow">Based on your starting novel</span>
               <div className="seed-title-row">
-                <h2><a href={novelPageUrl(data.seed_novel.id)}>
+                <h2><a href={novelPageUrl(data.seed_novel.id, undefined, data.seed_novel.media_type)}>
                   {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
                 </a></h2>
                 <Tooltip content={`Open on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
@@ -842,7 +842,7 @@ export default function App(): JSX.Element {
                         <div className="card-summary">
                           <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
                           <h3 className="novel-title">
-                            <a href={novelPageUrl(rec.target_id, data.seed_novel.id)}>
+                            <a href={novelPageUrl(rec.target_id, data.seed_novel.id, rec.media_type)}>
                               {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
                             </a>
                             <Tooltip content={`Open on ${sourceDisplayName(rec.source, rec.target_id)}`}>

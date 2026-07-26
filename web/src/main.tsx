@@ -13,10 +13,13 @@ const SettingsPage = lazy(() => import('./SettingsPage'));
 
 const locationParams = new URLSearchParams(window.location.search);
 const requestedView = locationParams.get('view');
+const isDetailView = requestedView === 'novel' || requestedView === 'manga' || requestedView === 'anime' || requestedView === 'item';
 const hasExplicitDiscoverSeed = locationParams.has('seed');
-const activeView: AppView = requestedView === 'discover' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings' || requestedView === 'novel'
-  ? requestedView
-  : hasExplicitDiscoverSeed ? 'discover' : loadNavigationPreferences().homeView;
+const activeView: AppView = isDetailView
+  ? 'novel'
+  : requestedView === 'discover' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings'
+    ? requestedView
+    : hasExplicitDiscoverSeed ? 'discover' : loadNavigationPreferences().homeView;
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

@@ -403,17 +403,17 @@ export default function BrowsePage(): JSX.Element {
 function BrowseCard({ novel }: { novel: BrowseNovel }) {
   const { settings } = useDisplaySettings();
   const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
-  const open = () => { window.location.href = novelPageUrl(novel.id); };
+  const open = () => { window.location.href = novelPageUrl(novel.id, undefined, novel.media_type); };
   return <Card className="browse-card" role="link" tabIndex={0} onClick={(event) => {
     if (!(event.target as HTMLElement).closest('a, button')) open();
   }} onKeyDown={(event) => {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); }
   }}>
-    <a className="browse-cover" href={novelPageUrl(novel.id)}>
+    <a className="browse-cover" href={novelPageUrl(novel.id, undefined, novel.media_type)}>
       {novel.cover_url ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
     </a>
     <div>
-      <a className="browse-title" href={novelPageUrl(novel.id)}>{title}</a>
+      <a className="browse-title" href={novelPageUrl(novel.id, undefined, novel.media_type)}>{title}</a>
       <p>{novel.author ? <a href={browseFacetUrl('author', novel.author)}>{novel.author}</a> : 'Unknown author'}</p>
       <div className="browse-meta">
         <Badge tone={novel.source === 'anilist' ? 'blue' : 'amber'} style={{ textTransform: 'capitalize' }}>
