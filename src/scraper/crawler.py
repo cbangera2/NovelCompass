@@ -42,12 +42,14 @@ class Crawler:
         max_attempts: int = 4,
         client: Optional[ScraperClient] = None,
         ignore_robots: bool = False,
+        mobile_mode: bool = False,
     ):
         self.repo = Repository(db_conn)
         self.client = client or ScraperClient(delay_range=delay_range)
         self.max_attempts = max_attempts
         self.stop_requested = False
         self.ignore_robots = ignore_robots
+        self.mobile_mode = mobile_mode
 
     def request_stop(self, *_args) -> None:
         self.stop_requested = True
@@ -259,7 +261,20 @@ class Crawler:
                     stats.errors += 1
                     if item["type"] == "novel":
                         consecutive_blocks += 1
-                        if consecutive_blocks >= 3:
+                        if self.mobile_mode and consecutive_blocks >= 2:
+                            print(
+                                "[MOBILE MODE] Intermittent rate limit detected. "
+                                "Pausing 10s for IP cooldown before auto-resuming...",
+                                flush=True,
+                            )
+                            time.sleep(10)
+                            with self.repo.conn:
+                                self.repo.conn.execute(
+                                    "UPDATE crawl_queue SET status = 'pending' WHERE status = 'blocked'"
+                                )
+                            consecutive_blocks = 0
+                            continue
+                        elif consecutive_blocks >= 3:
                             status = "partial"
                             reason = (
                                 "authentication or anti-bot challenge"
@@ -398,7 +413,17 @@ def main() -> int:
         action="store_false",
         help="Enforce robots.txt restriction checks",
     )
+    parser.add_argument(
+        "--mobile",
+        action="store_true",
+        help="Enable high-throughput Mobile Data Mode with fast CGNAT pacing (1.2-2.2s) and IP rotation prompt",
+    )
     args = parser.parse_args()
+    if args.mobile:
+        args.min_delay = 1.5
+        args.max_delay = 2.5
+        args.ignore_robots = True
+
     if args.min_delay < 0.1 or args.max_delay < args.min_delay:
         parser.error("require 0.1 <= min-delay <= max-delay")
 
@@ -427,7 +452,12 @@ def main() -> int:
         delay_range=(args.min_delay, args.max_delay),
         transport=transport,
     )
-    crawler = Crawler(conn, client=client, ignore_robots=args.ignore_robots)
+    crawler = Crawler(
+        conn,
+        client=client,
+        ignore_robots=args.ignore_robots,
+        mobile_mode=args.mobile,
+    )
     signal.signal(signal.SIGINT, crawler.request_stop)
     signal.signal(signal.SIGTERM, crawler.request_stop)
     try:

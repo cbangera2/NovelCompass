@@ -206,6 +206,11 @@ def main() -> int:
     crawl.add_argument(
         "--check-robots", dest="ignore_robots", action="store_false"
     )
+    crawl.add_argument(
+        "--mobile",
+        action="store_true",
+        help="Enable high-throughput Mobile Data Mode with fast CGNAT pacing (1.2-2.2s) and IP rotation prompt",
+    )
     args = parser.parse_args()
 
     if args.command == "prepare":
@@ -213,6 +218,11 @@ def main() -> int:
     elif args.command == "status":
         result = artifact_status(args.db)
     else:
+        if getattr(args, "mobile", False):
+            args.min_delay = 1.5
+            args.max_delay = 2.5
+            args.ignore_robots = True
+
         if args.min_delay < 0.1 or args.max_delay < args.min_delay:
             parser.error("require 0.1 <= min-delay <= max-delay")
         conn = init_db(str(args.db))
@@ -227,7 +237,12 @@ def main() -> int:
             delay_range=(args.min_delay, args.max_delay),
             transport=transport,
         )
-        crawler = Crawler(conn, client=client, ignore_robots=args.ignore_robots)
+        crawler = Crawler(
+            conn,
+            client=client,
+            ignore_robots=args.ignore_robots,
+            mobile_mode=getattr(args, "mobile", False),
+        )
         signal.signal(signal.SIGINT, crawler.request_stop)
         signal.signal(signal.SIGTERM, crawler.request_stop)
         try:
