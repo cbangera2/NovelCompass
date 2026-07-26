@@ -118,6 +118,31 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(set(layered_compact["pools"]), {"1", "257"})
             self.assertEqual(layered["recommendation_index_seed_count"], 2)
 
+    def test_verify_export_supports_legacy_13_field_schema(self):
+        from build_static_export import verify_export
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = {
+                "catalog_url": "catalog.json",
+                "novel_count": 1,
+            }
+            legacy_catalog = {
+                "fields": [
+                    "id", "slug", "title", "author", "cover", "rating", "votes",
+                    "readers", "year", "language_id", "status_id", "translated_chapters", "genre_ids"
+                ],
+                "rows": [[1, "one", "One", "A", "", 4.0, 1, 1, 2020, 0, 0, 10, []]],
+                "genres": [],
+                "tags": [],
+            }
+            (root / "manifest.json").write_text(json.dumps(manifest))
+            (root / "catalog.json").write_text(json.dumps(legacy_catalog))
+            (root / "options.json").write_text(json.dumps({"genres": [], "tags": []}))
+            (root / "details/01").mkdir(parents=True)
+            (root / "details/01/1.json").write_text(json.dumps({"id": 1}))
+
+            verify_export(root, expected_novels=1)
+
 
 if __name__ == "__main__":
     unittest.main()

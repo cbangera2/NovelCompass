@@ -604,7 +604,12 @@ def verify_export(
 ) -> None:
     manifest = json.loads((output / "manifest.json").read_text())
     catalog = json.loads((output / manifest["catalog_url"]).read_text())
-    if catalog["fields"] != list(CATALOG_FIELDS):
+    catalog_fields = catalog.get("fields", [])
+    if not (
+        catalog_fields == list(CATALOG_FIELDS)[: len(catalog_fields)]
+        and len(catalog_fields) >= 13
+        and set(catalog_fields).issubset(set(CATALOG_FIELDS))
+    ):
         raise ValueError("catalog fields do not match the static schema")
     if expected_novels is not None and len(catalog["rows"]) != expected_novels:
         raise ValueError("catalog novel count is incomplete")
@@ -613,7 +618,12 @@ def verify_export(
     bootstrap = json.loads(
         (output / manifest.get("bootstrap_catalog_url", manifest["catalog_url"])).read_text()
     )
-    if bootstrap["fields"] != list(CATALOG_FIELDS):
+    bootstrap_fields = bootstrap.get("fields", [])
+    if not (
+        bootstrap_fields == list(CATALOG_FIELDS)[: len(bootstrap_fields)]
+        and len(bootstrap_fields) >= 13
+        and set(bootstrap_fields).issubset(set(CATALOG_FIELDS))
+    ):
         raise ValueError("bootstrap catalog fields do not match the static schema")
     if expected_bootstrap_novels is not None and len(bootstrap["rows"]) != expected_bootstrap_novels:
         raise ValueError("bootstrap catalog novel count is incomplete")
