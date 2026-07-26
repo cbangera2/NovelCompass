@@ -51,3 +51,42 @@
   .browse-controls{grid-template-columns:1fr 1fr}
   .browse-direction,.browse-lucky{width:100%}
 }
+
+.segmented-media-filter {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.segmented-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.segmented-pill:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.segmented-pill.active {
+  background: var(--surface-raised);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+

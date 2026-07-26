@@ -14,18 +14,19 @@ import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
 import { useMediaFilterState } from './mediaFilterState';
+import { Palette, Film } from 'lucide-react';
 
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
-  const { selectedTypes: globalMediaTypes } = useMediaFilterState();
+  const { selectedTypes, toggleType } = useMediaFilterState();
   const { mode: dataMode } = useDataModePreference();
   const initialParams = new URLSearchParams(window.location.search);
   const saved = loadFilterSnapshot('browse', {
     query: '', sort: 'popular', direction: 'desc', language: '', author: '', genre: '', tag: '',
     minRating: 0, maxRating: 0, minVotes: 0, minYear: 0, maxYear: 0, status: '',
     minChapters: 0, maxChapters: 0, minReaders: 0, maxReaders: 0, includeGenres: '',
-    excludeGenres: '', includeTags: '', excludeTags: '', excludeLibrary: false, density: 'grid', mediaType: ''
+    excludeGenres: '', includeTags: '', excludeTags: '', excludeLibrary: false, density: 'grid'
   });
   const savedSort: BrowseSort = ['popular', 'rating', 'votes', 'title', 'newest'].includes(String(saved.sort))
     ? saved.sort as BrowseSort : 'popular';
@@ -33,7 +34,6 @@ export default function BrowsePage(): JSX.Element {
   const savedDensity: 'grid' | 'list' = saved.density === 'list' ? 'list' : 'grid';
   const initialString = (urlKey: string, savedKey: keyof typeof saved) => initialParams.has(urlKey) ? initialParams.get(urlKey) || '' : String(saved[savedKey] || '');
   const initialNumber = (key: string, savedKey: keyof typeof saved) => initialParams.has(key) ? Number(initialParams.get(key) || 0) : Number(saved[savedKey] || 0);
-  const [mediaType, setMediaType] = useState(initialString('media_type', 'mediaType'));
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
@@ -92,10 +92,10 @@ export default function BrowsePage(): JSX.Element {
   useEffect(() => {
     saveFilterSnapshot('browse', { query, sort, direction, language, author, genre, tag, minRating, maxRating,
       minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders,
-      includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density, mediaType });
+      includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density, mediaType: selectedTypes.join(',') });
   }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear,
     status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags,
-    excludeTags, excludeLibrary, density, mediaType]);
+    excludeTags, excludeLibrary, density, selectedTypes]);
 
   useEffect(() => {
     loadLocalProfile().then((profile) => setLibraryIds(
@@ -119,7 +119,7 @@ export default function BrowsePage(): JSX.Element {
           include_genres: includeGenres, exclude_genres: excludeGenres,
           include_tags: includeTags, exclude_tags: excludeTags,
           exclude_ids: excludeLibrary ? libraryIds.join(',') : '', direction,
-          media_type: mediaType || globalMediaTypes.join(','),
+          media_type: selectedTypes.join(','),
           page, page_size: PAGE_SIZE
         });
         if (requestId !== requestRef.current) return;
@@ -142,7 +142,7 @@ export default function BrowsePage(): JSX.Element {
       }
     }, page === 1 ? 240 : 0);
     return () => window.clearTimeout(timer);
-  }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, libraryIds, page, retryToken, mediaType, globalMediaTypes]);
+  }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, libraryIds, page, retryToken, selectedTypes]);
 
   const resetPage = (action: () => void) => {
     action();
@@ -296,9 +296,32 @@ export default function BrowsePage(): JSX.Element {
       </header>
 
       <nav className="browse-presets" aria-label="Catalog views">
-        <DSButton variant={mediaType === '' ? 'primary' : 'ghost'} onClick={() => resetPage(() => setMediaType(''))}>All Media</DSButton>
-        <DSButton variant={mediaType === 'novel' ? 'primary' : 'ghost'} onClick={() => resetPage(() => setMediaType('novel'))}>Novels Only</DSButton>
-        <DSButton variant={mediaType === 'manga' ? 'primary' : 'ghost'} onClick={() => resetPage(() => setMediaType('manga'))}>Manga Only</DSButton>
+        <div className="segmented-media-filter" aria-label="Format selection">
+          <button
+            type="button"
+            className={`segmented-pill ${selectedTypes.includes('novel') ? 'active' : ''}`}
+            onClick={() => resetPage(() => toggleType('novel'))}
+            title="Toggle Light Novels & Web Novels"
+          >
+            <BookOpen size={14} /> Novels
+          </button>
+          <button
+            type="button"
+            className={`segmented-pill ${selectedTypes.includes('manga') ? 'active' : ''}`}
+            onClick={() => resetPage(() => toggleType('manga'))}
+            title="Toggle Manga & Comics"
+          >
+            <Palette size={14} /> Manga
+          </button>
+          <button
+            type="button"
+            className={`segmented-pill ${selectedTypes.includes('anime') ? 'active' : ''}`}
+            onClick={() => resetPage(() => toggleType('anime'))}
+            title="Toggle Anime"
+          >
+            <Film size={14} /> Anime
+          </button>
+        </div>
         <DSButton variant="ghost" onClick={() => applyPreset('rated')}>Top rated</DSButton>
         <DSButton variant="ghost" onClick={() => applyPreset('popular')}>Most read</DSButton>
         <DSButton variant="ghost" onClick={() => applyPreset('hidden')} title="Rating ≥ 4.2, 10+ votes, fewer than 2,000 readers">Hidden gems</DSButton>
@@ -309,11 +332,6 @@ export default function BrowsePage(): JSX.Element {
         <label className="browse-search"><Search size={17} /><input value={query}
           onChange={(event) => resetPage(() => setQuery(event.target.value))}
           placeholder="Search titles, aliases, or authors…" /></label>
-        <Select label="Media Type" value={mediaType} onChange={(event) => resetPage(() => setMediaType(event.target.value))}>
-          <option value="">All Media</option>
-          <option value="novel">Novels</option>
-          <option value="manga">Manga / Comics</option>
-        </Select>
         <Select label="Sort" value={sort} onChange={(event) => resetPage(() => setSort(event.target.value as BrowseSort))}>
           <option value="popular">Most popular</option>
           <option value="rating">Highest rated</option>
