@@ -36,9 +36,14 @@ To allow items from multiple distinct upstream platforms (NovelUpdates and AniLi
   - Staff edges (Story, Art, Director, Studio)
   - Recommendation nodes & relations
 
-### Ingest Engine (`anilist_ingester.py`)
+### Ingest Engine & Cross-Source Popularity Normalization (`anilist_ingester.py`)
 - Maps raw AniList JSON nodes into database records.
 - Extracts studio names for Anime and author/artist names for Manga into the `author` field.
+- **Cross-Source Magnitude Normalization**:
+  - AniList raw user counts (popular items ~250,000 to 300,000) are roughly **10x higher** than NovelUpdates readership counts (popular items ~20,000 to 30,000).
+  - Without normalization, sorting by `"popular"` when viewing combined media (or algorithm ranking weights) would cause AniList items to dominate NovelUpdates entries.
+  - **Scaling Factor**: AniList `reading_list_count` is scaled by `0.10x` (`round(popularity * 0.10)`), bringing top items (e.g. *Attack on Titan*, *Death Note*) to ~25,000–30,000 readers, perfectly harmonized with top Light Novels (*Lord of the Mysteries*, *Solo Leveling*).
+  - `rating_votes` maps directly to AniList `favourites` count (or `0.04x` popularity fallback).
 - Upserts cross-media recommendations into `novel_recommendations` and relations into `novel_relations`.
 - Features rate-limited batching (0.5s pause per request) and JSON caching in `data/cache/anilist/`.
 

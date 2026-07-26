@@ -61,6 +61,8 @@ def test_map_anilist_media():
     assert mapped["media_type"] == "manga"
     assert mapped["source"] == "anilist"
     assert mapped["rating"] == 4.25
+    assert mapped["reading_list_count"] == 15000  # 150000 * 0.1
+    assert mapped["rating_votes"] == 45000  # favourites count
     assert mapped["author"] == "Tatsuki Fujimoto"
     assert "Action" in mapped["genres"]
     assert "Demons" in mapped["tags"]

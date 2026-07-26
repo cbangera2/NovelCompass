@@ -117,6 +117,11 @@ def map_anilist_media(media: Dict[str, Any]) -> Dict[str, Any]:
 
     episodes_or_chapters = media.get("episodes") or media.get("chapters") or 0
 
+    # Popularity Normalization: AniList user counts (~250k top) are ~10x higher than
+    # NovelUpdates readership (~30k top). Scaling by 0.1x aligns global sorting.
+    scaled_readers = max(1, round(popularity * 0.10)) if popularity else (favourites or 0)
+    scaled_votes = favourites if favourites > 0 else (max(1, round(popularity * 0.04)) if popularity else 0)
+
     return {
         "id": db_id,
         "anilist_id": anilist_id,
@@ -129,8 +134,8 @@ def map_anilist_media(media: Dict[str, Any]) -> Dict[str, Any]:
         "language": "Japanese" if country == "JP" else ("Korean" if country == "KR" else ("Chinese" if country == "CN" else "English")),
         "synopsis": clean_description(media.get("description")),
         "rating": rating,
-        "rating_votes": popularity,
-        "reading_list_count": popularity,
+        "rating_votes": scaled_votes,
+        "reading_list_count": scaled_readers,
         "chapters_orig": episodes_or_chapters,
         "chapters_trans": episodes_or_chapters,
         "status_trans": status_trans,
