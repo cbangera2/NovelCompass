@@ -21,9 +21,12 @@ supporting/artifacts/*.manifest.json
 .env.*
 !.env.example
 
-# Personal account exports (AniList GDPR, etc.)
+# Personal account exports (AniList GDPR, Novel Compass profile backups, etc.)
 anilist_gdpr_data.json
 *_gdpr_data.json
+novel-compass-profile*.json
+*compass-profile*.json
+local-profile*.json
 
 # Python
 __pycache__/
