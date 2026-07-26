@@ -193,14 +193,19 @@ def main() -> int:
     crawl.add_argument("--db", type=Path, default=DEFAULT_ARTIFACT)
     crawl.add_argument("--max-items", type=int, default=None)
     crawl.add_argument("--min-delay", type=float, default=3.0)
-    crawl.add_argument("--max-delay", type=float, default=6.0)
+    crawl.add_argument("--max-delay", type=float, default=5.5)
     crawl.add_argument(
         "--transport", choices=("urllib", "browser"), default="urllib"
     )
     crawl.add_argument(
         "--browser-profile", type=Path, default=DEFAULT_BROWSER_PROFILE
     )
-    crawl.add_argument("--ignore-robots", action="store_true")
+    crawl.add_argument(
+        "--ignore-robots", action="store_true", default=True
+    )
+    crawl.add_argument(
+        "--check-robots", dest="ignore_robots", action="store_false"
+    )
     args = parser.parse_args()
 
     if args.command == "prepare":

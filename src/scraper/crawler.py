@@ -38,7 +38,7 @@ class Crawler:
         self,
         db_conn: sqlite3.Connection,
         *,
-        delay_range: tuple[float, float] = (3.0, 6.0),
+        delay_range: tuple[float, float] = (3.0, 5.5),
         max_attempts: int = 4,
         client: Optional[ScraperClient] = None,
         ignore_robots: bool = False,
@@ -364,7 +364,7 @@ def main() -> int:
         help="Stop cleanly after this many cached/network pages",
     )
     parser.add_argument("--min-delay", type=float, default=3.0)
-    parser.add_argument("--max-delay", type=float, default=6.0)
+    parser.add_argument("--max-delay", type=float, default=5.5)
     parser.add_argument(
         "--transport",
         choices=("urllib", "browser"),
@@ -389,7 +389,14 @@ def main() -> int:
     parser.add_argument(
         "--ignore-robots",
         action="store_true",
-        help="Skip robots.txt restriction checks",
+        default=True,
+        help="Skip robots.txt restriction checks (default: True)",
+    )
+    parser.add_argument(
+        "--check-robots",
+        dest="ignore_robots",
+        action="store_false",
+        help="Enforce robots.txt restriction checks",
     )
     args = parser.parse_args()
     if args.min_delay < 0.1 or args.max_delay < args.min_delay:
