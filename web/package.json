@@ -16,6 +16,7 @@
     "smoke:static": "node ../scripts/smoke_static_preview.mjs",
     "test": "cd .. && PYTHONPATH=. .venv/bin/pytest -q",
     "typecheck": "tsc --noEmit",
+    "prepare": "git config core.hooksPath ../.githooks || true",
     "preview": "vite preview"
   },
   "dependencies": {

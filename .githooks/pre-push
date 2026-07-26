@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+echo "🧪 [pre-push] Running typecheck and tests..."
+cd web
+pnpm run typecheck
+pnpm run test
+echo "✅ [pre-push] All typechecks and tests passed!"

@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+echo "🔍 [pre-commit] Running oxlint and format check..."
+cd web
+pnpm run lint
+pnpm run format:check
+echo "✅ [pre-commit] All linting and formatting checks passed!"
