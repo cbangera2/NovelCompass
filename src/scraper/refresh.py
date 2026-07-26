@@ -200,6 +200,7 @@ def main() -> int:
     crawl.add_argument(
         "--browser-profile", type=Path, default=DEFAULT_BROWSER_PROFILE
     )
+    crawl.add_argument("--ignore-robots", action="store_true")
     args = parser.parse_args()
 
     if args.command == "prepare":
@@ -207,8 +208,8 @@ def main() -> int:
     elif args.command == "status":
         result = artifact_status(args.db)
     else:
-        if args.min_delay < 1 or args.max_delay < args.min_delay:
-            parser.error("require 1 <= min-delay <= max-delay")
+        if args.min_delay < 0.1 or args.max_delay < args.min_delay:
+            parser.error("require 0.1 <= min-delay <= max-delay")
         conn = init_db(str(args.db))
         transport = None
         if args.transport == "browser":
@@ -221,7 +222,7 @@ def main() -> int:
             delay_range=(args.min_delay, args.max_delay),
             transport=transport,
         )
-        crawler = Crawler(conn, client=client)
+        crawler = Crawler(conn, client=client, ignore_robots=args.ignore_robots)
         signal.signal(signal.SIGINT, crawler.request_stop)
         signal.signal(signal.SIGTERM, crawler.request_stop)
         try:

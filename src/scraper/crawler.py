@@ -41,11 +41,13 @@ class Crawler:
         delay_range: tuple[float, float] = (3.0, 6.0),
         max_attempts: int = 4,
         client: Optional[ScraperClient] = None,
+        ignore_robots: bool = False,
     ):
         self.repo = Repository(db_conn)
         self.client = client or ScraperClient(delay_range=delay_range)
         self.max_attempts = max_attempts
         self.stop_requested = False
+        self.ignore_robots = ignore_robots
 
     def request_stop(self, *_args) -> None:
         self.stop_requested = True
@@ -150,76 +152,77 @@ class Crawler:
         stats = CrawlStats()
         reason = None
         status = "running"
-        robots_text, robots_status, _ = self.client.fetch(
-            "https://www.novelupdates.com/robots.txt"
-        )
-        if robots_status != 200 or not robots_text:
-            status, reason = "aborted", f"robots.txt unavailable (HTTP {robots_status})"
-            self.repo.update_scrape_run(
-                run_id,
-                pages_scraped=0,
-                pages_cached=0,
-                pages_discovered=0,
-                errors=1,
-                status=status,
-                stop_reason=reason,
-                finished=True,
+        if not self.ignore_robots:
+            robots_text, robots_status, _ = self.client.fetch(
+                "https://www.novelupdates.com/robots.txt"
             )
-            result = {
-                "event": "crawl_finished",
-                "run_id": run_id,
-                "status": status,
-                "reason": reason,
-                "network": 0,
-                "cache": 0,
-                "discovered": 0,
-                "errors": 1,
-                "queue": self.repo.queue_counts(),
-            }
-            print(json.dumps(result), flush=True)
-            return result
-        robots = urllib.robotparser.RobotFileParser()
-        robots.set_url("https://www.novelupdates.com/robots.txt")
-        robots.parse(robots_text.splitlines())
-        disallowed = next(
-            (
-                row[0]
-                for row in self.repo.conn.execute(
-                    """
-                    SELECT url FROM crawl_queue
-                    WHERE status = 'pending'
-                    ORDER BY priority DESC, id ASC
-                    """
+            if robots_status != 200 or not robots_text:
+                status, reason = "aborted", f"robots.txt unavailable (HTTP {robots_status})"
+                self.repo.update_scrape_run(
+                    run_id,
+                    pages_scraped=0,
+                    pages_cached=0,
+                    pages_discovered=0,
+                    errors=1,
+                    status=status,
+                    stop_reason=reason,
+                    finished=True,
                 )
-                if not robots.can_fetch(self.client.headers["User-Agent"], row[0])
-            ),
-            None,
-        )
-        if disallowed:
-            status, reason = "aborted", "robots.txt disallows a queued URL"
-            self.repo.update_scrape_run(
-                run_id,
-                pages_scraped=0,
-                pages_cached=0,
-                pages_discovered=0,
-                errors=1,
-                status=status,
-                stop_reason=reason,
-                finished=True,
+                result = {
+                    "event": "crawl_finished",
+                    "run_id": run_id,
+                    "status": status,
+                    "reason": reason,
+                    "network": 0,
+                    "cache": 0,
+                    "discovered": 0,
+                    "errors": 1,
+                    "queue": self.repo.queue_counts(),
+                }
+                print(json.dumps(result), flush=True)
+                return result
+            robots = urllib.robotparser.RobotFileParser()
+            robots.set_url("https://www.novelupdates.com/robots.txt")
+            robots.parse(robots_text.splitlines())
+            disallowed = next(
+                (
+                    row[0]
+                    for row in self.repo.conn.execute(
+                        """
+                        SELECT url FROM crawl_queue
+                        WHERE status = 'pending'
+                        ORDER BY priority DESC, id ASC
+                        """
+                    )
+                    if not robots.can_fetch(self.client.headers["User-Agent"], row[0])
+                ),
+                None,
             )
-            result = {
-                "event": "crawl_finished",
-                "run_id": run_id,
-                "status": status,
-                "reason": reason,
-                "network": 0,
-                "cache": 0,
-                "discovered": 0,
-                "errors": 1,
-                "queue": self.repo.queue_counts(),
-            }
-            print(json.dumps(result), flush=True)
-            return result
+            if disallowed:
+                status, reason = "aborted", "robots.txt disallows a queued URL"
+                self.repo.update_scrape_run(
+                    run_id,
+                    pages_scraped=0,
+                    pages_cached=0,
+                    pages_discovered=0,
+                    errors=1,
+                    status=status,
+                    stop_reason=reason,
+                    finished=True,
+                )
+                result = {
+                    "event": "crawl_finished",
+                    "run_id": run_id,
+                    "status": status,
+                    "reason": reason,
+                    "network": 0,
+                    "cache": 0,
+                    "discovered": 0,
+                    "errors": 1,
+                    "queue": self.repo.queue_counts(),
+                }
+                print(json.dumps(result), flush=True)
+                return result
         print(
             json.dumps(
                 {
@@ -382,9 +385,14 @@ def main() -> int:
         action="store_true",
         help="Refresh the full snapshot seed and discovery queue first",
     )
+    parser.add_argument(
+        "--ignore-robots",
+        action="store_true",
+        help="Skip robots.txt restriction checks",
+    )
     args = parser.parse_args()
-    if args.min_delay < 1 or args.max_delay < args.min_delay:
-        parser.error("require 1 <= min-delay <= max-delay")
+    if args.min_delay < 0.1 or args.max_delay < args.min_delay:
+        parser.error("require 0.1 <= min-delay <= max-delay")
 
     transport = None
     if args.transport == "browser" or args.setup_browser_session:
@@ -411,7 +419,7 @@ def main() -> int:
         delay_range=(args.min_delay, args.max_delay),
         transport=transport,
     )
-    crawler = Crawler(conn, client=client)
+    crawler = Crawler(conn, client=client, ignore_robots=args.ignore_robots)
     signal.signal(signal.SIGINT, crawler.request_stop)
     signal.signal(signal.SIGTERM, crawler.request_stop)
     try:
