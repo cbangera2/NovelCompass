@@ -1,3 +1,4 @@
+import math
 import sqlite3
 from typing import Dict, List, Set, Tuple
 from src.nlp.taxonomy import calculate_tag_idf, weighted_tag_similarity
@@ -109,7 +110,10 @@ class CandidateGenerator:
 
         scored = []
         for target_id, votes, is_mutual in cur.fetchall():
-            score = (1.5 if is_mutual else 1.0) * (1.0 + 0.2 * votes)
+            # Diminishing-returns logarithmic scaling prevents multi-hundred vote platforms
+            # from swamping smaller platforms while preserving vote confidence ranking.
+            vote_factor = 1.0 + math.log(1.0 + max(0, votes or 0))
+            score = (1.5 if is_mutual else 1.0) * vote_factor
             scored.append((target_id, score))
 
         scored.sort(key=lambda x: x[1], reverse=True)

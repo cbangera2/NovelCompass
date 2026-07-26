@@ -44,7 +44,12 @@ To allow items from multiple distinct upstream platforms (NovelUpdates and AniLi
   - Without normalization, sorting by `"popular"` when viewing combined media (or algorithm ranking weights) would cause AniList items to dominate NovelUpdates entries.
   - **Scaling Factor**: AniList `reading_list_count` is scaled by `0.10x` (`round(popularity * 0.10)`), bringing top items (e.g. *Attack on Titan*, *Death Note*) to ~25,000–30,000 readers, perfectly harmonized with top Light Novels (*Lord of the Mysteries*, *Solo Leveling*).
   - `rating_votes` maps directly to AniList `favourites` count (or `0.04x` popularity fallback).
-- Upserts cross-media recommendations into `novel_recommendations` and relations into `novel_relations`.
+- **Direct Recommendation User Votes Ingestion & Diminishing-Returns Scaling**:
+  - Ingests exact community recommendation upvote counts from AniList (`rec_node.rating` stored as `direct_recs.votes`, up to 300+ votes for top pairs).
+  - NovelUpdates user recommendation votes (typically 1–15 votes) and AniList recommendation upvotes are normalized in candidate generation using **Logarithmic Diminishing-Returns Scaling**:
+    $$\text{vote\_weight} = 1.0 + \ln(1.0 + \text{votes})$$
+  - Prevents high-volume vote platforms from overpowering niche platforms while maintaining strong consensus weighting (300 votes = $6.7\times$, 15 votes = $3.8\times$, 1 vote = $1.7\times$).
+- Upserts cross-media recommendations into `direct_recs` and relations into `related_series`.
 - Features rate-limited batching (0.5s pause per request) and JSON caching in `data/cache/anilist/`.
 
 ---
