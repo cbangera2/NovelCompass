@@ -32,7 +32,7 @@ jobs:
         run: python -m pip install --requirement requirements-ci.txt
 
       - name: Compile Python
-        run: python -m compileall -q src build_static_export.py scripts/create_ci_dataset.py
+        run: python -m compileall -q src build_static_export.py build_static_export_parallel.py scripts/create_ci_dataset.py
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -56,11 +56,11 @@ jobs:
       - name: Generate fixture static projection
         run: |
           python -m scripts.create_ci_dataset "${RUNNER_TEMP}/fixture.sqlite"
-          python build_static_export.py \
+          python build_static_export_parallel.py \
             --db "${RUNNER_TEMP}/fixture.sqlite" \
             --output web/public/data \
             --candidate-limit 10
-          python build_static_export.py \
+          python build_static_export_parallel.py \
             --output web/public/data \
             --verify-only
 

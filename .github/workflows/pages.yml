@@ -55,6 +55,11 @@ jobs:
           fi
           echo "mode=external" >> "${GITHUB_OUTPUT}"
 
+      - name: Fetch pre-built dataset from data repository
+        if: steps.static-source.outputs.mode == 'committed'
+        run: |
+          git clone --depth 1 https://github.com/cbangera2/novelcompass-data.git web/public/data
+
       - name: Download and verify database
         if: steps.static-source.outputs.mode == 'external'
         env:
