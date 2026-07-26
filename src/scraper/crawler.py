@@ -257,15 +257,16 @@ class Crawler:
                         item["id"], queue_status, f"HTTP {http_status}"
                     )
                     stats.errors += 1
-                    consecutive_blocks += 1
-                    if consecutive_blocks >= 3:
-                        status = "partial"
-                        reason = (
-                            "authentication or anti-bot challenge"
-                            if http_status in {401, 403}
-                            else "server rate limit"
-                        )
-                        break
+                    if item["type"] == "novel":
+                        consecutive_blocks += 1
+                        if consecutive_blocks >= 3:
+                            status = "partial"
+                            reason = (
+                                "authentication or anti-bot challenge"
+                                if http_status in {401, 403}
+                                else "server rate limit"
+                            )
+                            break
                     continue
                 consecutive_blocks = 0
                 if not html_text or http_status != 200:
