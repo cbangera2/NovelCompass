@@ -4,9 +4,9 @@ export function Button({ className = '', variant = 'default', ...props }: Button
   return <button className={`ui-button ui-button-${variant} ${className}`.trim()} {...props} />;
 }
 
-export function Checkbox({ label, description, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { label: string; description?: string }) {
+export function Checkbox({ label, description, title, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { label: string; description?: string }) {
   return (
-    <label className="ui-checkbox">
+    <label className="ui-checkbox" title={title || description}>
       <input type="checkbox" {...props} />
       <span className="ui-checkbox-mark" aria-hidden="true" />
       <span><strong>{label}</strong>{description && <small>{description}</small>}</span>

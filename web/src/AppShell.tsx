@@ -337,7 +337,8 @@ function GlobalNovelSearch({
     localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(next));
   };
 
-  const browseUrl = `${import.meta.env.BASE_URL}?view=browse&q=${encodeURIComponent(query.trim())}`;
+  const typesParam = !isAllSelected && selectedTypes.length > 0 ? `&types=${encodeURIComponent(selectedTypes.join(','))}` : '';
+  const browseUrl = `${import.meta.env.BASE_URL}?view=browse&q=${encodeURIComponent(query.trim())}${typesParam}`;
   const hasPanelContent = loading || query.trim().length >= 2 || recent.length > 0;
   const searchPanel = (
     <div className="shell-search-panel" ref={rootRef}>

@@ -2,7 +2,9 @@ export const DISCOVER_DEFAULTS = {
   hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
   requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
   minYear: 0, maxYear: 0, includeTagsText: '', excludeTagsText: '', tagWeight: .8,
-  directRecWeight: 1.2, listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60
+  directRecWeight: 1.2, listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60,
+  types: '',
+  genreStates: {} as Record<string, 'include' | 'exclude'>
 };
 
 export type DiscoverRouteState = typeof DISCOVER_DEFAULTS & {
@@ -27,6 +29,7 @@ export function parseDiscoverRoute(params: URLSearchParams, fallback: DiscoverRo
     if (value && token[0] === '-') genreStates[value] = 'exclude';
   });
   const seed = numberValue(params, 'seed', 0, 1);
+  const typesParam = params.get('types') || params.get('media') || params.get('media_type');
   return {
     ...fallback,
     seed: seed || undefined,
@@ -50,7 +53,8 @@ export function parseDiscoverRoute(params: URLSearchParams, fallback: DiscoverRo
     listWeight: numberValue(params, 'wl', fallback.listWeight, 0, 3),
     structuralWeight: numberValue(params, 'ws', fallback.structuralWeight, 0, 3),
     hiddenGemStrength: numberValue(params, 'wh', fallback.hiddenGemStrength, 0, 1),
-    maxResults: numberValue(params, 'n', fallback.maxResults, 1, 100)
+    maxResults: numberValue(params, 'n', fallback.maxResults, 1, 100),
+    types: typesParam !== null ? typesParam : fallback.types
   };
 }
 
@@ -65,17 +69,20 @@ export function discoverSearchParams(state: DiscoverRouteState): URLSearchParams
   set('xb', state.excludeBL, false); set('xy', state.excludeYuri, false); set('done', state.requireCompleted, false);
   set('lang', state.language, ''); set('r', state.minRating, 0); set('v', state.minRatingVotes, 0);
   set('mr', state.maxReaders, 0); set('y0', state.minYear, 0); set('y1', state.maxYear, 0);
-  const genres = Object.entries(state.genreStates).sort(([a], [b]) => a.localeCompare(b))
+  const genres = Object.entries(state.genreStates || {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([name, value]) => `${value === 'include' ? '+' : '-'}${name}`).join(',');
   if (genres) params.set('g', genres);
   set('ti', state.includeTagsText.trim(), ''); set('tx', state.excludeTagsText.trim(), '');
   set('wt', state.tagWeight, DISCOVER_DEFAULTS.tagWeight); set('wd', state.directRecWeight, DISCOVER_DEFAULTS.directRecWeight);
   set('wl', state.listWeight, DISCOVER_DEFAULTS.listWeight); set('ws', state.structuralWeight, DISCOVER_DEFAULTS.structuralWeight);
   set('wh', state.hiddenGemStrength, DISCOVER_DEFAULTS.hiddenGemStrength); set('n', state.maxResults, DISCOVER_DEFAULTS.maxResults);
+  if (state.types) params.set('types', state.types);
   return params;
 }
 
 export function stableRouteUrl(params: URLSearchParams): string {
   const sorted = new URLSearchParams([...params.entries()].sort(([a], [b]) => a.localeCompare(b)));
-  return `${window.location.pathname}?${sorted.toString()}${window.location.hash}`;
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  return `${pathname}?${sorted.toString()}${hash}`;
 }

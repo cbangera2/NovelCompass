@@ -21,7 +21,30 @@ const LONG_LABELS: Record<MediaTypeChoice, string> = {
   anime: 'Anime',
 };
 
-export function getSelectedMediaTypes(): MediaTypeChoice[] {
+export function parseMediaTypesFromUrl(searchOrParams?: string | URLSearchParams): MediaTypeChoice[] | null {
+  try {
+    const params = typeof searchOrParams === 'string'
+      ? new URLSearchParams(searchOrParams)
+      : searchOrParams || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null);
+    if (!params) return null;
+    const raw = params.get('types') || params.get('media') || params.get('media_type');
+    if (!raw) return null;
+    if (raw === 'all') return [...ALL_TYPES];
+    const tokens = raw.split(',').map((t) => t.trim().toLowerCase());
+    const clean = tokens.filter((t): t is MediaTypeChoice => t === 'novel' || t === 'manga' || t === 'anime');
+    if (clean.length > 0) {
+      // Remove duplicates while preserving order
+      return Array.from(new Set(clean));
+    }
+  } catch {
+    // fallback
+  }
+  return null;
+}
+
+export function getSelectedMediaTypes(searchOrParams?: string | URLSearchParams): MediaTypeChoice[] {
+  const fromUrl = parseMediaTypesFromUrl(searchOrParams);
+  if (fromUrl) return fromUrl;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [...ALL_TYPES];
@@ -41,8 +64,16 @@ export function getSelectedMediaTypes(): MediaTypeChoice[] {
 export function setSelectedMediaTypes(types: MediaTypeChoice[]): void {
   const clean = types.filter((t) => ALL_TYPES.includes(t));
   const next = clean.length > 0 ? clean : [...ALL_TYPES];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: next }));
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    }
+  } catch {
+    // ignore storage restrictions
+  }
+  if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: next }));
+  }
 }
 
 export function toggleMediaType(type: MediaTypeChoice): MediaTypeChoice[] {

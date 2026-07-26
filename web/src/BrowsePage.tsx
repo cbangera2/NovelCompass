@@ -13,13 +13,13 @@ import { novelPageUrl } from './novelLinks';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
-import { useMediaFilterState } from './mediaFilterState';
+import { parseMediaTypesFromUrl, useMediaFilterState, MediaTypeChoice } from './mediaFilterState';
 import { Palette, Film } from 'lucide-react';
 
 const PAGE_SIZE = 24;
 
 export default function BrowsePage(): JSX.Element {
-  const { selectedTypes, toggleType, isAllSelected, scopeSentence } = useMediaFilterState();
+  const { selectedTypes, toggleType, setTypes, isAllSelected, scopeSentence } = useMediaFilterState();
   const { mode: dataMode } = useDataModePreference();
   const initialParams = new URLSearchParams(window.location.search);
   const saved = loadFilterSnapshot('browse', {
@@ -151,6 +151,11 @@ export default function BrowsePage(): JSX.Element {
     loadRequestedRef.current = false;
   };
 
+  const handleToggleFormat = (type: MediaTypeChoice) => {
+    window.history.pushState(null, '', window.location.href);
+    resetPage(() => toggleType(type));
+  };
+
   const requestNextPage = () => {
     if (loading || !hasMore || loadRequestedRef.current) return;
     loadRequestedRef.current = true;
@@ -195,8 +200,11 @@ export default function BrowsePage(): JSX.Element {
     Object.entries(values).forEach(([key, value]) => {
       if (value && value !== 'desc' && value !== 'grid') params.set(key, value === true ? '1' : String(value));
     });
+    if (!isAllSelected && selectedTypes.length > 0) {
+      params.set('types', selectedTypes.join(','));
+    }
     window.history.replaceState(null, '', stableRouteUrl(params));
-  }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density]);
+  }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density, selectedTypes, isAllSelected]);
 
   useEffect(() => {
     const restore = () => {
@@ -216,10 +224,12 @@ export default function BrowsePage(): JSX.Element {
       setIncludeGenres(text('include_genres')); setExcludeGenres(text('exclude_genres'));
       setIncludeTags(text('include_tags')); setExcludeTags(text('exclude_tags'));
       setExcludeLibrary(text('exclude_library') === '1'); setPage(1); setBatchError(''); loadRequestedRef.current = false;
+      const mediaTypes = parseMediaTypesFromUrl(params);
+      if (mediaTypes) setTypes(mediaTypes);
     };
     window.addEventListener('popstate', restore);
     return () => window.removeEventListener('popstate', restore);
-  }, []);
+  }, [setTypes]);
 
   const browseRequest = () => ({
     query, sort, language, author, genre, tag,
@@ -304,7 +314,7 @@ export default function BrowsePage(): JSX.Element {
           <button
             type="button"
             className={`segmented-pill ${selectedTypes.includes('novel') ? 'active' : ''}`}
-            onClick={() => resetPage(() => toggleType('novel'))}
+            onClick={() => handleToggleFormat('novel')}
             title="Toggle Light Novels & Web Novels"
           >
             <BookOpen size={14} /> Novels
@@ -312,7 +322,7 @@ export default function BrowsePage(): JSX.Element {
           <button
             type="button"
             className={`segmented-pill ${selectedTypes.includes('manga') ? 'active' : ''}`}
-            onClick={() => resetPage(() => toggleType('manga'))}
+            onClick={() => handleToggleFormat('manga')}
             title="Toggle Manga & Comics"
           >
             <Palette size={14} /> Manga
@@ -320,7 +330,7 @@ export default function BrowsePage(): JSX.Element {
           <button
             type="button"
             className={`segmented-pill ${selectedTypes.includes('anime') ? 'active' : ''}`}
-            onClick={() => resetPage(() => toggleType('anime'))}
+            onClick={() => handleToggleFormat('anime')}
             title="Toggle Anime"
           >
             <Film size={14} /> Anime

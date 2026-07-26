@@ -45,7 +45,7 @@ import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
 })));
-import { useMediaFilterState } from './mediaFilterState';
+import { parseMediaTypesFromUrl, useMediaFilterState } from './mediaFilterState';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 import { discoverSearchParams, parseDiscoverRoute, stableRouteUrl } from './routeState';
 
@@ -108,13 +108,15 @@ export default function App(): JSX.Element {
     includeOtherFormats,
     setIncludeOtherFormats,
     isAllSelected,
+    setTypes,
   } = useMediaFilterState();
   const savedFilters = loadFilterSnapshot('discover', {
     hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
     requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
     minYear: 0, maxYear: 0, genreStates: {} as Record<string, 'include' | 'exclude'>,
     includeTagsText: '', excludeTagsText: '', tagWeight: .8, directRecWeight: 1.2,
-    listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60
+    listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60,
+    types: ''
   });
   const initialRoute = parseDiscoverRoute(new URLSearchParams(window.location.search), {
     ...savedFilters,
@@ -209,13 +211,14 @@ export default function App(): JSX.Element {
         excludeYuri, requireCompleted, language, minRating, minRatingVotes, maxReaders, minYear, maxYear,
         genreStates, includeTagsText, excludeTagsText, tagWeight, directRecWeight, listWeight,
         structuralWeight, hiddenGemStrength, maxResults,
+        types: isAllSelected ? '' : selectedTypes.join(','),
       });
       window.history.replaceState(null, '', stableRouteUrl(params));
     }, 300);
     return () => window.clearTimeout(timer);
   }, [selectedNovel?.id, forYouMode, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
     minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
-    tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
+    tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults, selectedTypes, isAllSelected]);
 
   useEffect(() => {
     let cancelled = false;
@@ -500,6 +503,10 @@ export default function App(): JSX.Element {
       setIncludeTagsText(route.includeTagsText); setExcludeTagsText(route.excludeTagsText);
       setTagWeight(route.tagWeight); setDirectRecWeight(route.directRecWeight); setListWeight(route.listWeight);
       setStructuralWeight(route.structuralWeight); setHiddenGemStrength(route.hiddenGemStrength); setMaxResults(route.maxResults);
+      if (route.types !== undefined) {
+        const mediaTypes = parseMediaTypesFromUrl(route.types ? `types=${encodeURIComponent(route.types)}` : '');
+        if (mediaTypes) setTypes(mediaTypes);
+      }
       let seed = getDefaultSeed(selectedTypes);
       if (route.seed) {
         const detail = await dataSource.getNovel(route.seed).catch(() => null);
@@ -515,7 +522,7 @@ export default function App(): JSX.Element {
     window.addEventListener('popstate', restore);
     return () => window.removeEventListener('popstate', restore);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataSource]);
+  }, [dataSource, setTypes]);
 
   useEffect(() => {
     if (!autoRefreshReadyRef.current || !dataSource) return;
@@ -913,20 +920,12 @@ export default function App(): JSX.Element {
         </div>
         <div className="filter-basics">
           <FieldGroup label="Show">
-            {profile && (
-              <Checkbox
-                label="Exclude library IDs"
-                description="Drops matched library + Not-for-me from ranking (not just the UI list). Unmatched titles still cannot be excluded."
-                checked={hideLibraryTitles}
-                onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)}
-              />
-            )}
             <Checkbox
-              label="For You (multi-seed)"
-              description={
+              label="For You"
+              title={
                 profile
-                  ? 'Merge recs from your top rated/completed/loved seeds. Works offline on static Pages via rec shards.'
-                  : 'Import a profile first.'
+                  ? 'Merge recs from your top rated, completed, and loved seeds'
+                  : 'Import a profile first'
               }
               checked={forYouMode}
               disabled={!profile}
@@ -941,19 +940,27 @@ export default function App(): JSX.Element {
                 }
               }}
             />
-            <Checkbox label="Hidden gems" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.currentTarget.checked)} />
-            <Checkbox label="Completed" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.currentTarget.checked)} />
+            <Checkbox label="Hidden gems" title="Rating ≥ 4.2 with lower reader count" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.currentTarget.checked)} />
+            <Checkbox label="Completed" title="Finished / fully translated titles" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.currentTarget.checked)} />
             <Checkbox
-              label="Include other formats"
-              description={
+              label="Cross-format"
+              title={
                 isAllSelected
-                  ? 'All formats are already in scope via the format switcher.'
-                  : 'Allow recommendations outside the formats selected in the sidebar.'
+                  ? 'All formats are already in scope'
+                  : 'Allow recommendations outside the formats selected in the sidebar'
               }
               checked={includeOtherFormats}
               disabled={isAllSelected}
               onChange={(e) => setIncludeOtherFormats(e.currentTarget.checked)}
             />
+            {profile && (
+              <Checkbox
+                label="Exclude library"
+                title="Drops matched library + Not-for-me titles from recommendation ranking"
+                checked={hideLibraryTitles}
+                onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)}
+              />
+            )}
           </FieldGroup>
           <FieldGroup label="Leave out">
             <Checkbox label="Harem" checked={excludeHarem} onChange={(e) => setExcludeHarem(e.currentTarget.checked)} />
