@@ -431,7 +431,7 @@ export default function App(): JSX.Element {
       window.requestAnimationFrame(() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
       await fetchRecommendations(novel);
     } catch (profileError: any) {
-      setError(profileError.message || 'Could not find similar novels for that profile title.');
+      setError(profileError.message || 'Could not find similar titles for that profile entry.');
       setLoading(false);
     }
   };
@@ -502,7 +502,7 @@ export default function App(): JSX.Element {
       if (detailRequestRef.current === requestId) setDetail(body);
     } catch (detailFetchError: any) {
       if (detailRequestRef.current === requestId) {
-        setDetailError(detailFetchError.message || 'Could not load this novel.');
+        setDetailError(detailFetchError.message || 'Could not load this title.');
       }
     } finally {
       if (detailRequestRef.current === requestId) setDetailLoading(false);
@@ -654,7 +654,7 @@ export default function App(): JSX.Element {
         <div>
           <div className="eyebrow">Relationship-first discovery</div>
           <h1>Find your next obsession.</h1>
-          <p>Start with a novel you loved. We trace shared tropes, reader recommendations, and curated lists to find what belongs beside it.</p>
+          <p>Start with a title you loved. We trace shared tropes, recommendations, and related works to find what belongs beside it.</p>
           <div className="dataset-controls">
             {dataSource && (
               <Badge tone={dataSource.mode === 'api' ? 'green' : 'violet'}>
@@ -684,7 +684,7 @@ export default function App(): JSX.Element {
         <form onSubmit={handleSearch} className="search-input-wrapper">
           <Search className="search-icon" size={20} aria-hidden="true" />
           <div className="search-field">
-            <label htmlFor="novel-search">Starting novel</label>
+            <label htmlFor="novel-search">Starting title</label>
             <input
               id="novel-search"
               type="text"
@@ -704,7 +704,7 @@ export default function App(): JSX.Element {
         </form>
 
         {showSuggestions && suggestions.length > 0 && (
-          <div className="suggestions" role="listbox" aria-label="Novel matches">
+          <div className="suggestions" role="listbox" aria-label="Title matches">
             {suggestions.map((novel) => {
               const badge = getMediaBadgeInfo(novel);
               return (
@@ -872,10 +872,10 @@ export default function App(): JSX.Element {
             </div>
             <div className="weight-grid">
               <WeightControl label="Shared tropes" hint="Tag overlap weighted by specificity" value={tagWeight} onChange={setTagWeight} />
-              <WeightControl label="Direct recommendations" hint="Novel-to-novel human votes" value={directRecWeight} onChange={setDirectRecWeight} />
+              <WeightControl label="Direct recommendations" hint="Title-to-title human votes" value={directRecWeight} onChange={setDirectRecWeight} />
               <WeightControl label="Curated lists" hint="Co-occurrence on recommendation lists" value={listWeight} onChange={setListWeight} />
-              <WeightControl label="Author & related series" hint="Same author, sequels, shared universe" value={structuralWeight} onChange={setStructuralWeight} />
-              <WeightControl label="Hidden-gem strength" hint="How strongly to favor lower readership" value={hiddenGemStrength} onChange={setHiddenGemStrength} max={1} />
+              <WeightControl label="Author & related series" hint="Same creator, sequels, shared universe" value={structuralWeight} onChange={setStructuralWeight} />
+              <WeightControl label="Hidden-gem strength" hint="How strongly to favor lower list counts" value={hiddenGemStrength} onChange={setHiddenGemStrength} max={1} />
             </div>
           </section>
         </div>
@@ -888,7 +888,7 @@ export default function App(): JSX.Element {
           <Card className="results-heading">
             <CoverImage src={data.seed_novel.cover_url} alt="" variant="seed" />
             <div className="results-heading-copy">
-              <span className="eyebrow">Based on your starting novel</span>
+              <span className="eyebrow">Based on your starting title</span>
               <div className="seed-title-row">
                 <h2><a href={novelPageUrl(data.seed_novel.id, undefined, data.seed_novel.media_type)}>
                   {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
@@ -1016,7 +1016,9 @@ export default function App(): JSX.Element {
                               ['', 'Add'],
                               ['reading', 'Reading'],
                               ['completed', 'Completed'],
-                              ['plan_to_read', 'Plan']
+                              ['plan_to_read', 'Plan'],
+                              ['paused', 'Paused'],
+                              ['dropped', 'Dropped'],
                             ] as const).map(([status, label]) => (
                               <Menu.Item key={status || 'add'} className="reading-menu-item"
                                 onClick={() => setReadingStatus(rec, status)}>
@@ -1110,14 +1112,14 @@ function NovelDetailDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={detail ? 'novel-detail-title' : undefined}
-        aria-label={detail ? undefined : 'Novel details'}
+        aria-label={detail ? undefined : 'Title details'}
         aria-busy={loading}
       >
-        <button type="button" className="detail-close" onClick={onClose} aria-label="Close novel details" autoFocus>
+        <button type="button" className="detail-close" onClick={onClose} aria-label="Close title details" autoFocus>
           <X size={20} aria-hidden="true" />
         </button>
 
-        {loading && <div className="detail-state"><Sparkles size={22} aria-hidden="true" /> Loading novel details…</div>}
+        {loading && <div className="detail-state"><Sparkles size={22} aria-hidden="true" /> Loading title details…</div>}
         {error && <div className="detail-state detail-error">{error}</div>}
 
         {detail && (
@@ -1127,7 +1129,7 @@ function NovelDetailDialog({
               <div className="detail-heading">
                 <span className="eyebrow">{detail.language
                   ? <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a>
-                  : 'Web novel'}{detail.year ? ` · ${detail.year}` : ''}</span>
+                  : 'Catalog title'}{detail.year ? ` · ${detail.year}` : ''}</span>
                 <h2 id="novel-detail-title">{displayNovelTitle(detail.title, detail.associated_names, titlePreference)}</h2>
                 <p className="detail-author">{detail.author
                   ? <a href={browseFacetUrl('author', detail.author)}>{detail.author}</a>
@@ -1152,8 +1154,12 @@ function NovelDetailDialog({
                   <button type="button" className="detail-recommend-button" onClick={onRecommend}>
                     <Sparkles size={16} aria-hidden="true" /> Find recommendations like this
                   </button>
-                  <a href={detail.novelupdates_url} target="_blank" rel="noopener noreferrer">
-                    View on Novel Updates <ExternalLink size={15} aria-hidden="true" />
+                  <a
+                    href={detail.external_url || externalMediaUrl(detail.id, detail.source, detail.external_id, detail.media_type) || detail.novelupdates_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View on {sourceDisplayName(detail.source, detail.id)} <ExternalLink size={15} aria-hidden="true" />
                   </a>
                 </div>
               </div>
@@ -1174,7 +1180,7 @@ function NovelDetailDialog({
               )}
               {evidence.length > 0 && (
                 <section className="detail-section">
-                  <h3>Why it matched your starting novel</h3>
+                  <h3>Why it matched your starting title</h3>
                   <ul className="evidence-list detail-evidence">
                     {evidence.map((item, index) => (
                       <li key={index} className="evidence-item">

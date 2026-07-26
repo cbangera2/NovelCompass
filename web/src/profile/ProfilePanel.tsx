@@ -11,7 +11,9 @@ import { ImportPreview, LocalUserProfile, ParsedProfileFile, ProfileEntry, Readi
 const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
   completed: 'Completed',
-  plan_to_read: 'Plan to read'
+  plan_to_read: 'Plan to read',
+  dropped: 'Dropped',
+  paused: 'Paused',
 };
 
 export function ProfilePanel({
@@ -51,7 +53,9 @@ export function ProfilePanel({
   }, [dataset, onProfileChange, profile, source]);
 
   const statusCounts = useMemo(() => {
-    const counts: Record<ReadingStatus, number> = { reading: 0, completed: 0, plan_to_read: 0 };
+    const counts: Record<ReadingStatus, number> = {
+      reading: 0, completed: 0, plan_to_read: 0, dropped: 0, paused: 0,
+    };
     profile?.entries.forEach((entry) => { counts[entry.status] += 1; });
     return counts;
   }, [profile]);

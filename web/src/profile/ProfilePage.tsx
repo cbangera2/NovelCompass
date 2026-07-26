@@ -15,7 +15,9 @@ const ProfileAnalytics = lazy(() => import('./ProfileAnalytics'));
 const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
   completed: 'Completed',
-  plan_to_read: 'Plan to read'
+  plan_to_read: 'Plan to read',
+  dropped: 'Dropped',
+  paused: 'Paused',
 };
 
 function appUrl(params = ''): string {
@@ -100,7 +102,9 @@ export default function ProfilePage(): JSX.Element {
   }, [profile, source]);
 
   const counts = useMemo(() => {
-    const next: Record<ReadingStatus, number> = { reading: 0, completed: 0, plan_to_read: 0 };
+    const next: Record<ReadingStatus, number> = {
+      reading: 0, completed: 0, plan_to_read: 0, dropped: 0, paused: 0,
+    };
     profile?.entries.forEach((entry) => { next[entry.status] += 1; });
     return next;
   }, [profile]);
@@ -198,6 +202,7 @@ export default function ProfilePage(): JSX.Element {
             <div><strong>{counts.reading.toLocaleString()}</strong><span>Reading</span></div>
             <div><strong>{counts.completed.toLocaleString()}</strong><span>Completed</span></div>
             <div><strong>{counts.plan_to_read.toLocaleString()}</strong><span>Plan to read</span></div>
+            <div><strong>{(counts.dropped + counts.paused).toLocaleString()}</strong><span>Dropped / paused</span></div>
             <div><strong>{profile.entries.filter((entry) => entry.novel_id != null).length.toLocaleString()}</strong><span>Matched</span></div>
           </section>
 

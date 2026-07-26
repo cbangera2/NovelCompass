@@ -2,6 +2,7 @@ import { ChangeEvent, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { FileJson, FileText, FileUp, X } from 'lucide-react';
 import { createDataSource } from '../data';
+import { enrichAniListTitles, parseAniListGdprFile } from './anilistGdpr';
 import { parseProfileFile, PROFILE_PARSER_VERSION, withStatus } from './parser';
 import { resolveEntries } from './resolve';
 import { mergeProfiles, saveLocalProfile } from './store';
@@ -12,7 +13,11 @@ const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
   completed: 'Completed',
   plan_to_read: 'Plan to read',
+  dropped: 'Dropped',
+  paused: 'Paused',
 };
+
+type ImportMode = 'json' | 'html' | 'anilist';
 
 export function ProfileImportDialog({
   profile,
@@ -22,13 +27,14 @@ export function ProfileImportDialog({
   onImported?: (message: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<'json' | 'html'>('json');
+  const [mode, setMode] = useState<ImportMode>('json');
   const [files, setFiles] = useState<ParsedProfileFile[]>([]);
   const [entries, setEntries] = useState<ProfileEntry[]>([]);
   const [datasetVersion, setDatasetVersion] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const jsonInput = useRef<HTMLInputElement>(null);
+  const anilistInput = useRef<HTMLInputElement>(null);
 
   const finish = (text: string) => {
     setOpen(false);
@@ -56,14 +62,10 @@ export function ProfileImportDialog({
     }
   };
 
-  const prepareHtml = async (event: ChangeEvent<HTMLInputElement>) => {
-    const selected = [...(event.target.files || [])];
-    event.target.value = '';
-    if (!selected.length) return;
+  const prepareParsed = async (parsed: ParsedProfileFile[], statusMessage: string) => {
     setBusy(true);
-    setMessage('Parsing saved pages and matching titles…');
+    setMessage(statusMessage);
     try {
-      const parsed = await Promise.all(selected.map(parseProfileFile));
       const source = await createDataSource();
       const manifest = await source.getManifest();
       const resolved = await resolveEntries(parsed, source);
@@ -76,14 +78,52 @@ export function ProfileImportDialog({
     } catch (error) {
       setFiles([]);
       setEntries([]);
-      setMessage(error instanceof Error ? error.message : 'Those saved pages could not be imported.');
+      setMessage(error instanceof Error ? error.message : 'Those files could not be imported.');
     } finally {
       setBusy(false);
     }
   };
 
+  const prepareHtml = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = [...(event.target.files || [])];
+    event.target.value = '';
+    if (!selected.length) return;
+    setBusy(true);
+    setMessage('Parsing saved pages and matching titles…');
+    try {
+      const parsed = await Promise.all(selected.map(parseProfileFile));
+      await prepareParsed(parsed, 'Matching titles against the catalog…');
+    } catch (error) {
+      setFiles([]);
+      setEntries([]);
+      setMessage(error instanceof Error ? error.message : 'Those saved pages could not be imported.');
+      setBusy(false);
+    }
+  };
+
+  const prepareAniList = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    setMessage('Parsing AniList GDPR export and fetching titles…');
+    try {
+      const parsed = await parseAniListGdprFile(file);
+      const withTitles = {
+        ...parsed,
+        entries: await enrichAniListTitles(parsed.entries),
+      };
+      await prepareParsed([withTitles], 'Matching AniList IDs against the catalog…');
+    } catch (error) {
+      setFiles([]);
+      setEntries([]);
+      setMessage(error instanceof Error ? error.message : 'That AniList export could not be imported.');
+      setBusy(false);
+    }
+  };
+
   const changeStatus = async (index: number, status: ReadingStatus) => {
-    const next = files.map((file, fileIndex) => fileIndex === index ? withStatus(file, status) : file);
+    const next = files.map((file, fileIndex) => (fileIndex === index ? withStatus(file, status) : file));
     setFiles(next);
     setBusy(true);
     try {
@@ -99,9 +139,9 @@ export function ProfileImportDialog({
     }
   };
 
-  const commitHtml = async (importMode: 'replace' | 'merge') => {
+  const commitImport = async (importMode: 'replace' | 'merge') => {
     if (!files.length || !entries.length) return;
-    if (importMode === 'replace' && profile && !window.confirm('Replace your current local profile with this HTML import?')) return;
+    if (importMode === 'replace' && profile && !window.confirm('Replace your current local profile with this import?')) return;
     const incoming: LocalUserProfile = {
       profile_id: crypto.randomUUID(),
       parser_version: PROFILE_PARSER_VERSION,
@@ -119,12 +159,14 @@ export function ProfileImportDialog({
   };
 
   const matched = entries.filter((entry) => entry.novel_id != null).length;
+  const showPreview = files.length > 0 && (mode === 'html' || mode === 'anilist');
+  const isAniListMode = mode === 'anilist';
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger className="shell-import-trigger">
         <FileUp size={16} />
-        <span>Import profile<small>JSON backup or NovelUpdates HTML</small></span>
+        <span>Import profile<small>JSON, NovelUpdates HTML, or AniList GDPR</small></span>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="profile-backdrop" />
@@ -141,6 +183,9 @@ export function ProfileImportDialog({
             <button type="button" role="tab" aria-selected={mode === 'html'} onClick={() => setMode('html')}>
               <FileText size={20} /><span><strong>NovelUpdates HTML</strong><small>Import saved reading-list pages</small></span>
             </button>
+            <button type="button" role="tab" aria-selected={mode === 'anilist'} onClick={() => setMode('anilist')}>
+              <FileJson size={20} /><span><strong>AniList GDPR</strong><small>Import anilist_gdpr_data.json</small></span>
+            </button>
           </div>
 
           {mode === 'json' ? (
@@ -152,7 +197,7 @@ export function ProfileImportDialog({
               </button>
               <input ref={jsonInput} type="file" accept=".json,application/json" onChange={importBackup} hidden />
             </section>
-          ) : (
+          ) : mode === 'html' ? (
             <section className="profile-import-pane" role="tabpanel">
               <h3>Import saved NovelUpdates pages</h3>
               <p>Open each Reading, Completed, or Plan to Read category, wait for its table, then save the page. Select one or several HTML files here.</p>
@@ -161,26 +206,52 @@ export function ProfileImportDialog({
                 <input type="file" accept=".html,.htm,text/html" multiple onChange={prepareHtml} disabled={busy} hidden />
               </label>
               <p className="profile-import-note"><strong>Why no profile-link field?</strong> NovelUpdates pages cannot be fetched reliably from a static site because of browser cross-origin rules and bot protection. Saving the loaded page preserves a private, dependable import.</p>
-              {files.length > 0 && (
-                <div className="profile-import-preview">
-                  {files.map((file, index) => (
-                    <div key={file.fingerprint}>
-                      <span><strong>{file.filename}</strong><small>{file.entries.length} rows</small></span>
-                      <label>Status
-                        <select value={file.selected_status} onChange={(event) => changeStatus(index, event.target.value as ReadingStatus)}>
-                          {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                        </select>
-                      </label>
-                    </div>
-                  ))}
-                  <p>{entries.length} unique titles · {matched} matched · {entries.length - matched} unmatched</p>
-                  <div>
-                    {profile && <button type="button" onClick={() => commitHtml('merge')} disabled={busy}>Merge with profile</button>}
-                    <button type="button" className="profile-import-primary" onClick={() => commitHtml('replace')} disabled={busy}>Replace and save</button>
-                  </div>
-                </div>
-              )}
             </section>
+          ) : (
+            <section className="profile-import-pane" role="tabpanel">
+              <h3>Import AniList GDPR export</h3>
+              <p>
+                On AniList go to <strong>Settings → Account → Download Data</strong>, then choose the resulting
+                {' '}<code>anilist_gdpr_data.json</code> here. List status, scores, and progress are preserved locally.
+              </p>
+              <button type="button" className="profile-import-primary" disabled={busy} onClick={() => anilistInput.current?.click()}>
+                <FileUp size={16} /> Choose anilist_gdpr_data.json
+              </button>
+              <input ref={anilistInput} type="file" accept=".json,application/json" onChange={prepareAniList} hidden />
+              <p className="profile-import-note">
+                <strong>Matching note:</strong> AniList rows only include media IDs. Titles are fetched from AniList’s public API when online.
+                Catalog matches only succeed for titles already ingested into Novel Compass (popular sync / manual AniList sync).
+                Unmatched entries still save to your local profile for later.
+              </p>
+            </section>
+          )}
+
+          {showPreview && (
+            <div className="profile-import-preview">
+              {files.map((file, index) => (
+                <div key={file.fingerprint}>
+                  <span><strong>{file.filename}</strong><small>{file.entries.length} rows</small></span>
+                  {!isAniListMode && (
+                    <label>Status
+                      <select value={file.selected_status} onChange={(event) => changeStatus(index, event.target.value as ReadingStatus)}>
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              ))}
+              {isAniListMode && files[0]?.warnings?.map((warning) => (
+                <p key={warning} className="profile-import-note">{warning}</p>
+              ))}
+              <p>
+                {entries.length} unique titles · {matched} matched in catalog · {entries.length - matched} unmatched
+                {isAniListMode ? ' (still saved with AniList IDs)' : ''}
+              </p>
+              <div>
+                {profile && <button type="button" onClick={() => commitImport('merge')} disabled={busy}>Merge with profile</button>}
+                <button type="button" className="profile-import-primary" onClick={() => commitImport('replace')} disabled={busy}>Replace and save</button>
+              </div>
+            </div>
           )}
           {message && <p className="profile-import-message" role="status">{message}</p>}
         </Dialog.Popup>

@@ -50,7 +50,7 @@ import { useDataModePreference } from './dataModePreference';
 export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
 
 const NAV_ITEMS = [
-  { view: 'discover' as const, label: 'Discover', note: 'Find related novels', icon: Sparkles },
+  { view: 'discover' as const, label: 'Discover', note: 'Find related titles', icon: Sparkles },
   { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen },
   { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings },
   { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database },
@@ -339,8 +339,8 @@ function GlobalNovelSearch({
           ref={inputRef}
           type="search"
           value={query}
-          placeholder="Search novels…"
-          aria-label="Search the novel catalog"
+          placeholder="Search titles…"
+          aria-label="Search the catalog"
           aria-expanded={open}
           onFocus={() => setOpen(true)}
           onChange={(event) => {
@@ -370,11 +370,11 @@ function GlobalNovelSearch({
           <div className="shell-search-result-list">
             {loading && <p className="shell-search-state">Searching catalog…</p>}
             {!loading && query.trim().length >= 2 && results.length === 0 && (
-              <p className="shell-search-state">No matching novels</p>
+              <p className="shell-search-state">No matching titles</p>
             )}
             {!loading && query.trim().length < 2 && recent.length > 0 && (
               <p className="shell-search-heading">
-                <Clock3 size={13} /> Recent novels
+                <Clock3 size={13} /> Recent titles
               </p>
             )}
             {(query.trim().length >= 2 ? results : recent).map((novel) => {
@@ -400,7 +400,7 @@ function GlobalNovelSearch({
                         </span>
                       </span>
                     </div>
-                    <small>{novel.author || 'Catalog novel'}</small>
+                    <small>{novel.author || 'Catalog title'}</small>
                   </span>
                   <ArrowRight size={15} aria-hidden="true" />
                 </a>
@@ -423,7 +423,7 @@ function GlobalNovelSearch({
       <button
         className={mobile ? 'shell-mobile-search-trigger' : 'shell-compact-search-trigger'}
         type="button"
-        aria-label="Search novels"
+        aria-label="Search titles"
         aria-expanded={open}
         onClick={() => {
           setOpen((value) => !value);

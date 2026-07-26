@@ -106,6 +106,17 @@ export class ApiDataSource implements RecommendationDataSource {
     return result;
   }
 
+  async resolveNovelIds(ids: number[]): Promise<Map<number, NovelSearchResult>> {
+    const unique = [...new Set(ids.filter((id) => Number.isFinite(id)))];
+    if (!unique.length) return new Map();
+    const body = await apiFetch<{ results: NovelSearchResult[] }>('/api/resolve-ids', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: unique }),
+    }).catch(() => ({ results: [] }));
+    return new Map((body.results || []).map((novel) => [novel.id, novel]));
+  }
+
   getNovel(id: number): Promise<NovelDetail> {
     return apiFetch(`/api/novels/${id}`);
   }

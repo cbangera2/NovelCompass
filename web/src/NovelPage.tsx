@@ -40,7 +40,7 @@ export default function NovelPage(): JSX.Element {
   useEffect(() => {
     let cancelled = false;
     if (!Number.isInteger(novelId) || novelId <= 0) {
-      setError('This novel link is missing a valid catalog ID.');
+      setError('This title link is missing a valid catalog ID.');
       return;
     }
     Promise.all([createDataSource(dataMode), loadLocalProfile().catch(() => null)])
@@ -69,7 +69,7 @@ export default function NovelPage(): JSX.Element {
           : Promise.resolve();
         await Promise.all([relatedRequest, insightsRequest, relationshipRequest]);
       })
-      .catch((reason) => !cancelled && setError(reason.message || 'Could not load this novel.'));
+      .catch((reason) => !cancelled && setError(reason.message || 'Could not load this title.'));
     return () => { cancelled = true; };
   }, [dataMode, fromId, novelId]);
 
@@ -134,7 +134,7 @@ export default function NovelPage(): JSX.Element {
     setActiveSection(id);
   };
 
-  if (error) return <main className="novel-page-state"><Card><BookOpen /><h1>Novel unavailable</h1><p>{error}</p><DSButton as="a" href={import.meta.env.BASE_URL}>Return to Discover</DSButton></Card></main>;
+  if (error) return <main className="novel-page-state"><Card><BookOpen /><h1>Title unavailable</h1><p>{error}</p><DSButton as="a" href={import.meta.env.BASE_URL}>Return to Discover</DSButton></Card></main>;
   if (!detail || !source) return <main className="novel-page novel-page-loading" aria-busy="true"><Skeleton className="novel-hero-skeleton" /><Skeleton className="novel-content-skeleton" /></main>;
 
   return <main className="novel-page">
@@ -207,7 +207,7 @@ export default function NovelPage(): JSX.Element {
       </div>
     </section>
 
-    <nav className="novel-section-nav" aria-label="Novel sections">
+    <nav className="novel-section-nav" aria-label="Title sections">
       {([['overview', BookOpen, 'Overview'], ['insights', Library, 'Insights'], ['relationship', MessageSquare, 'Relationships']] as const)
         .map(([id, Icon, label]) => <button key={id} className={activeSection === id ? 'active' : ''}
           aria-current={activeSection === id ? 'location' : undefined} onClick={() => goToSection(id)}>
@@ -219,7 +219,7 @@ export default function NovelPage(): JSX.Element {
         <header className="novel-section-heading"><span>01</span><div><h2>Overview</h2><p>Story details, genres, and themes.</p></div></header>
         <div className="novel-content-grid">
           <Card className="novel-about">
-            <h2>About this novel</h2>
+            <h2>About this title</h2>
             <p>{detail.synopsis || 'A synopsis is not available in this catalog snapshot.'}</p>
             {detail.associated_names.length > 0 && (detail.associated_names.length <= 4
               ? <div className="novel-aliases"><strong>Alternative titles</strong><ul>{detail.associated_names.map((name) => <li key={name}>{name}</li>)}</ul></div>
@@ -241,7 +241,7 @@ export default function NovelPage(): JSX.Element {
         <header className="novel-section-heading"><span>03</span><div><h2>Relationships</h2><p>Recommendation evidence and related directions to explore.</p></div></header>
         {origin && <RelationshipPanel relationship={relationship} origin={origin} current={detail} />}
         {related.length > 0 && <section className="novel-related">
-          <div className="section-heading"><div><span>Continue exploring</span><h2>Related novels</h2></div><a href={`${import.meta.env.BASE_URL}?seed=${novelId}`}>See full recommendations <Search size={15} /></a></div>
+          <div className="section-heading"><div><span>Continue exploring</span><h2>Related titles</h2></div><a href={`${import.meta.env.BASE_URL}?seed=${novelId}`}>See full recommendations <Search size={15} /></a></div>
           <p className="related-definition">Ranked from the current recommendation candidate pool. Percent match is normalized within this seed’s result set; signal ranks show which evidence channels surfaced each title.</p>
           <div className="novel-related-grid">{related.slice(0, 10).map((item) =>
             <a className="related-novel" key={item.target_id} href={novelPageUrl(item.target_id, novelId)}>
@@ -269,7 +269,7 @@ function topSignals(item: Recommendation): string[] {
 function RelationshipPanel({ relationship, origin, current }: {
   relationship: Recommendation | null; origin: NovelDetail | null; current: NovelDetail;
 }) {
-  if (!origin) return <Card className="relationship-empty"><Sparkles /><h2>Why does this novel connect?</h2><p>Open this title from a recommendation to see the exact evidence connecting it to your starting novel.</p><DSButton as="a" href={`${import.meta.env.BASE_URL}?seed=${current.id}`}>Use as a starting point</DSButton></Card>;
+  if (!origin) return <Card className="relationship-empty"><Sparkles /><h2>Why does this title connect?</h2><p>Open this title from a recommendation to see the exact evidence connecting it to your starting title.</p><DSButton as="a" href={`${import.meta.env.BASE_URL}?seed=${current.id}`}>Use as a starting point</DSButton></Card>;
   if (!relationship) return <Card className="relationship-empty"><h2>Relationship to {origin.title}</h2><p>This title is outside the saved candidate pool, so detailed ranking evidence is not available.</p></Card>;
   const ranks = Object.entries(relationship.channel_ranks).filter(([, rank]) => Number.isFinite(rank));
   const maxRank = Math.max(1, ...ranks.map(([, rank]) => rank));
@@ -278,7 +278,7 @@ function RelationshipPanel({ relationship, origin, current }: {
     <div className="relationship-layout">
       <div><h3>Why it surfaced</h3><ul>{relationship.evidence_bullets.map((item) => <li key={item}><Check size={15} />{item}</li>)}</ul>
         {relationship.shared_tags.length > 0 && <div className="shared-facets">{relationship.shared_tags.slice(0, 12).map((tag) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>)}</div>}</div>
-      <div className="rank-chart"><h3>Signal strength</h3><p>Lower rank means this signal connected the novels more strongly.</p>{ranks.map(([channel, rank]) =>
+      <div className="rank-chart"><h3>Signal strength</h3><p>Lower rank means this signal connected the titles more strongly.</p>{ranks.map(([channel, rank]) =>
         <div key={channel}><span>{CHANNEL_LABELS[channel] || channel.replace(/_/g, ' ')}</span><div><i style={{ width: `${Math.max(8, 100 - ((rank - 1) / maxRank) * 88)}%` }} /></div><b>#{rank}</b></div>)}</div>
     </div>
   </Card>;

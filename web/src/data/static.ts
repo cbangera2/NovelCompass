@@ -374,6 +374,16 @@ export class StaticDataSource implements RecommendationDataSource {
     return result;
   }
 
+  async resolveNovelIds(ids: number[]): Promise<Map<number, NovelSearchResult>> {
+    await this.loadCatalog();
+    const result = new Map<number, NovelSearchResult>();
+    for (const id of ids) {
+      const card = this.cards.get(id);
+      if (card) result.set(id, card);
+    }
+    return result;
+  }
+
   async getNovel(id: number): Promise<NovelDetail> {
     await this.loadBootstrapCatalog();
     if (!this.cards.has(id)) await this.loadCatalog();
@@ -660,7 +670,7 @@ export class StaticDataSource implements RecommendationDataSource {
 
   async getRandomNovel(request: BrowseRequest, randomValue = Math.random()): Promise<BrowseNovel> {
     const count = await this.browseNovels({ ...request, page: 1, page_size: 1 });
-    if (!count.total) throw new DataSourceError('No novels match the active filters.');
+    if (!count.total) throw new DataSourceError('No titles match the active filters.');
     const page = Math.min(count.total, Math.floor(Math.max(0, Math.min(0.999999, randomValue)) * count.total) + 1);
     const result = await this.browseNovels({ ...request, page, page_size: 1 });
     if (!result.items[0]) throw new DataSourceError('The selected novel is unavailable.');

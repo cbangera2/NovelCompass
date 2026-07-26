@@ -130,7 +130,7 @@ export default function BrowsePage(): JSX.Element {
         setTagSupported(result.capabilities.tags);
       } catch (reason: any) {
         if (requestId === requestRef.current) {
-          const message = reason.message || 'Could not browse novels.';
+          const message = reason.message || 'Could not browse the catalog.';
           if (page > 1) setBatchError(message);
           else setError(message);
         }
@@ -258,7 +258,7 @@ export default function BrowsePage(): JSX.Element {
       const novel = await source.getRandomNovel(browseRequest());
       window.location.href = novelPageUrl(novel.id);
     } catch (reason: any) {
-      setError(reason.message || 'Could not choose a random novel.');
+      setError(reason.message || 'Could not choose a random title.');
     } finally {
       setLuckyLoading(false);
     }
@@ -391,7 +391,7 @@ export default function BrowsePage(): JSX.Element {
 
       {!tagSupported && <p className="browse-notice">Tag filtering is unavailable in this static snapshot, so the selected tag was not applied.</p>}
       <div className="browse-results-header">
-        <CardHeader title="Novels" eyebrow="Catalog results" description={hasLoaded ? `${total.toLocaleString()} matches in this snapshot` : 'Loading catalog status'}
+        <CardHeader title="Titles" eyebrow="Catalog results" description={hasLoaded ? `${total.toLocaleString()} matches in this snapshot` : 'Loading catalog status'}
           action={<div className="browse-density" aria-label="Result density">
             <DSButton variant={density === 'grid' ? 'primary' : 'ghost'} onClick={() => setDensity('grid')} aria-label="Grid view"><LayoutGrid size={16} /></DSButton>
             <DSButton variant={density === 'list' ? 'primary' : 'ghost'} onClick={() => setDensity('list')} aria-label="List view"><List size={16} /></DSButton>
@@ -402,16 +402,16 @@ export default function BrowsePage(): JSX.Element {
         {items.map((novel) => <BrowseCard key={novel.id} novel={novel} />)}
         {loading && page === 1 && Array.from({ length: 6 }, (_, index) => <Card className="browse-card browse-card-skeleton" key={index}><Skeleton /><div><Skeleton /><Skeleton /><Skeleton /></div></Card>)}
       </section>
-      {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No novels match these filters.</p>}
+      {!loading && hasLoaded && !items.length && !error && <p className="browse-empty">No titles match these filters.</p>}
       <div ref={sentinelRef} className="browse-sentinel" aria-hidden="true" />
       <div className="browse-page-status" role="status" aria-live="polite">
-        {loading && <div className="browse-loading"><span /> Loading {page > 1 ? 'more novels' : 'catalog'}…</div>}
+        {loading && <div className="browse-loading"><span /> Loading {page > 1 ? 'more titles' : 'catalog'}…</div>}
         {batchError && <div className="browse-batch-error"><span>{batchError}</span><DSButton onClick={retryBatch}>Retry loading more</DSButton></div>}
         {hasMore && !loading && !batchError && !observerSupported && (
           <div className="browse-pagination"><DSButton className="browse-more" onClick={requestNextPage}>Load {PAGE_SIZE} more</DSButton><span>Showing {items.length.toLocaleString()} of {total.toLocaleString()}</span></div>
         )}
-        {hasMore && observerSupported && !batchError && <span className="sr-only">More novels load automatically as you scroll.</span>}
-        {hasLoaded && !hasMore && items.length > 0 && <p className="browse-end">End of results · {items.length.toLocaleString()} novels shown</p>}
+        {hasMore && observerSupported && !batchError && <span className="sr-only">More titles load automatically as you scroll.</span>}
+        {hasLoaded && !hasMore && items.length > 0 && <p className="browse-end">End of results · {items.length.toLocaleString()} titles shown</p>}
       </div>
 
     </main>

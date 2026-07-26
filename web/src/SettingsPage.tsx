@@ -17,7 +17,7 @@ export default function SettingsPage(): JSX.Element {
       <header>
         <span className="eyebrow">Local preferences</span>
         <h1>Settings</h1>
-        <p>Appearance and display choices stay in this browser and apply to Browse, recommendations, profiles, and novel details.</p>
+        <p>Appearance and display choices stay in this browser and apply to Browse, recommendations, profiles, and title details.</p>
       </header>
       <Card className="settings-card">
         <CardHeader title="Appearance" description="Follow your device or choose a fixed theme." action={<Sun size={19} />} />
@@ -38,7 +38,7 @@ export default function SettingsPage(): JSX.Element {
         <div className="settings-choice-grid title-choices">
           {(['discover', 'browse'] as const).map((value) => <button key={value} className={homeView === value ? 'selected' : ''}
             aria-pressed={homeView === value} onClick={() => { setHomeView(value); saveNavigationPreferences(value); }}>
-            <span><strong>{value === 'discover' ? 'Discover home' : 'Browse home'}</strong><small>{value === 'discover' ? 'Start from a novel relationship search' : 'Start from the full catalog'}</small></span>
+            <span><strong>{value === 'discover' ? 'Discover home' : 'Browse home'}</strong><small>{value === 'discover' ? 'Start from a title relationship search' : 'Start from the full catalog'}</small></span>
           </button>)}
         </div>
         <label className="settings-toggle"><input type="checkbox" checked={rememberFilters}
@@ -49,7 +49,7 @@ export default function SettingsPage(): JSX.Element {
         {resetMessage && <p className="settings-disclosure" role="status">{resetMessage}</p>}
       </Card>
       <Card className="settings-card">
-        <CardHeader title="Novel titles" description="Choose how titles are displayed when the active dataset provides associated names." action={<Type size={19} />} />
+        <CardHeader title="Title display" description="Choose how titles are displayed when the active dataset provides associated names." action={<Type size={19} />} />
         <div className="settings-choice-grid title-choices">
           <button className={settings.titlePreference === 'catalog' ? 'selected' : ''} onClick={() => updateSettings({ titlePreference: 'catalog' })} aria-pressed={settings.titlePreference === 'catalog'}>
             <span><strong>Catalog title</strong><small>Use the primary title from the active snapshot</small></span>

@@ -1,4 +1,4 @@
-export type ReadingStatus = 'reading' | 'completed' | 'plan_to_read';
+export type ReadingStatus = 'reading' | 'completed' | 'plan_to_read' | 'dropped' | 'paused';
 
 export interface ProfileEntry {
   novel_id?: number;

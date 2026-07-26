@@ -7,7 +7,7 @@ import { novelPageUrl } from './novelLinks';
 import { Badge, Card } from './design-system';
 import './novel-insights.css';
 
-const LABELS = { rating: 'Rating', rating_votes: 'Rating votes', readers: 'Readers' };
+const LABELS = { rating: 'Rating', rating_votes: 'Rating votes', readers: 'List count' };
 const NovelCohortChart = lazy(() => import('./NovelCohortChart'));
 
 export function NovelInsightsPanel({
@@ -53,7 +53,7 @@ export function NovelInsightsPanel({
         <BarChart3 />
         <div>
           <h3 id={`insights-${novelId}`}>Catalog insights</h3>
-          <p>Compared with all {insights.catalog_size.toLocaleString()} novels in this snapshot.</p>
+          <p>Compared with all {insights.catalog_size.toLocaleString()} titles in this snapshot.</p>
         </div>
       </div>
       <div className="insight-metrics">
@@ -73,9 +73,9 @@ export function NovelInsightsPanel({
       </div>
       {insights.cohorts.length > 0 && (
         <Card className="insight-cohorts">
-          <h4>Comparable readership</h4>
+          <h4>Comparable popularity</h4>
           <p className="insight-section-note">
-            Rank among novels sharing a meaningful catalog attribute.
+            Rank among titles sharing a meaningful catalog attribute.
           </p>
           <div>
             {insights.cohorts.map((item) => (

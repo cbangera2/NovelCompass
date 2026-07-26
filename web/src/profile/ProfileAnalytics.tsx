@@ -34,9 +34,9 @@ function AnalyticsTooltip({ active, payload, label }: any) {
     <strong>{item.title || item.language || item.label || label}</strong>
     {item.count != null && <span>{item.count} titles</span>}
     {item.rating != null && <span>Rating {item.rating}</span>}
-    {item.readers != null && <span>{Number(item.readers).toLocaleString()} readers</span>}
+    {item.readers != null && <span>{Number(item.readers).toLocaleString()} on lists</span>}
     {item.hidden && <span>Potential hidden gem</span>}
-    {item.id != null && <span>Select for novel details</span>}
+    {item.id != null && <span>Select for title details</span>}
   </div>;
 }
 
@@ -138,7 +138,7 @@ export default function ProfileAnalytics({
       </p>
       {loading && <p className="analytics-state" aria-live="polite">Loading matched catalog analytics…</p>}
       {error && <p className="analytics-state analytics-error">{error}</p>}
-      {!loading && !error && !requested && <p className="analytics-state">No matched novels are available for catalog analytics.</p>}
+      {!loading && !error && !requested && <p className="analytics-state">No matched titles are available for catalog analytics.</p>}
       {!loading && details.length > 0 && <>
         <div className="analytics-grid">
           <article className="analytics-card">
@@ -200,14 +200,14 @@ export default function ProfileAnalytics({
           </article>
         </div>
         <article className="analytics-card scatter-card">
-          <h3>Rating vs. readers</h3>
-          <p>Gold points meet the transparent potential-hidden-gem rule: rating ≥ 4.2 and fewer than 2,000 readers. This is not a calibrated quality score.</p>
-          <div className="analytics-chart analytics-chart-scatter" role="group" aria-label="Interactive rating and readership plot. Select a point to show novel details.">
+          <h3>Rating vs. list count</h3>
+          <p>Gold points meet the transparent potential-hidden-gem rule: rating ≥ 4.2 and fewer than 2,000 on lists. This is not a calibrated quality score.</p>
+          <div className="analytics-chart analytics-chart-scatter" role="group" aria-label="Interactive rating and list-count plot. Select a point to show title details.">
             <ResponsiveContainer width="100%" height={340}>
               <ScatterChart margin={{ top: 18, right: 24, bottom: 26, left: 4 }}>
                 <CartesianGrid stroke="var(--border)" />
-                <XAxis type="number" dataKey="readerScale" name="Readers (log scale)" tick={{ fill: 'var(--muted)', fontSize: 10 }}
-                  tickFormatter={(value) => Math.round(Math.pow(10, Number(value))).toLocaleString()} label={{ value: 'Readers · logarithmic scale', position: 'bottom', fill: 'var(--muted)', fontSize: 11 }} />
+                <XAxis type="number" dataKey="readerScale" name="List count (log scale)" tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                  tickFormatter={(value) => Math.round(Math.pow(10, Number(value))).toLocaleString()} label={{ value: 'List count · logarithmic scale', position: 'bottom', fill: 'var(--muted)', fontSize: 11 }} />
                 <YAxis type="number" dataKey="rating" name="Rating" domain={[0, 5]} tick={{ fill: 'var(--muted)', fontSize: 10 }} width={34} />
                 <ChartTooltip content={<AnalyticsTooltip />} cursor={{ strokeDasharray: '3 3', stroke: 'var(--border-strong)' }} />
                 <Legend verticalAlign="top" height={28} formatter={() => 'Sampled profile titles · gold indicates potential hidden gem'} wrapperStyle={{ color: 'var(--muted)', fontSize: 11 }} />
@@ -217,7 +217,7 @@ export default function ProfileAnalytics({
                     const select = () => setSelectedPoint(point);
                     return <circle cx={props.cx} cy={props.cy} r={6} fill={point.hidden ? '#d89113' : 'var(--accent)'}
                       stroke="var(--surface)" strokeWidth={2} className="chart-selectable-point" role="button" tabIndex={0}
-                      aria-label={`${point.title}, rating ${point.rating}, ${point.readers.toLocaleString()} readers. Show details.`}
+                      aria-label={`${point.title}, rating ${point.rating}, ${point.readers.toLocaleString()} on lists. Show details.`}
                       onClick={select} onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
@@ -232,12 +232,12 @@ export default function ProfileAnalytics({
           </div>
           {selectedPoint && <div className="chart-point-card" role="status">
             <div><strong>{selectedPoint.title}</strong>
-              <span>{selectedPoint.rating} rating · {selectedPoint.readers.toLocaleString()} readers</span>
+              <span>{selectedPoint.rating} rating · {selectedPoint.readers.toLocaleString()} on lists</span>
               {selectedPoint.hidden && <span>Potential hidden gem</span>}
             </div>
-            <a href={novelPageUrl(selectedPoint.id)}>Open novel</a>
+            <a href={novelPageUrl(selectedPoint.id)}>Open title</a>
           </div>}
-          <div className="analytics-table-wrap"><table><caption>Plotted novel data</caption><thead><tr><th>Novel</th><th>Rating</th><th>Readers</th><th>Classification</th></tr></thead><tbody>
+          <div className="analytics-table-wrap"><table><caption>Plotted title data</caption><thead><tr><th>Title</th><th>Rating</th><th>List count</th><th>Classification</th></tr></thead><tbody>
             {scatter.map((detail) => <tr key={detail.id}><th><a href={novelPageUrl(detail.id)}>{detail.title}</a></th><td>{detail.rating}</td><td>{detail.reading_list_count.toLocaleString()}</td><td>{hiddenGem(detail) ? 'Potential hidden gem' : 'Other sample title'}</td></tr>)}
           </tbody></table></div>
         </article>

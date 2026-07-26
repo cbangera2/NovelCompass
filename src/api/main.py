@@ -211,6 +211,10 @@ class SlugResolveRequest(BaseModel):
     slugs: List[str] = Field(default_factory=list, max_length=1000)
 
 
+class IdResolveRequest(BaseModel):
+    ids: List[int] = Field(default_factory=list, max_length=2000)
+
+
 def novel_search_result(row: sqlite3.Row) -> Dict[str, Any]:
     row_dict = dict(row) if isinstance(row, sqlite3.Row) else {}
     nid = row[0]
@@ -266,9 +270,39 @@ def resolve_novel_slugs(request: SlugResolveRequest):
             rows = conn.execute(
                 f"""
                 SELECT id, title, slug, author, cover_url, rating, rating_votes,
-                       associated_names
+                       associated_names, COALESCE(media_type, 'novel') as media_type,
+                       COALESCE(source, 'novelupdates') as source, external_id, external_url
                 FROM novels
                 WHERE lower(slug) IN ({placeholders})
+                """,
+                chunk,
+            ).fetchall()
+            results.extend(novel_search_result(row) for row in rows)
+        return {"results": results}
+    finally:
+        conn.close()
+
+
+@app.post("/api/resolve-ids")
+def resolve_novel_ids(request: IdResolveRequest):
+    """Batch-confirm catalog membership by numeric novel id (AniList offset IDs)."""
+    requested = list(dict.fromkeys(int(value) for value in request.ids if isinstance(value, int) or str(value).isdigit()))
+    if not requested:
+        return {"results": []}
+
+    conn = get_db()
+    try:
+        results = []
+        for offset in range(0, len(requested), 500):
+            chunk = requested[offset:offset + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = conn.execute(
+                f"""
+                SELECT id, title, slug, author, cover_url, rating, rating_votes,
+                       associated_names, COALESCE(media_type, 'novel') as media_type,
+                       COALESCE(source, 'novelupdates') as source, external_id, external_url
+                FROM novels
+                WHERE id IN ({placeholders})
                 """,
                 chunk,
             ).fetchall()

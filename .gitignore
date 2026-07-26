@@ -21,6 +21,10 @@ supporting/artifacts/*.manifest.json
 .env.*
 !.env.example
 
+# Personal account exports (AniList GDPR, etc.)
+anilist_gdpr_data.json
+*_gdpr_data.json
+
 # Python
 __pycache__/
 .venv/

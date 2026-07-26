@@ -1,6 +1,6 @@
 import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
 
-const STATUSES = new Set<ReadingStatus>(['reading', 'completed', 'plan_to_read']);
+const STATUSES = new Set<ReadingStatus>(['reading', 'completed', 'plan_to_read', 'dropped', 'paused']);
 const SIGNALS = new Set(['love', 'read', 'not_for_me']);
 
 function object(value: unknown, label: string): Record<string, unknown> {
