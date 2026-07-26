@@ -93,6 +93,97 @@ const compiled = ts.transpileModule(patched, {
     assert json.loads(result.stdout)["ok"] is True
 
 
+def test_affinity_multiplier_and_for_you_endpoint(tmp_path, monkeypatch):
+    script = r"""
+const fs = require('node:fs');
+const ts = require('./web/node_modules/typescript');
+const source = fs.readFileSync('./web/src/profile/taste.ts', 'utf8');
+const patched = source
+  .replace(/import type .*?;\n/g, '')
+  .replace(/import \{ inferMediaKind \} from '\.\/profileStats';\n/,
+    "const inferMediaKind = (e) => e.media_kind || 'novel';\n");
+const compiled = ts.transpileModule(patched, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+(async () => {
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`;
+  const { tasteAffinityAdjustment, mergeSeedRecommendations } = await import(moduleUrl);
+  const affinity = {
+    likedTags: new Map([['progression', 8]]),
+    avoidTags: new Map([['harem', 6]]),
+    likedGenres: new Map(),
+    avoidGenres: new Map(),
+  };
+  const boost = tasteAffinityAdjustment(['Progression', 'other'], [], affinity);
+  if (!(boost.multiplier > 1)) throw new Error('expected boost');
+  const pen = tasteAffinityAdjustment(['Harem'], [], affinity);
+  if (!(pen.multiplier < 1)) throw new Error('expected penalty');
+  const seed = { novel_id: 1, title: 'S', weight: 5, reason: '5★' };
+  const merged = mergeSeedRecommendations([{
+    seed,
+    response: {
+      seed_novel: { id: 1, title: 'S', slug: 's', novelupdates_url: '' },
+      count: 1,
+      recommendations: [{
+        target_id: 9, title: 'T', author: '', slug: 't', novelupdates_url: '', language: '',
+        rating: 4, rating_votes: 1, reading_list_count: 10, status_trans: '', chapters_trans: 0,
+        rrf_score: 0.1, match_score_percent: 50, channel_ranks: {}, shared_tags: ['Progression'],
+        evidence_bullets: []
+      }]
+    }
+  }], { affinity, limit: 5 });
+  if (!merged[0].evidence_bullets.some((b) => b.includes('Taste boost'))) throw new Error('missing boost evidence');
+  process.stdout.write(JSON.stringify({ ok: true }));
+})().catch((e) => { console.error(e); process.exit(1); });
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    assert json.loads(result.stdout)["ok"] is True
+
+    db_file = str(tmp_path / "foryou.db")
+    conn = init_db(db_file)
+    repo = Repository(conn)
+    for nid, title in [(1, "SeedA"), (2, "SeedB"), (10, "Cand")]:
+        repo.upsert_novel({
+            "id": nid,
+            "title": title,
+            "slug": f"s-{nid}",
+            "media_type": "novel",
+            "source": "novelupdates",
+            "reading_list_count": 50,
+            "rating": 4.2,
+            "rating_votes": 8,
+        })
+    with conn:
+        conn.execute("INSERT INTO direct_recs (source_novel_id, target_novel_id, is_mutual, votes) VALUES (1, 10, 0, 3)")
+        conn.execute("INSERT INTO direct_recs (source_novel_id, target_novel_id, is_mutual, votes) VALUES (2, 10, 0, 2)")
+        conn.execute("INSERT INTO tags (id, name) VALUES (1, 'Progression')")
+        conn.execute("INSERT INTO novel_tags (novel_id, tag_id) VALUES (1, 1), (10, 1)")
+    conn.close()
+    monkeypatch.setattr("src.api.main.get_db", lambda: init_db(db_file))
+    client = TestClient(app)
+    res = client.post(
+        "/api/recommend/for-you",
+        json={
+            "seeds": [{"id": 1, "weight": 5, "title": "SeedA"}, {"id": 2, "weight": 4, "title": "SeedB"}],
+            "liked_tags": [{"name": "Progression", "weight": 8}],
+            "limit": 10,
+        },
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["mode"] == "api-multi-seed"
+    assert body["count"] >= 1
+    assert any(r["target_id"] == 10 for r in body["recommendations"])
+    bullets = " ".join(body["recommendations"][0].get("evidence_bullets") or [])
+    assert "seed" in bullets.lower() or "Taste" in bullets
+
+
 def test_recommend_excludes_library_ids(tmp_path, monkeypatch):
     db_file = str(tmp_path / "taste.db")
     conn = init_db(db_file)

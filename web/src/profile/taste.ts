@@ -279,12 +279,76 @@ export function computeTasteProfile(
   };
 }
 
+export type AffinityMaps = {
+  likedTags: Map<string, number>;
+  avoidTags: Map<string, number>;
+  likedGenres: Map<string, number>;
+  avoidGenres: Map<string, number>;
+};
+
+export function affinityMapsFromTaste(taste: Pick<TasteProfile, 'liked_tags' | 'avoid_tags' | 'liked_genres' | 'avoid_genres'>): AffinityMaps {
+  const toMap = (facets: WeightedFacet[]) => new Map(facets.map((f) => [f.name.toLowerCase(), f.weight]));
+  return {
+    likedTags: toMap(taste.liked_tags),
+    avoidTags: toMap(taste.avoid_tags),
+    likedGenres: toMap(taste.liked_genres),
+    avoidGenres: toMap(taste.avoid_genres),
+  };
+}
+
+/**
+ * Soft personalization on shared tags (and optional genre names).
+ * Multiplier is clamped so one trope cannot erase multi-seed consensus.
+ */
+export function tasteAffinityAdjustment(
+  tags: string[] | undefined,
+  genres: string[] | undefined,
+  affinity?: AffinityMaps | null
+): { multiplier: number; liked: string[]; avoided: string[] } {
+  if (!affinity) return { multiplier: 1, liked: [], avoided: [] };
+  let likeScore = 0;
+  let avoidScore = 0;
+  const liked: string[] = [];
+  const avoided: string[] = [];
+  for (const raw of tags || []) {
+    const key = raw.toLowerCase();
+    const lw = affinity.likedTags.get(key);
+    const aw = affinity.avoidTags.get(key);
+    if (lw) {
+      likeScore += lw;
+      liked.push(raw);
+    }
+    if (aw) {
+      avoidScore += aw;
+      avoided.push(raw);
+    }
+  }
+  for (const raw of genres || []) {
+    const key = raw.toLowerCase();
+    const lw = affinity.likedGenres.get(key);
+    const aw = affinity.avoidGenres.get(key);
+    if (lw) {
+      likeScore += lw * 0.85;
+      liked.push(raw);
+    }
+    if (aw) {
+      avoidScore += aw * 0.85;
+      avoided.push(raw);
+    }
+  }
+  // Scale: a few strong tags → ~±15–30%; hard cap so multi-seed structure remains.
+  const raw = 1 + Math.min(0.35, likeScore * 0.012) - Math.min(0.4, avoidScore * 0.016);
+  const multiplier = Math.max(0.55, Math.min(1.45, raw));
+  return { multiplier, liked: liked.slice(0, 4), avoided: avoided.slice(0, 4) };
+}
+
 /** Merge multi-seed recommendation responses with seed weights (static + API safe). */
 export function mergeSeedRecommendations(
   seedResults: Array<{ seed: TasteSeed; response: RecommendResponse }>,
   options: {
     excludeIds?: Set<number> | number[];
     limit?: number;
+    affinity?: AffinityMaps | null;
   } = {}
 ): Recommendation[] {
   const exclude = new Set(
@@ -323,6 +387,13 @@ export function mergeSeedRecommendations(
     }
   }
 
+  // Apply taste affinity after multi-seed consensus (explainable soft boost/penalty).
+  for (const item of byId.values()) {
+    const adj = tasteAffinityAdjustment(item.rec.shared_tags, undefined, options.affinity);
+    item.score *= adj.multiplier;
+    (item as Acc & { affinity?: typeof adj }).affinity = adj;
+  }
+
   const merged = [...byId.values()]
     .sort((a, b) => b.score - a.score || b.rec.rating - a.rec.rating)
     .slice(0, limit)
@@ -337,7 +408,24 @@ export function mergeSeedRecommendations(
         item.seeds.length > 1
           ? `Appeared under ${item.seeds.length} of your seeds (e.g. ${seedTitles.join(', ')})`
           : `From your seed: ${seedTitles[0] || 'library favorite'}`;
-      const evidence = [multiSeedBullet, ...(item.rec.evidence_bullets || [])].slice(0, 6);
+      const affinity = (item as Acc & { affinity?: ReturnType<typeof tasteAffinityAdjustment> }).affinity;
+      const affinityBullets: string[] = [];
+      if (affinity && affinity.multiplier !== 1) {
+        if (affinity.liked.length) {
+          affinityBullets.push(
+            `Taste boost ×${affinity.multiplier.toFixed(2)} via liked tropes: ${affinity.liked.join(', ')}`
+          );
+        }
+        if (affinity.avoided.length) {
+          affinityBullets.push(
+            `Taste penalty ×${affinity.multiplier.toFixed(2)} via avoided tropes: ${affinity.avoided.join(', ')}`
+          );
+        }
+        if (!affinity.liked.length && !affinity.avoided.length && affinity.multiplier !== 1) {
+          affinityBullets.push(`Taste affinity ×${affinity.multiplier.toFixed(2)}`);
+        }
+      }
+      const evidence = [multiSeedBullet, ...affinityBullets, ...(item.rec.evidence_bullets || [])].slice(0, 7);
       return {
         ...item.rec,
         rrf_score: item.score,
@@ -349,9 +437,18 @@ export function mergeSeedRecommendations(
   return merged;
 }
 
+export type ForYouResult = {
+  recommendations: Recommendation[];
+  seeds_used: TasteSeed[];
+  seeds_failed: Array<{ seed: TasteSeed; error: string }>;
+  exclude_count: number;
+  mode: 'api-multi-seed' | 'client-merge';
+  affinity_applied: boolean;
+};
+
 /**
- * For You: multi-seed recommend using existing single-seed endpoint (works in static + API).
- * Failures on individual seeds are skipped and reported in caveats via partial results.
+ * For You: prefer live multi-seed API when available; otherwise merge single-seed
+ * pools (static GitHub Pages path). Individual seed failures are reported, not hidden.
  */
 export async function fetchForYouRecommendations(
   source: RecommendationDataSource,
@@ -361,19 +458,69 @@ export async function fetchForYouRecommendations(
     seedLimit?: number;
     scope?: 'all' | ProfileMediaKind;
     onProgress?: (done: number, total: number, seedTitle: string) => void;
+    /** Precomputed taste; if omitted, seeds/excludes only (no tag affinity). */
+    taste?: TasteProfile | null;
   } = {}
-): Promise<{
-  recommendations: Recommendation[];
-  seeds_used: TasteSeed[];
-  seeds_failed: Array<{ seed: TasteSeed; error: string }>;
-  exclude_count: number;
-}> {
-  const seeds = selectPositiveSeeds(profile, {
-    limit: options.seedLimit ?? DEFAULT_SEED_LIMIT,
-    scope: options.scope ?? 'all',
-  });
-  const excludeIds = buildExcludeIds(profile);
+): Promise<ForYouResult> {
+  const seeds = options.taste?.positive_seeds?.length
+    ? options.taste.positive_seeds.slice(0, options.seedLimit ?? DEFAULT_SEED_LIMIT)
+    : selectPositiveSeeds(profile, {
+        limit: options.seedLimit ?? DEFAULT_SEED_LIMIT,
+        scope: options.scope ?? 'all',
+      });
+  const excludeIds = options.taste?.exclude_ids?.length
+    ? options.taste.exclude_ids
+    : buildExcludeIds(profile);
   const excludeSet = new Set(excludeIds);
+  const affinity =
+    options.taste && (options.taste.liked_tags.length || options.taste.avoid_tags.length)
+      ? affinityMapsFromTaste(options.taste)
+      : null;
+
+  // Live API: one request multi-seed path (faster, shared filter).
+  if (source.mode === 'api' && seeds.length > 0) {
+    try {
+      options.onProgress?.(0, 1, 'server multi-seed');
+      const response = await (source as RecommendationDataSource & {
+        getForYouRecommendations?: (body: unknown) => Promise<RecommendResponse & {
+          seeds_used?: Array<{ id: number; title: string; weight: number }>;
+          seeds_missing?: number[];
+        }>;
+      }).getForYouRecommendations?.({
+        ...baseRequest,
+        seeds: seeds.map((s) => ({ id: s.novel_id, weight: s.weight, title: s.title })),
+        exclude_novel_ids: excludeIds,
+        liked_tags: options.taste?.liked_tags.map((f) => ({ name: f.name, weight: f.weight })) || [],
+        avoid_tags: options.taste?.avoid_tags.map((f) => ({ name: f.name, weight: f.weight })) || [],
+        limit: baseRequest.limit || 40,
+      });
+      if (response?.recommendations) {
+        options.onProgress?.(1, 1, 'server multi-seed');
+        const usedFromServer = (response.seeds_used || []).map((s) => ({
+          novel_id: s.id,
+          title: s.title,
+          weight: s.weight,
+          reason: seeds.find((x) => x.novel_id === s.id)?.reason || 'server seed',
+        }));
+        const missing = new Set(response.seeds_missing || []);
+        const seeds_failed = seeds
+          .filter((s) => missing.has(s.novel_id) || !usedFromServer.some((u) => u.novel_id === s.novel_id))
+          .filter((s) => missing.has(s.novel_id))
+          .map((s) => ({ seed: s, error: 'Seed not found in live catalog' }));
+        return {
+          recommendations: response.recommendations,
+          seeds_used: usedFromServer.length ? usedFromServer : seeds.filter((s) => !missing.has(s.novel_id)),
+          seeds_failed,
+          exclude_count: excludeIds.length,
+          mode: 'api-multi-seed',
+          affinity_applied: Boolean(affinity),
+        };
+      }
+    } catch {
+      // Fall through to client merge (older API or offline).
+    }
+  }
+
   const seeds_failed: Array<{ seed: TasteSeed; error: string }> = [];
   const seedResults: Array<{ seed: TasteSeed; response: RecommendResponse }> = [];
 
@@ -401,6 +548,7 @@ export async function fetchForYouRecommendations(
   const recommendations = mergeSeedRecommendations(seedResults, {
     excludeIds: excludeSet,
     limit: baseRequest.limit || 40,
+    affinity,
   });
 
   return {
@@ -408,5 +556,7 @@ export async function fetchForYouRecommendations(
     seeds_used: seedResults.map((r) => r.seed),
     seeds_failed,
     exclude_count: excludeIds.length,
+    mode: 'client-merge',
+    affinity_applied: Boolean(affinity),
   };
 }

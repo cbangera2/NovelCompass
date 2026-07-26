@@ -5,7 +5,7 @@ import re
 import sqlite3
 import random
 import secrets
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -207,6 +207,46 @@ class RecommendRequest(BaseModel):
     source: str = "all"
     # Client library / feedback exclusions (matched catalog IDs only).
     exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)
+
+
+class ForYouSeed(BaseModel):
+    id: int
+    weight: float = 1.0
+    title: str = ""
+
+
+class TasteTagWeight(BaseModel):
+    name: str
+    weight: float = 1.0
+
+
+class ForYouRecommendRequest(BaseModel):
+    """Multi-seed For You ranking for live API mode (static clients merge pools instead)."""
+    seeds: List[ForYouSeed] = Field(default_factory=list, max_length=20)
+    limit: int = 40
+    hidden_gem_mode: bool = False
+    exclude_harem: bool = False
+    exclude_bl: bool = False
+    exclude_yuri: bool = False
+    language: str = ""
+    min_rating: float = 0.0
+    min_rating_votes: int = 0
+    max_readers: int = 0
+    min_year: int = 0
+    max_year: int = 0
+    include_genres: List[str] = Field(default_factory=list)
+    exclude_genres: List[str] = Field(default_factory=list)
+    include_tags: List[str] = Field(default_factory=list)
+    exclude_tags: List[str] = Field(default_factory=list)
+    channel_weights: Dict[str, float] = Field(default_factory=dict)
+    hidden_gem_strength: float = 0.3
+    min_chapters: int = 0
+    require_completed: bool = False
+    media_type: str = "all"
+    source: str = "all"
+    exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)
+    liked_tags: List[TasteTagWeight] = Field(default_factory=list, max_length=40)
+    avoid_tags: List[TasteTagWeight] = Field(default_factory=list, max_length=40)
 
 
 class SlugResolveRequest(BaseModel):
@@ -897,6 +937,216 @@ def get_recommendations(req: RecommendRequest):
         conn.close()
 
 
+@app.post("/api/recommend/for-you")
+def get_for_you_recommendations(req: ForYouRecommendRequest):
+    """Multi-seed RRF fusion for profile For You (live mode only)."""
+    conn = get_db()
+    try:
+        return _get_for_you_recommendations(conn, req)
+    finally:
+        conn.close()
+
+
+def _recommend_preferences(req: Any, extra_exclude: List[int]) -> Dict[str, Any]:
+    exclude_tags = []
+    if getattr(req, "exclude_harem", False):
+        exclude_tags.extend(["harem", "reverse harem"])
+    if getattr(req, "exclude_bl", False):
+        exclude_tags.extend(["yaoi", "bl", "boys love", "shounen ai"])
+    if getattr(req, "exclude_yuri", False):
+        exclude_tags.extend(["yuri", "shoujo ai"])
+    exclude_tags.extend(getattr(req, "exclude_tags", None) or [])
+    exclude_ids = {
+        int(nid)
+        for nid in (getattr(req, "exclude_novel_ids", None) or [])
+        if str(nid).lstrip("-").isdigit()
+    }
+    exclude_ids.update(int(nid) for nid in extra_exclude)
+    return {
+        "exclude_tags": exclude_tags,
+        "include_tags": getattr(req, "include_tags", None) or [],
+        "include_genres": getattr(req, "include_genres", None) or [],
+        "exclude_genres": getattr(req, "exclude_genres", None) or [],
+        "language": getattr(req, "language", "") or "",
+        "min_rating": getattr(req, "min_rating", 0) or 0,
+        "min_rating_votes": getattr(req, "min_rating_votes", 0) or 0,
+        "max_readers": getattr(req, "max_readers", 0) or 0,
+        "min_year": getattr(req, "min_year", 0) or 0,
+        "max_year": getattr(req, "max_year", 0) or 0,
+        "require_completed": getattr(req, "require_completed", False),
+        "min_chapters": getattr(req, "min_chapters", 0) or 0,
+        "media_type": getattr(req, "media_type", "all") or "all",
+        "source": getattr(req, "source", "all") or "all",
+        "exclude_novel_ids": list(exclude_ids),
+    }
+
+
+def _channel_weights(req: Any) -> Dict[str, float]:
+    raw = getattr(req, "channel_weights", None) or {}
+    return {
+        key: max(0.0, min(3.0, float(value)))
+        for key, value in raw.items()
+        if key in {"vector", "tag", "direct_rec", "rec_list", "structural"}
+    }
+
+
+def _affinity_multiplier(shared_tags: List[str], liked: Dict[str, float], avoided: Dict[str, float]) -> tuple[float, List[str], List[str]]:
+    like_score = 0.0
+    avoid_score = 0.0
+    hit_like: List[str] = []
+    hit_avoid: List[str] = []
+    for tag in shared_tags or []:
+        key = tag.lower()
+        if key in liked:
+            like_score += liked[key]
+            hit_like.append(tag)
+        if key in avoided:
+            avoid_score += avoided[key]
+            hit_avoid.append(tag)
+    raw = 1.0 + min(0.35, like_score * 0.012) - min(0.4, avoid_score * 0.016)
+    return max(0.55, min(1.45, raw)), hit_like[:4], hit_avoid[:4]
+
+
+def _get_for_you_recommendations(conn: sqlite3.Connection, req: ForYouRecommendRequest):
+    if not req.seeds:
+        raise HTTPException(status_code=400, detail="For You requires at least one seed id.")
+
+    cur = conn.cursor()
+    cand_gen = CandidateGenerator(conn)
+    filter_engine = HardFilterEngine(conn)
+    preferences = _recommend_preferences(req, [seed.id for seed in req.seeds])
+    channel_weights = _channel_weights(req)
+    effective_weights = channel_weights or DEFAULT_CHANNEL_WEIGHTS
+
+    liked = {t.name.lower(): float(t.weight) for t in req.liked_tags if t.name}
+    avoided = {t.name.lower(): float(t.weight) for t in req.avoid_tags if t.name}
+
+    seeds_used = []
+    seeds_missing = []
+    # nid -> accumulated score and contributing seeds
+    scores: Dict[int, float] = {}
+    seed_hits: Dict[int, List[Dict[str, Any]]] = {}
+    best_seed_for: Dict[int, tuple[int, float]] = {}
+    channel_ranks_by_seed: Dict[int, Dict[str, List[Tuple[int, float]]]] = {}
+
+    for seed in req.seeds:
+        seed_id = int(seed.id)
+        row = cur.execute(
+            "SELECT id, title, slug, cover_url FROM novels WHERE id = ?",
+            (seed_id,),
+        ).fetchone()
+        if not row:
+            seeds_missing.append(seed_id)
+            continue
+        weight = max(0.1, min(10.0, float(seed.weight or 1.0)))
+        seeds_used.append({
+            "id": seed_id,
+            "title": seed.title or row[1],
+            "weight": weight,
+        })
+        channels = cand_gen.get_candidate_channels(seed_id, limit_per_channel=150)
+        all_ids = {nid for cands in channels.values() for nid, _ in cands}
+        valid = set(filter_engine.filter_candidates(list(all_ids), preferences))
+        filtered = {
+            name: [(nid, sc) for nid, sc in cands if nid in valid]
+            for name, cands in channels.items()
+        }
+        channel_ranks_by_seed[seed_id] = filtered
+        rrf = calculate_rrf_scores(filtered, channel_weights=channel_weights or None)
+        for nid, score in rrf.items():
+            if nid == seed_id:
+                continue
+            contribution = score * weight
+            scores[nid] = scores.get(nid, 0.0) + contribution
+            seed_hits.setdefault(nid, []).append({
+                "id": seed_id,
+                "title": seed.title or row[1],
+                "weight": weight,
+                "contribution": contribution,
+            })
+            prev = best_seed_for.get(nid)
+            if prev is None or contribution > prev[1]:
+                best_seed_for[nid] = (seed_id, contribution)
+
+    if not seeds_used:
+        raise HTTPException(status_code=404, detail="None of the For You seeds exist in this catalog.")
+
+    # Soft taste affinity using union of tags with any contributing seed (approx via best seed shared tags later).
+    # First pass: hidden gem + clamp; affinity applied after shared-tag lookup in explain loop.
+
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    # Pre-trim before expensive explain
+    ranked = ranked[: max(req.limit * 3, req.limit)]
+
+    explainer = EvidenceExplainer(conn)
+    recommendations = []
+    for nid, base_score in ranked:
+        primary_seed, _ = best_seed_for.get(nid, (seeds_used[0]["id"], 0.0))
+        ch_ranks: Dict[str, int] = {}
+        for ch_name, cands in channel_ranks_by_seed.get(primary_seed, {}).items():
+            for r_idx, (cand_id, _) in enumerate(cands, 1):
+                if cand_id == nid:
+                    ch_ranks[ch_name] = r_idx
+                    break
+        exp = explainer.explain_recommendation(primary_seed, nid, base_score, ch_ranks)
+        if not exp:
+            continue
+        shared = exp.get("shared_tags") or []
+        mult, hit_like, hit_avoid = _affinity_multiplier(shared, liked, avoided)
+        score = base_score * mult
+        if req.hidden_gem_mode:
+            score = apply_hidden_gem_boost(
+                score,
+                exp.get("reading_list_count") or 0,
+                gamma=max(0.0, min(1.0, req.hidden_gem_strength)),
+            )
+        exp["rrf_score"] = score
+        bullets = list(exp.get("evidence_bullets") or [])
+        hits = seed_hits.get(nid) or []
+        if len(hits) > 1:
+            titles = ", ".join(h["title"] for h in sorted(hits, key=lambda h: -h["contribution"])[:3])
+            bullets.insert(0, f"Appeared under {len(hits)} of your seeds (e.g. {titles})")
+        elif hits:
+            bullets.insert(0, f"From your seed: {hits[0]['title']}")
+        if mult != 1.0:
+            if hit_like:
+                bullets.insert(1, f"Taste boost ×{mult:.2f} via liked tropes: {', '.join(hit_like)}")
+            if hit_avoid:
+                bullets.insert(1, f"Taste penalty ×{mult:.2f} via avoided tropes: {', '.join(hit_avoid)}")
+        exp["evidence_bullets"] = bullets[:7]
+        exp["_sort_score"] = score
+        exp["_unboosted"] = base_score * mult
+        recommendations.append(exp)
+
+    recommendations.sort(key=lambda item: item.get("_sort_score", 0), reverse=True)
+    recommendations = recommendations[: req.limit]
+    active_channels = list(effective_weights.keys())
+    for exp in recommendations:
+        exp["match_score_percent"] = calculate_match_percent(
+            float(exp.pop("_unboosted", exp.get("rrf_score") or 0)),
+            active_channels,
+            effective_weights,
+        )
+        exp.pop("_sort_score", None)
+
+    top = seeds_used[0]
+    return {
+        "seed_novel": {
+            "id": 0,
+            "title": "For You (multi-seed)",
+            "slug": "for-you",
+            "novelupdates_url": "",
+            "cover_url": None,
+        },
+        "count": len(recommendations),
+        "recommendations": recommendations,
+        "seeds_used": seeds_used,
+        "seeds_missing": seeds_missing,
+        "primary_seed_id": top["id"],
+        "mode": "api-multi-seed",
+    }
+
+
 def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
     cur = conn.cursor()
 
@@ -919,36 +1169,7 @@ def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
 
     # Filter candidates
     filter_engine = HardFilterEngine(conn)
-    exclude_tags = []
-    if req.exclude_harem:
-        exclude_tags.extend(['harem', 'reverse harem'])
-    if req.exclude_bl:
-        exclude_tags.extend(['yaoi', 'bl', 'boys love', 'shounen ai'])
-    if req.exclude_yuri:
-        exclude_tags.extend(['yuri', 'shoujo ai'])
-    exclude_tags.extend(req.exclude_tags)
-
-    preferences = {
-        'exclude_tags': exclude_tags,
-        'include_tags': req.include_tags,
-        'include_genres': req.include_genres,
-        'exclude_genres': req.exclude_genres,
-        'language': req.language,
-        'min_rating': req.min_rating,
-        'min_rating_votes': req.min_rating_votes,
-        'max_readers': req.max_readers,
-        'min_year': req.min_year,
-        'max_year': req.max_year,
-        'require_completed': req.require_completed,
-        'min_chapters': req.min_chapters,
-        'media_type': req.media_type,
-        'source': req.source,
-        # Always drop the seed; merge client library / not-for-me IDs when provided.
-        'exclude_novel_ids': list({
-            seed_id,
-            *[int(nid) for nid in (req.exclude_novel_ids or []) if str(nid).lstrip('-').isdigit()],
-        }),
-    }
+    preferences = _recommend_preferences(req, [seed_id])
 
     all_cand_ids = set()
     for ch_cands in channels.values():
@@ -962,11 +1183,7 @@ def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
     for ch_name, cands in channels.items():
         filtered_channels[ch_name] = [(nid, sc) for nid, sc in cands if nid in valid_cand_ids]
 
-    channel_weights = {
-        key: max(0.0, min(3.0, value))
-        for key, value in req.channel_weights.items()
-        if key in {'vector', 'tag', 'direct_rec', 'rec_list', 'structural'}
-    }
+    channel_weights = _channel_weights(req)
     rrf_scores = calculate_rrf_scores(
         filtered_channels,
         channel_weights=channel_weights or None,

@@ -133,6 +133,18 @@ export class ApiDataSource implements RecommendationDataSource {
     });
   }
 
+  getForYouRecommendations(body: unknown): Promise<RecommendResponse & {
+    seeds_used?: Array<{ id: number; title: string; weight: number }>;
+    seeds_missing?: number[];
+    mode?: string;
+  }> {
+    return apiFetch('/api/recommend/for-you', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
   browseNovels(request: BrowseRequest): Promise<BrowseResponse> {
     const params = new URLSearchParams();
     Object.entries(request).forEach(([key, value]) => {

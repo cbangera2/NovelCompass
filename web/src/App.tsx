@@ -32,8 +32,8 @@ import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile/ty
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import {
   buildExcludeIds,
+  computeTasteProfile,
   fetchForYouRecommendations,
-  selectPositiveSeeds,
   type TasteSeed,
 } from './profile/taste';
 import { displayNovelTitle, useDisplaySettings } from './settings';
@@ -184,6 +184,8 @@ export default function App(): JSX.Element {
     seedsFailed: Array<{ seed: TasteSeed; error: string }>;
     excludeCount: number;
     progress?: string;
+    mode?: 'api-multi-seed' | 'client-merge';
+    affinityApplied?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -329,7 +331,10 @@ export default function App(): JSX.Element {
           setForYouMeta(null);
           return;
         }
-        const seeds = selectPositiveSeeds(profile, { limit: 12 });
+        const taste = computeTasteProfile(profile, [], {
+          datasetVersion: dataset?.dataset_version,
+        });
+        const seeds = taste.positive_seeds;
         if (!seeds.length) {
           setError(
             'For You needs matched positive seeds (4★+, Completed, or Loved). Rate catalog-matched titles or import Completed lists.'
@@ -341,19 +346,32 @@ export default function App(): JSX.Element {
         setForYouMeta({
           seedsUsed: seeds,
           seedsFailed: [],
-          excludeCount: libraryExcludeIds.length,
-          progress: `0/${seeds.length}`,
+          excludeCount: taste.exclude_ids.length,
+          progress: source.mode === 'api' ? 'live multi-seed…' : `0/${seeds.length}`,
+        });
+        // Load seed/negative details for tag affinity when cheap enough (cap 24).
+        const detailIds = [
+          ...seeds.map((s) => s.novel_id),
+          ...taste.negative_ids.slice(0, 12),
+        ].filter((id, i, all) => all.indexOf(id) === i).slice(0, 24);
+        const detailResults = await Promise.allSettled(detailIds.map((id) => source.getNovel(id)));
+        const details = detailResults.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+        const richTaste = computeTasteProfile(profile, details, {
+          datasetVersion: dataset?.dataset_version,
         });
         const result = await fetchForYouRecommendations(source, profile, basePayload, {
           seedLimit: 12,
+          taste: richTaste,
           onProgress: (done, total, seedTitle) => {
             if (requestId !== recommendationRequestRef.current) return;
-            setForYouMeta({
-              seedsUsed: seeds,
-              seedsFailed: [],
-              excludeCount: libraryExcludeIds.length,
+            setForYouMeta((prev) => ({
+              seedsUsed: prev?.seedsUsed || seeds,
+              seedsFailed: prev?.seedsFailed || [],
+              excludeCount: richTaste.exclude_ids.length,
               progress: `${done}/${total} · ${seedTitle}`,
-            });
+              mode: prev?.mode,
+              affinityApplied: prev?.affinityApplied,
+            }));
           },
         });
         if (requestId !== recommendationRequestRef.current) return;
@@ -361,11 +379,13 @@ export default function App(): JSX.Element {
           seedsUsed: result.seeds_used,
           seedsFailed: result.seeds_failed,
           excludeCount: result.exclude_count,
+          mode: result.mode,
+          affinityApplied: result.affinity_applied,
         });
         const json: RecommendResponse = {
           seed_novel: {
             id: 0,
-            title: 'For You (multi-seed)',
+            title: result.mode === 'api-multi-seed' ? 'For You (live multi-seed)' : 'For You (client pool merge)',
             slug: 'for-you',
             novelupdates_url: '',
             cover_url: undefined,
@@ -383,7 +403,7 @@ export default function App(): JSX.Element {
           );
         } else if (result.seeds_failed.length) {
           setIncrementalError(
-            `${result.seeds_failed.length} seed${result.seeds_failed.length === 1 ? '' : 's'} failed (often missing static rec shards). Showing merge of ${result.seeds_used.length} successful seeds.`
+            `${result.seeds_failed.length} seed${result.seeds_failed.length === 1 ? '' : 's'} failed (often missing static rec shards). Showing merge of ${result.seeds_used.length} successful seeds · mode=${result.mode}.`
           );
         }
         return;
@@ -1082,6 +1102,8 @@ export default function App(): JSX.Element {
               <p>
                 <span>{data.count}</span> evidence-backed matches
                 {forYouMeta ? ` · ${forYouMeta.seedsUsed.length} seeds used · ${forYouMeta.excludeCount} IDs excluded` : ''}
+                {forYouMeta?.mode ? ` · ${forYouMeta.mode}` : ''}
+                {forYouMeta?.affinityApplied ? ' · taste affinity on' : forYouMeta ? ' · taste affinity off (no tag details)' : ''}
                 {forYouMeta?.progress && loading ? ` · ${forYouMeta.progress}` : ''}
               </p>
               {forYouMeta && forYouMeta.seedsFailed.length > 0 && (
