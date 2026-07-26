@@ -136,6 +136,7 @@ export class StaticDataSource implements RecommendationDataSource {
   private bootstrapPromise?: Promise<void>;
   private catalogPromise?: Promise<void>;
   private facetsPromise?: Promise<FacetsFile>;
+  private detailPromises = new Map<string, Promise<Record<string, any>>>();
   private compactRecommendationPromises = new Map<string, Promise<CompactRecommendationShard>>();
   private cards = new Map<number, CatalogCard>();
   private aliases = new Map<number, string[]>();
@@ -390,14 +391,23 @@ export class StaticDataSource implements RecommendationDataSource {
     const card = this.cards.get(id);
     if (!card) throw new DataSourceError(`Novel ${id} is not in this static snapshot.`);
     let detail: any = {};
+    const bucket = bucketForNovel(id);
+    let detailBucketPromise = this.detailPromises.get(bucket);
+    if (!detailBucketPromise) {
+      detailBucketPromise = jsonFetch<Record<string, any>>(joinUrl(this.baseUrl, `details/${bucket}.json`));
+      this.detailPromises.set(bucket, detailBucketPromise);
+    }
     try {
-      detail = await jsonFetch<any>(
-        joinUrl(this.baseUrl, `details/${bucketForNovel(id)}/${id}.json`)
-      );
+      const shard = await detailBucketPromise;
+      detail = shard[String(id)] || {};
     } catch (error) {
-      if (!(error instanceof DataSourceError) || !error.message.includes('returned 404')) throw error;
-      // Full-catalog Browse entries outside the bounded bootstrap intentionally
-      // expose catalog metadata without pretending a detail shard exists.
+      try {
+        detail = await jsonFetch<any>(
+          joinUrl(this.baseUrl, `details/${bucket}/${id}.json`)
+        );
+      } catch (err) {
+        if (!(err instanceof DataSourceError) || !err.message.includes('returned 404')) throw err;
+      }
     }
     const genreIds: number[] = detail.genre_ids || card.genre_ids || [];
     const tagIds: number[] = detail.tag_ids || [];
@@ -497,21 +507,22 @@ export class StaticDataSource implements RecommendationDataSource {
     let pool: RecommendationPool;
     const manifest = await this.getManifest();
     try {
-      pool = await jsonFetch<RecommendationPool>(
-        joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
-      );
-    } catch (error) {
-      if (error instanceof DataSourceError && error.message.includes('returned 404')) {
-        const compactPool = await this.loadCompactRecommendationPool(seedId, manifest);
-        if (!compactPool) {
-          throw new DataSourceError(
-            'Recommendations for this title are unavailable in this static snapshot.'
-          );
-        }
+      const compactPool = await this.loadCompactRecommendationPool(seedId, manifest);
+      if (compactPool) {
         pool = compactPool;
       } else {
-        throw error;
+        pool = await jsonFetch<RecommendationPool>(
+          joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
+        );
       }
+    } catch (error) {
+      const compactPool = await this.loadCompactRecommendationPool(seedId, manifest);
+      if (!compactPool) {
+        throw new DataSourceError(
+          'Recommendations for this title are unavailable in this static snapshot.'
+        );
+      }
+      pool = compactPool;
     }
     const needsTagTraits = Boolean(
       request.exclude_harem || request.exclude_bl || request.exclude_yuri ||

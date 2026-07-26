@@ -244,6 +244,12 @@ class CompactCandidateIndex:
                 self.tags_by_novel[novel_id].add(tag_id)
                 self.novels_by_tag[tag_id].append(novel_id)
                 tag_frequency[tag_id] = tag_frequency.get(tag_id, 0) + 1
+        self.popularity = dict(conn.execute(
+            "SELECT id, COALESCE(reading_list_count, 0) FROM novels"
+        ))
+        for tag_id, novel_list in list(self.novels_by_tag.items()):
+            novel_list.sort(key=lambda cid: self.popularity.get(cid, 0), reverse=True)
+            self.novels_by_tag[tag_id] = novel_list[:500]
         total = max(1, len(novel_ids))
         priority = {name.lower() for name in HIGH_PRIORITY_TAGS}
         tag_names = dict(conn.execute("SELECT id, name FROM tags"))
@@ -562,74 +568,22 @@ def export_static_dataset(
         ts = datetime.now().strftime("%H:%M:%S")
         print(f"[{ts}] metadata: ✓ Done in {t_meta - t0:.1f}s", flush=True)
 
-        # --- PARALLEL details phase ---
+        # --- PARALLEL details phase (Bucket Aggregated) ---
         ts = datetime.now().strftime("%H:%M:%S")
-        print(f"[{ts}] details: Writing {len(bootstrap_novels):,} detail files...", flush=True)
-        detail_items = [
-            (output / "details" / bucket_for_id(row["id"]) / f"{row['id']}.json", details[row["id"]])
-            for row in bootstrap_novels
-        ]
+        print(f"[{ts}] details: Aggregating {len(bootstrap_novels):,} details into 256 bucket files...", flush=True)
+        (output / "details").mkdir(parents=True, exist_ok=True)
+        detail_buckets: dict[str, dict[str, Any]] = defaultdict(dict)
+        for row in bootstrap_novels:
+            nid = row["id"]
+            detail_buckets[bucket_for_id(nid)][str(nid)] = details[nid]
+
+        def _write_detail_bucket(b: str) -> None:
+            _atomic_json(output / "details" / f"{b}.json", detail_buckets.get(b, {}))
+
         with ThreadPoolExecutor(max_workers=min(32, n_workers * 4)) as io_exec:
-            list(io_exec.map(lambda item: _atomic_json(item[0], item[1]), detail_items))
+            list(io_exec.map(_write_detail_bucket, [f"{v:02x}" for v in range(256)]))
 
-        # --- PARALLEL rich pool phase ---
-        ordered_seeds = conn.execute(
-            "SELECT id FROM novels ORDER BY reading_list_count DESC, rating_votes DESC, id ASC"
-        ).fetchall()
-        selected = {row["id"] for row in ordered_seeds[:max_novels]} if max_novels is not None else {
-            row["id"] for row in ordered_seeds
-        }
-        selected &= exported_ids
-
-        generator = CandidateGenerator(conn)
-        ts = datetime.now().strftime("%H:%M:%S")
-        print(f"[{ts}] rich-pools: Pre-building vector matrix and caching tag maps for {len(exported_ids):,} titles...", flush=True)
-        _ = generator._get_vector_data()
-        _ = generator._get_novel_tags_map()
-        _ = generator._get_idf_dict()
-
-        selected_novels = [row["id"] for row in bootstrap_novels if row["id"] in selected]
-        rich_log = ProgressLogger("rich-pools", len(selected_novels), min_interval_s=1.0)
-
-        import threading
-        thread_local = threading.local()
-
-        def _process_rich_pool(novel_id: int) -> bool:
-            if not hasattr(thread_local, "conn"):
-                thread_local.conn = get_connection(db_path)
-            tconn = thread_local.conn
-
-            pool_path = output / "recs" / bucket_for_id(novel_id) / f"{novel_id}.json"
-            if reuse_recommendations and pool_path.is_file():
-                pool = json.loads(pool_path.read_text())
-                if pool.get("seed") != novel_id:
-                    raise ValueError(f"invalid reusable recommendation pool for {novel_id}")
-            else:
-                pool = _export_pool(tconn, generator, novel_id, candidate_limit, tag_indices, list_titles)
-                pool["candidates"] = [c for c in pool["candidates"] if c["id"] in exported_ids]
-                if not pool["candidates"]:
-                    pool["reason"] = "no_candidates_in_snapshot"
-            if pool is not None:
-                _atomic_json(pool_path, pool)
-                return bool(pool.get("candidates"))
-            elif pool_path.exists():
-                pool_path.unlink()
-            return False
-
-        rich_recommendable = 0
-        with ThreadPoolExecutor(max_workers=min(16, n_workers * 2)) as rich_exec:
-            futures = [rich_exec.submit(_process_rich_pool, nid) for nid in selected_novels]
-            for future in as_completed(futures):
-                rich_recommendable += future.result()
-                rich_log.update(1)
-        rich_log.done_msg()
-
-        t_rich = time.perf_counter()
-
-        # --- PARALLEL compact pool phase ---
-        # Each worker spawns fresh, runs _worker_init() which builds its own
-        # CompactCandidateIndex from SQLite — zero pickling of the big object.
-        # Workers only receive tiny lists of novel IDs.
+        # --- PARALLEL recommendation pool phase (256 Sharded Index) ---
         all_novel_ids = sorted(catalog_ids)
         chunk_size = max(50, math.ceil(len(all_novel_ids) / (n_workers * 16)))
         chunks = [all_novel_ids[i:i + chunk_size] for i in range(0, len(all_novel_ids), chunk_size)]
@@ -669,10 +623,9 @@ def export_static_dataset(
             compact_buckets[bucket_for_id(novel_id)][str(novel_id)] = pool
             recommendable += bool(pool)
 
-        # Pre-create recommendation-index directory once
         (output / "recommendation-index").mkdir(parents=True, exist_ok=True)
+        (output / "recs").mkdir(parents=True, exist_ok=True)
 
-        # --- PARALLEL bucket write phase (I/O-bound → ThreadPoolExecutor) ---
         bucket_log = ProgressLogger("bucket-writes", 256)
         write_args = [
             (output, f"{v:02x}", compact_buckets.get(f"{v:02x}", {}))
@@ -687,6 +640,17 @@ def export_static_dataset(
             list(io_exec.map(_write_and_log, write_args))
         bucket_log.done_msg()
 
+        # Clean up legacy subdirectories if present
+        for group in ("details", "recs"):
+            for path in (output / group).glob("*/*.json"):
+                path.unlink()
+            for sub in (output / group).glob("*"):
+                if sub.is_dir():
+                    try:
+                        sub.rmdir()
+                    except OSError:
+                        pass
+
         t_write = time.perf_counter()
 
         # Cleanup orphaned files from a narrower catalog scope
@@ -695,6 +659,7 @@ def export_static_dataset(
                 if path.stem.isdigit() and int(path.stem) not in exported_ids:
                     path.unlink()
 
+        rich_recommendable = recommendable
         generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         manifest = {
             "schema_version": SCHEMA_VERSION,
@@ -705,8 +670,8 @@ def export_static_dataset(
             "source_novel_count": source_novel_count,
             "bootstrap_novel_count": len(bootstrap_novels),
             "detail_novel_count": len(bootstrap_novels),
-            "recommendation_seed_count": len(selected),
-            "rich_recommendation_seed_count": len(selected),
+            "recommendation_seed_count": len(catalog_ids),
+            "rich_recommendation_seed_count": len(catalog_ids),
             "snapshot_scope": (
                 f"complete_catalog_with_top_{len(bootstrap_novels)}_bootstrap"
                 if catalog_limit is not None else "complete_catalog"
@@ -731,8 +696,7 @@ def export_static_dataset(
         print(
             f"[{ts}] export: ✓ Total {t_total - t0:.1f}s  "
             f"| meta {t_meta-t0:.1f}s"
-            f"  rich-pools {t_rich-t_meta:.1f}s"
-            f"  compact-pools {t_pools-t_rich:.1f}s"
+            f"  compact-pools {t_pools-t_meta:.1f}s"
             f"  bucket-writes {t_write-t_pools:.1f}s",
             flush=True,
         )
@@ -778,13 +742,19 @@ def verify_export(
     options = json.loads((output / manifest.get("options_url", "options.json")).read_text())
     if options.get("genres") != catalog.get("genres") or options.get("tags") != catalog.get("tags"):
         raise ValueError("options and catalog facet dictionaries differ")
+    detail_shards = {}
+    for bucket in (f"{v:02x}" for v in range(256)):
+        path = output / "details" / f"{bucket}.json"
+        if path.is_file():
+            detail_shards[bucket] = json.loads(path.read_text())
     for row in bootstrap["rows"]:
         novel_id = row[0]
-        path = output / "details" / bucket_for_id(novel_id) / f"{novel_id}.json"
-        if not path.is_file():
-            raise ValueError(f"missing details artifact for novel {novel_id}")
-        if json.loads(path.read_text())["id"] != novel_id:
-            raise ValueError(f"invalid details artifact for novel {novel_id}")
+        bucket = bucket_for_id(novel_id)
+        shard = detail_shards.get(bucket) or {}
+        if str(novel_id) not in shard:
+            legacy_file = output / "details" / bucket / f"{novel_id}.json"
+            if not legacy_file.is_file():
+                raise ValueError(f"missing details artifact for novel {novel_id}")
     index_template = manifest.get("recommendation_index_url")
     if index_template:
         indexed_seeds = 0

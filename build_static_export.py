@@ -200,6 +200,12 @@ class CompactCandidateIndex:
                 self.tags_by_novel[novel_id].add(tag_id)
                 self.novels_by_tag[tag_id].append(novel_id)
                 tag_frequency[tag_id] = tag_frequency.get(tag_id, 0) + 1
+        self.popularity = dict(conn.execute(
+            "SELECT id, COALESCE(reading_list_count, 0) FROM novels"
+        ))
+        for tag_id, novel_list in list(self.novels_by_tag.items()):
+            novel_list.sort(key=lambda cid: self.popularity.get(cid, 0), reverse=True)
+            self.novels_by_tag[tag_id] = novel_list[:500]
         total = max(1, len(novel_ids))
         priority = {name.lower() for name in HIGH_PRIORITY_TAGS}
         tag_names = dict(conn.execute("SELECT id, name FROM tags"))
@@ -501,38 +507,13 @@ def export_static_dataset(
         }
         selected &= exported_ids
         generator = CandidateGenerator(conn)
-        rich_recommendable = 0
-        for index, row in enumerate(bootstrap_novels, 1):
-            novel_id = row["id"]
-            _atomic_json(
-                output / "details" / bucket_for_id(novel_id) / f"{novel_id}.json",
-                details[novel_id],
-            )
-            pool_path = output / "recs" / bucket_for_id(novel_id) / f"{novel_id}.json"
-            if reuse_recommendations and pool_path.is_file():
-                pool = json.loads(pool_path.read_text())
-                if pool.get("seed") != novel_id:
-                    raise ValueError(f"invalid reusable recommendation pool for {novel_id}")
-            elif novel_id in selected:
-                pool = _export_pool(
-                    conn, generator, novel_id, candidate_limit,
-                    tag_indices, list_titles
-                )
-                pool["candidates"] = [
-                    candidate for candidate in pool["candidates"]
-                    if candidate["id"] in exported_ids
-                ]
-                if not pool["candidates"]:
-                    pool["reason"] = "no_candidates_in_snapshot"
-            else:
-                pool = None
-            if pool is not None:
-                rich_recommendable += bool(pool["candidates"])
-                _atomic_json(pool_path, pool)
-            elif pool_path.exists():
-                pool_path.unlink()
-            if index % 100 == 0:
-                print(f"Exported recommendation pools: {index}/{len(bootstrap_novels)}")
+        (output / "details").mkdir(parents=True, exist_ok=True)
+        detail_buckets: dict[str, dict[str, Any]] = defaultdict(dict)
+        for row in bootstrap_novels:
+            nid = row["id"]
+            detail_buckets[bucket_for_id(nid)][str(nid)] = details[nid]
+        for bucket in (f"{v:02x}" for v in range(256)):
+            _atomic_json(output / "details" / f"{bucket}.json", detail_buckets.get(bucket, {}))
 
         compact_index = CompactCandidateIndex(conn, catalog_ids, tag_indices)
         compact_buckets: dict[str, dict[str, list[list[Any]]]] = defaultdict(dict)
@@ -541,8 +522,10 @@ def export_static_dataset(
             compact_pool = compact_index.pool(novel_id, compact_candidate_limit)
             compact_buckets[bucket_for_id(novel_id)][str(novel_id)] = compact_pool
             recommendable += bool(compact_pool)
-            if index % 1000 == 0:
+            if index % 5000 == 0:
                 print(f"Exported compact recommendation pools: {index}/{len(catalog_ids)}")
+        (output / "recommendation-index").mkdir(parents=True, exist_ok=True)
+        (output / "recs").mkdir(parents=True, exist_ok=True)
         for bucket in (f"{value:02x}" for value in range(256)):
             _atomic_json(output / "recommendation-index" / f"{bucket}.json", {
                 "algorithm_version": ALGORITHM_VERSION,
@@ -551,12 +534,18 @@ def export_static_dataset(
             })
 
         # Re-running a bounded export into the same directory must not leave
-        # addressable detail/pool files from a different catalog scope.
+        # legacy subdirectories or per-item files.
         for group in ("details", "recs"):
             for path in (output / group).glob("*/*.json"):
-                if path.stem.isdigit() and int(path.stem) not in exported_ids:
-                    path.unlink()
+                path.unlink()
+            for sub in (output / group).glob("*"):
+                if sub.is_dir():
+                    try:
+                        sub.rmdir()
+                    except OSError:
+                        pass
 
+        rich_recommendable = recommendable
         generated_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         manifest = {
             "schema_version": SCHEMA_VERSION,
@@ -632,13 +621,19 @@ def verify_export(
     options = json.loads((output / manifest.get("options_url", "options.json")).read_text())
     if options.get("genres") != catalog.get("genres") or options.get("tags") != catalog.get("tags"):
         raise ValueError("options and catalog facet dictionaries differ")
+    detail_shards = {}
+    for bucket in (f"{v:02x}" for v in range(256)):
+        path = output / "details" / f"{bucket}.json"
+        if path.is_file():
+            detail_shards[bucket] = json.loads(path.read_text())
     for row in bootstrap["rows"]:
         novel_id = row[0]
-        path = output / "details" / bucket_for_id(novel_id) / f"{novel_id}.json"
-        if not path.is_file():
-            raise ValueError(f"missing details artifact for novel {novel_id}")
-        if json.loads(path.read_text())["id"] != novel_id:
-            raise ValueError(f"invalid details artifact for novel {novel_id}")
+        bucket = bucket_for_id(novel_id)
+        shard = detail_shards.get(bucket) or {}
+        if str(novel_id) not in shard:
+            legacy_file = output / "details" / bucket / f"{novel_id}.json"
+            if not legacy_file.is_file():
+                raise ValueError(f"missing details artifact for novel {novel_id}")
     index_template = manifest.get("recommendation_index_url")
     if index_template:
         indexed_seeds = 0

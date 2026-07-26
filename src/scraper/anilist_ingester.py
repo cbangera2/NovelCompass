@@ -165,12 +165,13 @@ class AniListIngester:
 
     def ingest_media_nodes(self, media_nodes: List[Dict[str, Any]]) -> List[int]:
         ingested_ids = []
-        for raw in media_nodes:
-            if not raw or not raw.get("id"):
-                continue
-            item = map_anilist_media(raw)
-            db_id = self.repo.upsert_manga(item)
-            ingested_ids.append(db_id)
+        with self.conn:
+            for raw in media_nodes:
+                if not raw or not raw.get("id"):
+                    continue
+                item = map_anilist_media(raw)
+                db_id = self.repo.upsert_manga(item)
+                ingested_ids.append(db_id)
 
             raw_type = (raw.get("type") or "MANGA").upper()
             offset = ANILIST_ANIME_ID_OFFSET if raw_type == "ANIME" else ANILIST_MANGA_ID_OFFSET

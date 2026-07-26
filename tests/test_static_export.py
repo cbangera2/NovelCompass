@@ -70,22 +70,14 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(catalog["aliases"], [[1, ["Uno"]]])
             self.assertEqual(catalog["genres"], ["Fantasy"])
             self.assertEqual(catalog["tags"], ["Academy"])
-            pool = json.loads((root / "out/recs/01/1.json").read_text())
-            self.assertEqual(pool["candidates"][0]["r"], [1, 1, None, None, None])
-            self.assertEqual(pool["candidates"][0]["shared_tag_ids"], [0])
-            self.assertEqual(pool["candidates"][0]["direct_votes"], 3)
-            self.assertEqual(
-                pool["candidates"][0]["lists"],
-                [{"id": 10, "title": "Thoughtful progression fantasy"}],
-            )
-            self.assertFalse((root / "out/recs/01/257.json").exists())
             compact = json.loads(
                 (root / "out/recommendation-index/01.json").read_text()
             )
             self.assertEqual(compact["channels"][0], "tag")
             self.assertEqual(compact["pools"]["257"][0][0], 1)
             self.assertEqual(compact["pools"]["257"][0][2], [0])
-            detail = json.loads((root / "out/details/01/1.json").read_text())
+            details_shard = json.loads((root / "out/details/01.json").read_text())
+            detail = details_shard["1"]
             self.assertEqual(detail["novelupdates_url"], "https://www.novelupdates.com/?p=1")
             self.assertEqual(manifest["novel_count"], 2)
             self.assertEqual(manifest["source_novel_count"], 2)
@@ -109,9 +101,8 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(layered["novel_count"], 2)
             self.assertEqual(layered["bootstrap_novel_count"], 1)
             self.assertEqual(layered["bootstrap_catalog_url"], "bootstrap-catalog.json")
-            self.assertTrue((root / "layered/details/01/1.json").is_file())
-            self.assertFalse((root / "layered/details/01/257.json").exists())
-            self.assertFalse((root / "layered/recs/01/257.json").exists())
+            layered_details = json.loads((root / "layered/details/01.json").read_text())
+            self.assertIn("1", layered_details)
             layered_compact = json.loads(
                 (root / "layered/recommendation-index/01.json").read_text()
             )
