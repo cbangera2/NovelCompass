@@ -178,6 +178,51 @@ def artifact_status(db_path: Path) -> dict:
     return result
 
 
+def _sync_anilist_source(db_path: Path, pages: int = 10, per_page: int = 50, media_type: str = "all") -> dict:
+    from src.scraper.anilist_client import AniListClient
+    from src.scraper.anilist_ingester import AniListIngester
+
+    def log(msg: str) -> None:
+        ts = datetime.now().strftime("%H:%M:%S")
+        print(f"[{ts}] [AniList] {msg}", flush=True)
+
+    log(f"Connecting to database at {db_path}...")
+    conn = init_db(str(db_path))
+    client = AniListClient()
+    ingester = AniListIngester(conn, client)
+    sync_types = ["anime", "manga"] if media_type == "all" else [media_type]
+    total_ingested = 0
+
+    try:
+        for m_type in sync_types:
+            log(f"--- Syncing {m_type.upper()} ({pages} page(s), {per_page} items/page) ---")
+            for p in range(1, pages + 1):
+                log(f"Fetching page {p}/{pages} for {m_type}...")
+                if m_type == "anime":
+                    ingested_ids = ingester.sync_popular_anime(page=p, per_page=per_page)
+                else:
+                    ingested_ids = ingester.sync_popular_manga(page=p, per_page=per_page)
+                total_ingested += len(ingested_ids)
+                log(f"✓ Page {p}/{pages} [{m_type}]: Ingested {len(ingested_ids)} items (Total: {total_ingested})")
+
+        anilist_count = conn.execute(
+            "SELECT COUNT(*) FROM novels WHERE COALESCE(source, 'novelupdates') = 'anilist'"
+        ).fetchone()[0]
+        rec_count = conn.execute(
+            """SELECT COUNT(*) FROM direct_recs d 
+               JOIN novels n ON d.source_novel_id = n.id 
+               WHERE n.source = 'anilist'"""
+        ).fetchone()[0]
+        return {
+            "status": "complete",
+            "ingested_count": total_ingested,
+            "anilist_total_media": anilist_count,
+            "anilist_direct_recs": rec_count,
+        }
+    finally:
+        conn.close()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build a separate 2026 refresh artifact without modifying the baseline"
@@ -207,6 +252,24 @@ def main() -> int:
         "--check-robots", dest="ignore_robots", action="store_false"
     )
     crawl.add_argument(
+        "--source",
+        choices=("novelupdates", "anilist", "all"),
+        default="novelupdates",
+        help="Target data source to scrape/sync (default: novelupdates)",
+    )
+    crawl.add_argument(
+        "--pages", type=int, default=10, help="AniList pages to sync (default: 10)"
+    )
+    crawl.add_argument(
+        "--per-page", type=int, default=50, help="AniList per-page count (default: 50)"
+    )
+    crawl.add_argument(
+        "--media-type",
+        choices=("anime", "manga", "all"),
+        default="all",
+        help="AniList media type filter (default: all)",
+    )
+    crawl.add_argument(
         "--mobile",
         action="store_true",
         help="Enable high-throughput Mobile Data Mode with fast CGNAT pacing (1.2-2.2s) and IP rotation prompt",
@@ -218,6 +281,13 @@ def main() -> int:
     elif args.command == "status":
         result = artifact_status(args.db)
     else:
+        if args.source == "anilist":
+            result = _sync_anilist_source(
+                args.db, pages=args.pages, per_page=args.per_page, media_type=args.media_type
+            )
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
+
         if getattr(args, "mobile", False):
             args.min_delay = 1.5
             args.max_delay = 2.5
@@ -225,6 +295,13 @@ def main() -> int:
 
         if args.min_delay < 0.1 or args.max_delay < args.min_delay:
             parser.error("require 0.1 <= min-delay <= max-delay")
+
+        if args.source == "all":
+            anilist_res = _sync_anilist_source(
+                args.db, pages=args.pages, per_page=args.per_page, media_type=args.media_type
+            )
+            print(json.dumps({"anilist_sync": anilist_res}, indent=2))
+
         conn = init_db(str(args.db))
         transport = None
         if args.transport == "browser":
