@@ -39,6 +39,7 @@ import { novelPageUrl } from './novelLinks';
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
 })));
+import { useMediaFilterState } from './mediaFilterState';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 import { discoverSearchParams, parseDiscoverRoute, stableRouteUrl } from './routeState';
 
@@ -47,12 +48,53 @@ const DEFAULT_NOVEL: NovelSearchResult = {
   title: 'Reverend Insanity',
   slug: 'reverend-insanity',
   novelupdates_url: 'https://www.novelupdates.com/?p=6780',
+  external_url: 'https://www.novelupdates.com/?p=6780',
+  media_type: 'novel',
+  source: 'novelupdates',
   author: 'gu zhen ren, 蛊真人',
   rating: 4.3,
   rating_votes: 1625
 };
 
+const DEFAULT_MANGA: NovelSearchResult = {
+  id: 2117195,
+  title: 'Oshi no Ko',
+  slug: 'oshi-no-ko',
+  novelupdates_url: 'https://anilist.co/manga/117195',
+  external_url: 'https://anilist.co/manga/117195',
+  media_type: 'manga',
+  source: 'anilist',
+  external_id: '117195',
+  author: 'Aka Akasaka, Mengo Yokoyari',
+  rating: 4.4,
+  rating_votes: 2000
+};
+
+const DEFAULT_ANIME: NovelSearchResult = {
+  id: 3001535,
+  title: 'DEATH NOTE',
+  slug: 'death-note',
+  novelupdates_url: 'https://anilist.co/anime/1535',
+  external_url: 'https://anilist.co/anime/1535',
+  media_type: 'anime',
+  source: 'anilist',
+  external_id: '1535',
+  author: 'Madhouse',
+  rating: 4.3,
+  rating_votes: 2500
+};
+
+export function getDefaultSeed(types: string[]): NovelSearchResult {
+  if (types.length === 1) {
+    if (types[0] === 'manga') return DEFAULT_MANGA;
+    if (types[0] === 'anime') return DEFAULT_ANIME;
+    if (types[0] === 'novel') return DEFAULT_NOVEL;
+  }
+  return DEFAULT_NOVEL;
+}
+
 export default function App(): JSX.Element {
+  const { selectedTypes } = useMediaFilterState();
   const savedFilters = loadFilterSnapshot('discover', {
     hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
     requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
@@ -284,14 +326,42 @@ export default function App(): JSX.Element {
           chooseNovel(seed);
           return fetchRecommendations(seed);
         })
-        .catch(() => fetchRecommendations(DEFAULT_NOVEL))
+        .catch(() => {
+          const fallback = getDefaultSeed(selectedTypes);
+          chooseNovel(fallback);
+          return fetchRecommendations(fallback);
+        })
         .finally(() => { autoRefreshReadyRef.current = true; });
     } else {
-      fetchRecommendations(DEFAULT_NOVEL).finally(() => { autoRefreshReadyRef.current = true; });
+      const initialSeed = getDefaultSeed(selectedTypes);
+      chooseNovel(initialSeed);
+      fetchRecommendations(initialSeed).finally(() => { autoRefreshReadyRef.current = true; });
     }
     // Load the initial recommendation set once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataSource]);
+
+  useEffect(() => {
+    if (!autoRefreshReadyRef.current || !dataSource) return;
+    const currentSeedType = (
+      selectedNovel?.media_type ||
+      (selectedNovel && selectedNovel.id >= 3000000
+        ? 'anime'
+        : selectedNovel && selectedNovel.id >= 2000000
+        ? 'manga'
+        : 'novel')
+    ).toLowerCase();
+    const matchesSelected =
+      selectedTypes.includes(currentSeedType as any) ||
+      selectedTypes.includes('all' as any);
+
+    if (!matchesSelected) {
+      const fallbackSeed = getDefaultSeed(selectedTypes);
+      chooseNovel(fallbackSeed);
+      fetchRecommendations(fallbackSeed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTypes]);
 
   useEffect(() => {
     if (!dataSource) return;
@@ -304,7 +374,7 @@ export default function App(): JSX.Element {
       setIncludeTagsText(route.includeTagsText); setExcludeTagsText(route.excludeTagsText);
       setTagWeight(route.tagWeight); setDirectRecWeight(route.directRecWeight); setListWeight(route.listWeight);
       setStructuralWeight(route.structuralWeight); setHiddenGemStrength(route.hiddenGemStrength); setMaxResults(route.maxResults);
-      let seed = DEFAULT_NOVEL;
+      let seed = getDefaultSeed(selectedTypes);
       if (route.seed) {
         const detail = await dataSource.getNovel(route.seed).catch(() => null);
         if (detail) seed = {
