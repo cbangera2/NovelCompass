@@ -22,7 +22,7 @@ import {
 } from './profile/store';
 import { downloadProfileBackup } from './profile/transfer';
 import { ProfileImportDialog } from './profile/ProfileImportDialog';
-import { Badge, DSButton } from './design-system';
+import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
 import type { NovelSearchResult } from './types';
@@ -189,7 +189,6 @@ export default function AppShell({
       </Sidebar>
       <SidebarInset>
         <header className="shell-desktop-header">
-          <MediaFilterBar />
           <GlobalNovelSearch compact={activeView === 'discover' || activeView === 'browse'} />
           <AccountMenu profile={profile} profileLabel={profileLabel} />
         </header>
@@ -246,46 +245,6 @@ function SidebarMediaGroup() {
         })}
       </SidebarMenu>
     </SidebarGroup>
-  );
-}
-
-function MediaFilterBar() {
-  const { isSelected, toggleType, setTypes, isAllSelected } = useMediaFilterState();
-
-  const choices: Array<{ type: MediaTypeChoice; label: string; icon: any }> = [
-    { type: 'novel', label: 'Light Novels', icon: Book },
-    { type: 'manga', label: 'Manga', icon: ImageIcon },
-    { type: 'anime', label: 'Anime', icon: Film },
-  ];
-
-  return (
-    <nav className="shell-media-selector" aria-label="Media format filters">
-      <DSButton
-        variant={isAllSelected ? 'primary' : 'ghost'}
-        className="media-pill"
-        onClick={() => setTypes(['novel', 'manga', 'anime'])}
-        title="Show all media formats"
-      >
-        All Media
-      </DSButton>
-      <div className="media-pill-group">
-        {choices.map(({ type, label, icon: Icon }) => {
-          const active = isSelected(type);
-          return (
-            <DSButton
-              key={type}
-              variant={active ? 'primary' : 'ghost'}
-              className={`media-pill ${active ? 'active' : ''}`}
-              aria-pressed={active}
-              onClick={() => toggleType(type)}
-            >
-              <Icon size={14} aria-hidden="true" />
-              <span>{label}</span>
-            </DSButton>
-          );
-        })}
-      </div>
-    </nav>
   );
 }
 
