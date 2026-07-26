@@ -920,52 +920,69 @@ export default function App(): JSX.Element {
         </div>
         <div className="filter-basics">
           <FieldGroup label="Show">
-            <Checkbox
-              label="For You"
-              title={
+            <Tooltip
+              content={
                 profile
-                  ? 'Merge recs from your top rated, completed, and loved seeds'
-                  : 'Import a profile first'
+                  ? 'Merge recommendations from your top rated, completed, and loved titles'
+                  : 'Import a profile first to enable personalized recommendations'
               }
-              checked={forYouMode}
-              disabled={!profile}
-              onChange={(e) => {
-                if (e.currentTarget.checked) runForYou();
-                else {
-                  setForYouMode(false);
-                  setForYouMeta(null);
-                  const seed = selectedNovel || getDefaultSeed(selectedTypes);
-                  chooseNovel(seed);
-                  void fetchRecommendations(seed, Math.min(8, maxResults), false, { forYou: false });
-                }
-              }}
-            />
-            <Checkbox label="Hidden gems" title="Rating ≥ 4.2 with lower reader count" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.currentTarget.checked)} />
-            <Checkbox label="Completed" title="Finished / fully translated titles" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.currentTarget.checked)} />
-            <Checkbox
-              label="Cross-format"
-              title={
+            >
+              <Checkbox
+                label="For You"
+                checked={forYouMode}
+                disabled={!profile}
+                onChange={(e) => {
+                  if (e.currentTarget.checked) runForYou();
+                  else {
+                    setForYouMode(false);
+                    setForYouMeta(null);
+                    const seed = selectedNovel || getDefaultSeed(selectedTypes);
+                    chooseNovel(seed);
+                    void fetchRecommendations(seed, Math.min(8, maxResults), false, { forYou: false });
+                  }
+                }}
+              />
+            </Tooltip>
+            <Tooltip content="Show titles rated 4.2★+ with lower reader counts (<2,000 readers)">
+              <Checkbox label="Hidden gems" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.currentTarget.checked)} />
+            </Tooltip>
+            <Tooltip content="Show finished or fully translated titles only">
+              <Checkbox label="Completed" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.currentTarget.checked)} />
+            </Tooltip>
+            <Tooltip
+              content={
                 isAllSelected
-                  ? 'All formats are already in scope'
+                  ? 'All formats are already in scope via the format switcher'
                   : 'Allow recommendations outside the formats selected in the sidebar'
               }
-              checked={includeOtherFormats}
-              disabled={isAllSelected}
-              onChange={(e) => setIncludeOtherFormats(e.currentTarget.checked)}
-            />
-            {profile && (
+            >
               <Checkbox
-                label="Exclude library"
-                title="Drops matched library + Not-for-me titles from recommendation ranking"
-                checked={hideLibraryTitles}
-                onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)}
+                label="Cross-format"
+                checked={includeOtherFormats}
+                disabled={isAllSelected}
+                onChange={(e) => setIncludeOtherFormats(e.currentTarget.checked)}
               />
+            </Tooltip>
+            {profile && (
+              <Tooltip content="Exclude matched library and Not-for-Me titles from recommendation ranking">
+                <Checkbox
+                  label="Exclude library"
+                  checked={hideLibraryTitles}
+                  onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)}
+                />
+              </Tooltip>
             )}
           </FieldGroup>
           <FieldGroup label="Leave out">
-            <Checkbox label="Harem" checked={excludeHarem} onChange={(e) => setExcludeHarem(e.currentTarget.checked)} />
-            <Checkbox label="BL" checked={excludeBL} onChange={(e) => setExcludeBL(e.currentTarget.checked)} />
-            <Checkbox label="Yuri" checked={excludeYuri} onChange={(e) => setExcludeYuri(e.currentTarget.checked)} />
+            <Tooltip content="Exclude titles tagged with Harem genre or themes">
+              <Checkbox label="Harem" checked={excludeHarem} onChange={(e) => setExcludeHarem(e.currentTarget.checked)} />
+            </Tooltip>
+            <Tooltip content="Exclude Boys' Love / Yaoi titles">
+              <Checkbox label="BL" checked={excludeBL} onChange={(e) => setExcludeBL(e.currentTarget.checked)} />
+            </Tooltip>
+            <Tooltip content="Exclude Girls' Love / Yuri titles">
+              <Checkbox label="Yuri" checked={excludeYuri} onChange={(e) => setExcludeYuri(e.currentTarget.checked)} />
+            </Tooltip>
           </FieldGroup>
           <div className="filter-selects">
             <Select label="Language" value={language} onChange={(e) => setLanguage(e.currentTarget.value)}>

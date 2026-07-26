@@ -649,7 +649,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .ui-button-ghost:hover { background: var(--surface-raised); color: var(--text); }
 .ui-button-primary { background: var(--accent); border-color: transparent; color: white; }
 .ui-tooltip { display: inline-flex; position: relative; }
-.ui-tooltip-content { background: #080a10; border: 1px solid rgba(255,255,255,.15); border-radius: 7px; bottom: calc(100% + 7px); color: #f7f5ff; font-size: .64rem; left: 50%; max-width: 220px; opacity: 0; padding: .35rem .48rem; pointer-events: none; position: absolute; transform: translate(-50%,4px); transition: opacity .15s,transform .15s; visibility: hidden; white-space: nowrap; z-index: 80; }
+.ui-tooltip-content { background: #111522; border: 1px solid var(--border-strong); border-radius: 8px; bottom: calc(100% + 7px); box-shadow: 0 10px 30px rgba(0,0,0,.5); color: #e5e1f8; font-size: .66rem; font-weight: 500; left: 50%; line-height: 1.35; max-width: 220px; opacity: 0; padding: .4rem .55rem; pointer-events: none; position: absolute; text-align: center; transform: translate(-50%,4px); transition: opacity .15s,transform .15s; visibility: hidden; white-space: normal; width: max-content; z-index: 100; }
 .ui-tooltip-bottom .ui-tooltip-content { bottom: auto; top: calc(100% + 7px); transform: translate(-50%,-4px); }
 .ui-tooltip:hover .ui-tooltip-content,.ui-tooltip:focus-within .ui-tooltip-content { opacity: 1; transform: translate(-50%,0); visibility: visible; }
 .active-filter-chips { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .65rem; padding-top: .55rem; }
