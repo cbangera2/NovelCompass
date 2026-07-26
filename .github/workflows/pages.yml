@@ -55,6 +55,11 @@ jobs:
           fi
           echo "mode=external" >> "${GITHUB_OUTPUT}"
 
+      - name: Fetch pre-built dataset from data repository
+        if: steps.static-source.outputs.mode == 'committed'
+        run: |
+          git clone --depth 1 https://github.com/cbangera2/novelcompass-data.git web/public/data
+
       - name: Download and verify database
         if: steps.static-source.outputs.mode == 'external'
         env:
@@ -87,13 +92,13 @@ jobs:
             fi
             export_args+=(--catalog-limit "${STATIC_CATALOG_LIMIT}")
           fi
-          python build_static_export.py \
+          python build_static_export_parallel.py \
             --db "${RUNNER_TEMP}/recommender.sqlite" \
             --output web/public/data \
             "${export_args[@]}"
 
       - name: Validate normalized static data
-        run: python build_static_export.py --output web/public/data --verify-only
+        run: python build_static_export_parallel.py --output web/public/data --verify-only
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

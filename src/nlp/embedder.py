@@ -18,7 +18,7 @@ class SynopsisEmbedder:
         try:
             from sentence_transformers import SentenceTransformer
             print(f"Loading embedding model: {self.model_name}...")
-            self.model = SentenceTransformer(self.model_name)
+            self.model = SentenceTransformer(self.model_name, device="cpu")
         except Exception as e:
             print(f"[Warning] Could not load SentenceTransformer ({e}). Fallback to TF-IDF vectorizer.")
             self.model = None
@@ -38,7 +38,7 @@ class SynopsisEmbedder:
     def encode(self, texts: List[str]) -> np.ndarray:
         self._load_model()
         if self.model is not None:
-            return self.model.encode(texts, show_progress_bar=False, normalize_embeddings=True)
+            return self.model.encode(texts, batch_size=256, show_progress_bar=False, normalize_embeddings=True)
         else:
             # Simple TF-IDF fallback vectorizer
             from sklearn.feature_extraction.text import TfidfVectorizer
