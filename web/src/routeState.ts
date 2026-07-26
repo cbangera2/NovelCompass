@@ -7,6 +7,7 @@ export const DISCOVER_DEFAULTS = {
 
 export type DiscoverRouteState = typeof DISCOVER_DEFAULTS & {
   seed?: number;
+  forYou?: boolean;
   genreStates: Record<string, 'include' | 'exclude'>;
 };
 
@@ -29,6 +30,7 @@ export function parseDiscoverRoute(params: URLSearchParams, fallback: DiscoverRo
   return {
     ...fallback,
     seed: seed || undefined,
+    forYou: booleanValue(params, 'for_you', Boolean(fallback.forYou)),
     hiddenGemMode: booleanValue(params, 'hg', fallback.hiddenGemMode),
     excludeHarem: booleanValue(params, 'xh', fallback.excludeHarem),
     excludeBL: booleanValue(params, 'xb', fallback.excludeBL),
@@ -58,6 +60,7 @@ export function discoverSearchParams(state: DiscoverRouteState): URLSearchParams
     if (value !== fallback && value !== '' && value !== false && value !== 0) params.set(key, value === true ? '1' : String(value));
   };
   if (state.seed) params.set('seed', String(state.seed));
+  set('for_you', Boolean(state.forYou), false);
   set('hg', state.hiddenGemMode, false); set('xh', state.excludeHarem, false);
   set('xb', state.excludeBL, false); set('xy', state.excludeYuri, false); set('done', state.requireCompleted, false);
   set('lang', state.language, ''); set('r', state.minRating, 0); set('v', state.minRatingVotes, 0);

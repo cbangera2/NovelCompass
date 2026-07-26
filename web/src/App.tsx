@@ -30,6 +30,12 @@ import {
 import { useDataModePreference } from './dataModePreference';
 import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile/types';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
+import {
+  buildExcludeIds,
+  fetchForYouRecommendations,
+  selectPositiveSeeds,
+  type TasteSeed,
+} from './profile/taste';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
@@ -169,7 +175,16 @@ export default function App(): JSX.Element {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailEvidence, setDetailEvidence] = useState<string[]>([]);
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
-  const [hideLibraryTitles, setHideLibraryTitles] = useState(false);
+  const [hideLibraryTitles, setHideLibraryTitles] = useState(true);
+  const [forYouMode, setForYouMode] = useState(() =>
+    new URLSearchParams(window.location.search).get('for_you') === '1'
+  );
+  const [forYouMeta, setForYouMeta] = useState<{
+    seedsUsed: TasteSeed[];
+    seedsFailed: Array<{ seed: TasteSeed; error: string }>;
+    excludeCount: number;
+    progress?: string;
+  } | null>(null);
 
   useEffect(() => {
     loadLocalProfile().then(setProfile).catch(() => setProfile(null));
@@ -185,14 +200,18 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const params = discoverSearchParams({ seed: selectedNovel?.id, hiddenGemMode, excludeHarem, excludeBL,
+      const params = discoverSearchParams({
+        seed: forYouMode ? undefined : selectedNovel?.id,
+        forYou: forYouMode,
+        hiddenGemMode, excludeHarem, excludeBL,
         excludeYuri, requireCompleted, language, minRating, minRatingVotes, maxReaders, minYear, maxYear,
         genreStates, includeTagsText, excludeTagsText, tagWeight, directRecWeight, listWeight,
-        structuralWeight, hiddenGemStrength, maxResults });
+        structuralWeight, hiddenGemStrength, maxResults,
+      });
       window.history.replaceState(null, '', stableRouteUrl(params));
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [selectedNovel?.id, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
+  }, [selectedNovel?.id, forYouMode, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
     minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
     tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
 
@@ -249,53 +268,138 @@ export default function App(): JSX.Element {
     };
   }, [query, selectedNovel, dataSource]);
 
+  const libraryExcludeIds = useMemo(() => {
+    if (!profile) return [] as number[];
+    const ids = buildExcludeIds(profile);
+    // When "Unread only" is off, still exclude not-for-me; keep library visible in results.
+    if (hideLibraryTitles) return ids;
+    return (profile.feedback || [])
+      .filter((item) => item.signal === 'not_for_me')
+      .map((item) => item.novel_id);
+  }, [profile, hideLibraryTitles]);
+
   const fetchRecommendations = async (
     novel: NovelSearchResult | null = selectedNovel,
     requestedLimit = Math.min(8, maxResults),
-    expanding = false
+    expanding = false,
+    options: { forYou?: boolean } = {}
   ) => {
     const source = dataSourceRef.current;
     if (!source) return;
-    const requestedQuery = novel ? String(novel.id) : selectedNovel ? String(selectedNovel.id) : query.trim();
-    if (!requestedQuery) return;
+    const useForYou = options.forYou ?? forYouMode;
 
     const requestId = ++recommendationRequestRef.current;
     setLoading(true);
     if (!expanding) setIncrementalError(null);
     setError(null);
     setShowSuggestions(false);
+
+    const basePayload: Omit<RecommendRequest, 'query'> = {
+      limit: requestedLimit,
+      hidden_gem_mode: hiddenGemMode,
+      exclude_harem: excludeHarem,
+      exclude_bl: excludeBL,
+      exclude_yuri: excludeYuri,
+      require_completed: requireCompleted,
+      language,
+      min_rating: minRating,
+      min_rating_votes: minRatingVotes,
+      max_readers: maxReaders,
+      min_year: minYear,
+      max_year: maxYear,
+      include_genres: Object.entries(genreStates).filter(([, state]) => state === 'include').map(([genre]) => genre),
+      exclude_genres: Object.entries(genreStates).filter(([, state]) => state === 'exclude').map(([genre]) => genre),
+      include_tags: includeTagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
+      exclude_tags: excludeTagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
+      channel_weights: {
+        tag: tagWeight,
+        direct_rec: directRecWeight,
+        rec_list: listWeight,
+        structural: structuralWeight
+      },
+      hidden_gem_strength: hiddenGemStrength,
+      media_type: includeOtherFormats || !mediaParam ? 'all' : mediaParam,
+      exclude_novel_ids: libraryExcludeIds,
+    };
+
     try {
+      if (useForYou) {
+        if (!profile) {
+          setError('Import a local profile first — For You needs ratings or completed titles.');
+          setForYouMeta(null);
+          return;
+        }
+        const seeds = selectPositiveSeeds(profile, { limit: 12 });
+        if (!seeds.length) {
+          setError(
+            'For You needs matched positive seeds (4★+, Completed, or Loved). Rate catalog-matched titles or import Completed lists.'
+          );
+          setForYouMeta({ seedsUsed: [], seedsFailed: [], excludeCount: libraryExcludeIds.length });
+          setData(null);
+          return;
+        }
+        setForYouMeta({
+          seedsUsed: seeds,
+          seedsFailed: [],
+          excludeCount: libraryExcludeIds.length,
+          progress: `0/${seeds.length}`,
+        });
+        const result = await fetchForYouRecommendations(source, profile, basePayload, {
+          seedLimit: 12,
+          onProgress: (done, total, seedTitle) => {
+            if (requestId !== recommendationRequestRef.current) return;
+            setForYouMeta({
+              seedsUsed: seeds,
+              seedsFailed: [],
+              excludeCount: libraryExcludeIds.length,
+              progress: `${done}/${total} · ${seedTitle}`,
+            });
+          },
+        });
+        if (requestId !== recommendationRequestRef.current) return;
+        setForYouMeta({
+          seedsUsed: result.seeds_used,
+          seedsFailed: result.seeds_failed,
+          excludeCount: result.exclude_count,
+        });
+        const json: RecommendResponse = {
+          seed_novel: {
+            id: 0,
+            title: 'For You (multi-seed)',
+            slug: 'for-you',
+            novelupdates_url: '',
+            cover_url: undefined,
+          },
+          count: result.recommendations.length,
+          recommendations: result.recommendations,
+        };
+        setData(json);
+        setLoadedLimit(requestedLimit);
+        setAvailableExhausted(true); // multi-seed path loads a fixed merge batch
+        if (!expanding) setVisibleCount(8);
+        if (result.seeds_failed.length && !result.recommendations.length) {
+          setError(
+            `Every seed failed. Example: ${result.seeds_failed[0].seed.title} — ${result.seeds_failed[0].error}`
+          );
+        } else if (result.seeds_failed.length) {
+          setIncrementalError(
+            `${result.seeds_failed.length} seed${result.seeds_failed.length === 1 ? '' : 's'} failed (often missing static rec shards). Showing merge of ${result.seeds_used.length} successful seeds.`
+          );
+        }
+        return;
+      }
+
+      const requestedQuery = novel ? String(novel.id) : selectedNovel ? String(selectedNovel.id) : query.trim();
+      if (!requestedQuery) return;
+
       const payload: RecommendRequest = {
+        ...basePayload,
         query: requestedQuery,
-        limit: requestedLimit,
-        hidden_gem_mode: hiddenGemMode,
-        exclude_harem: excludeHarem,
-        exclude_bl: excludeBL,
-        exclude_yuri: excludeYuri,
-        require_completed: requireCompleted,
-        language,
-        min_rating: minRating,
-        min_rating_votes: minRatingVotes,
-        max_readers: maxReaders,
-        min_year: minYear,
-        max_year: maxYear,
-        include_genres: Object.entries(genreStates).filter(([, state]) => state === 'include').map(([genre]) => genre),
-        exclude_genres: Object.entries(genreStates).filter(([, state]) => state === 'exclude').map(([genre]) => genre),
-        include_tags: includeTagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
-        exclude_tags: excludeTagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
-        channel_weights: {
-          tag: tagWeight,
-          direct_rec: directRecWeight,
-          rec_list: listWeight,
-          structural: structuralWeight
-        },
-        hidden_gem_strength: hiddenGemStrength,
-        // Format scope: default same-format pool; opt-in to allow other modalities.
-        media_type: includeOtherFormats || !mediaParam ? 'all' : mediaParam,
       };
 
       const json = await source.getRecommendations(payload);
       if (requestId !== recommendationRequestRef.current) return;
+      setForYouMeta(null);
       setData(json);
       setLoadedLimit(requestedLimit);
       setAvailableExhausted(json.recommendations.length < requestedLimit || (expanding && json.recommendations.length <= (data?.recommendations.length || 0)));
@@ -315,7 +419,21 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     if (!dataSource) return;
-    const seedId = Number(new URLSearchParams(window.location.search).get('seed'));
+    const params = new URLSearchParams(window.location.search);
+    const wantForYou = params.get('for_you') === '1';
+    const seedId = Number(params.get('seed'));
+    if (wantForYou) {
+      setForYouMode(true);
+      // Wait for profile load then multi-seed; profile effect may still be settling.
+      loadLocalProfile()
+        .then((loaded) => {
+          if (loaded) setProfile(loaded);
+          return fetchRecommendations(null, Math.min(40, maxResults), false, { forYou: true });
+        })
+        .catch(() => fetchRecommendations(null, Math.min(40, maxResults), false, { forYou: true }))
+        .finally(() => { autoRefreshReadyRef.current = true; });
+      return;
+    }
     if (Number.isInteger(seedId) && seedId > 0) {
       dataSource.getNovel(seedId)
         .then((detail) => {
@@ -380,21 +498,28 @@ export default function App(): JSX.Element {
   }, [dataSource]);
 
   useEffect(() => {
-    if (!autoRefreshReadyRef.current || !selectedNovel || !dataSource) return;
+    if (!autoRefreshReadyRef.current || !dataSource) return;
+    if (!forYouMode && !selectedNovel) return;
     const timer = window.setTimeout(() => {
       setAvailableExhausted(false);
-      fetchRecommendations(selectedNovel, Math.min(24, maxResults));
+      if (forYouMode) {
+        void fetchRecommendations(null, Math.min(40, maxResults), false, { forYou: true });
+      } else {
+        void fetchRecommendations(selectedNovel, Math.min(24, maxResults), false, { forYou: false });
+      }
     }, 280);
     return () => window.clearTimeout(timer);
     // The selected seed is fetched explicitly when chosen. This effect only
     // reacts to recommendation controls and coalesces rapid text/slider edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataSource, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
+  }, [dataSource, forYouMode, hideLibraryTitles, libraryExcludeIds, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
     minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
     excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength,
     maxResults, routeRevision, mediaParam, includeOtherFormats]);
 
   const chooseNovel = (novel: NovelSearchResult) => {
+    setForYouMode(false);
+    setForYouMeta(null);
     setSelectedNovel(novel);
     setQuery(novel.title);
     setSuggestions([]);
@@ -404,7 +529,15 @@ export default function App(): JSX.Element {
     const params = new URLSearchParams(window.location.search);
     params.set('view', 'discover');
     params.set('seed', String(novel.id));
+    params.delete('for_you');
     window.history.pushState(null, '', stableRouteUrl(params));
+  };
+  const runForYou = () => {
+    setForYouMode(true);
+    setHideLibraryTitles(true);
+    setSelectedNovel(null);
+    setQuery('For You (your library)');
+    void fetchRecommendations(null, Math.min(40, maxResults), false, { forYou: true });
   };
 
   const useProfileEntryAsSeed = async (entry: ProfileEntry) => {
@@ -585,7 +718,8 @@ export default function App(): JSX.Element {
 
   const activeFilters = useMemo(() => {
     const active: string[] = [];
-    if (hideLibraryTitles) active.push('Hide library');
+    if (hideLibraryTitles && profile) active.push('Exclude library IDs');
+    if (forYouMode) active.push('For You multi-seed');
     if (hiddenGemMode) active.push('Hidden gems');
     if (requireCompleted) active.push('Completed');
     if (excludeHarem) active.push('No harem');
@@ -603,8 +737,9 @@ export default function App(): JSX.Element {
     active.push(...Object.entries(genreStates).map(([genre, state]) => `${state === 'include' ? '+' : '−'}${genre}`));
     if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) active.push('Custom ranking');
     return active;
-  }, [hideLibraryTitles, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, isAllSelected, includeOtherFormats, scopeSentence, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
+  }, [hideLibraryTitles, forYouMode, profile, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, isAllSelected, includeOtherFormats, scopeSentence, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
 
+  // Ranking already excludes library IDs when hideLibraryTitles is on; keep client filters for not_for_me edge cases.
   const filteredRecommendations = useMemo(() => (data?.recommendations || [])
     .filter((rec) => feedbackByNovel.get(rec.target_id) !== 'not_for_me')
     .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
@@ -758,7 +893,34 @@ export default function App(): JSX.Element {
         </div>
         <div className="filter-basics">
           <FieldGroup label="Show">
-            {profile && <Checkbox label="Unread only" checked={hideLibraryTitles} onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)} />}
+            {profile && (
+              <Checkbox
+                label="Exclude library IDs"
+                description="Drops matched library + Not-for-me from ranking (not just the UI list). Unmatched titles still cannot be excluded."
+                checked={hideLibraryTitles}
+                onChange={(e) => setHideLibraryTitles(e.currentTarget.checked)}
+              />
+            )}
+            <Checkbox
+              label="For You (multi-seed)"
+              description={
+                profile
+                  ? 'Merge recs from your top rated/completed/loved seeds. Works offline on static Pages via rec shards.'
+                  : 'Import a profile first.'
+              }
+              checked={forYouMode}
+              disabled={!profile}
+              onChange={(e) => {
+                if (e.currentTarget.checked) runForYou();
+                else {
+                  setForYouMode(false);
+                  setForYouMeta(null);
+                  const seed = selectedNovel || getDefaultSeed(selectedTypes);
+                  chooseNovel(seed);
+                  void fetchRecommendations(seed, Math.min(8, maxResults), false, { forYou: false });
+                }
+              }}
+            />
             <Checkbox label="Hidden gems" checked={hiddenGemMode} onChange={(e) => setHiddenGemMode(e.currentTarget.checked)} />
             <Checkbox label="Completed" checked={requireCompleted} onChange={(e) => setRequireCompleted(e.currentTarget.checked)} />
             <Checkbox
@@ -897,19 +1059,51 @@ export default function App(): JSX.Element {
           <Card className="results-heading">
             <CoverImage src={data.seed_novel.cover_url} alt="" variant="seed" />
             <div className="results-heading-copy">
-              <span className="eyebrow">Based on your starting title</span>
+              <span className="eyebrow">
+                {forYouMode ? 'For You · multi-seed library ranking' : 'Based on your starting title'}
+              </span>
               <div className="seed-title-row">
-                <h2><a href={novelPageUrl(data.seed_novel.id, undefined, data.seed_novel.media_type)}>
-                  {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
-                </a></h2>
-                <Tooltip content={`Open on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
-                  <a className="seed-external-link" href={data.seed_novel.external_url || externalMediaUrl(data.seed_novel.id, data.seed_novel.source, data.seed_novel.external_id, data.seed_novel.media_type) || data.seed_novel.novelupdates_url} target="_blank"
-                    rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
-                    <ExternalLink size={15} aria-hidden="true" />
-                  </a>
-                </Tooltip>
+                {forYouMode || data.seed_novel.id === 0 ? (
+                  <h2>{data.seed_novel.title}</h2>
+                ) : (
+                  <>
+                    <h2><a href={novelPageUrl(data.seed_novel.id, undefined, data.seed_novel.media_type)}>
+                      {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
+                    </a></h2>
+                    <Tooltip content={`Open on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
+                      <a className="seed-external-link" href={data.seed_novel.external_url || externalMediaUrl(data.seed_novel.id, data.seed_novel.source, data.seed_novel.external_id, data.seed_novel.media_type) || data.seed_novel.novelupdates_url} target="_blank"
+                        rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
+                        <ExternalLink size={15} aria-hidden="true" />
+                      </a>
+                    </Tooltip>
+                  </>
+                )}
               </div>
-              <p><span>{data.count}</span> evidence-backed matches, ranked for fit</p>
+              <p>
+                <span>{data.count}</span> evidence-backed matches
+                {forYouMeta ? ` · ${forYouMeta.seedsUsed.length} seeds used · ${forYouMeta.excludeCount} IDs excluded` : ''}
+                {forYouMeta?.progress && loading ? ` · ${forYouMeta.progress}` : ''}
+              </p>
+              {forYouMeta && forYouMeta.seedsFailed.length > 0 && (
+                <p className="for-you-failures">
+                  {forYouMeta.seedsFailed.length} seed(s) failed (often missing static rec shards):{' '}
+                  {forYouMeta.seedsFailed.slice(0, 3).map((f) => f.seed.title).join('; ')}
+                  {forYouMeta.seedsFailed.length > 3 ? '…' : ''}
+                </p>
+              )}
+              {forYouMeta && forYouMeta.seedsUsed.length > 0 && (
+                <details className="for-you-seeds">
+                  <summary>Seeds used ({forYouMeta.seedsUsed.length})</summary>
+                  <ul>
+                    {forYouMeta.seedsUsed.map((seed) => (
+                      <li key={seed.novel_id}>
+                        <a href={novelPageUrl(seed.novel_id)}>{seed.title}</a>
+                        {' '}· w={seed.weight.toFixed(2)} · {seed.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           </Card>
 
@@ -934,7 +1128,7 @@ export default function App(): JSX.Element {
                         <div className="card-summary">
                           <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
                           <h3 className="novel-title">
-                            <a href={novelPageUrl(rec.target_id, data.seed_novel.id, rec.media_type)}>
+                            <a href={novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type)}>
                               {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
                             </a>
                             <Tooltip content={`Open on ${sourceDisplayName(rec.source, rec.target_id)}`}>

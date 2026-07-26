@@ -268,13 +268,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .display-settings .display-settings-note { grid-column: 1 / -1; }
 .taste-snapshot { background: linear-gradient(145deg, rgba(155,135,245,.08), rgba(17,21,32,.88)); border: 1px solid rgba(155,135,245,.2); border-radius: 15px; padding: 1.1rem; }
 .taste-columns { display: grid; gap: 1rem; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+.taste-columns-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 960px) { .taste-columns-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .taste-columns h3 { color: var(--dim); font-size: .68rem; letter-spacing: .08em; margin-bottom: .55rem; text-transform: uppercase; }
 .taste-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
 .taste-chips span, .taste-chips a { align-items: center; background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; color: #d9d5e6; display: inline-flex; font-size: .72rem; gap: .35rem; padding: .3rem .5rem; text-decoration: none; }
+.taste-chips-avoid a, .taste-chips-avoid span { border-color: color-mix(in srgb, var(--red) 35%, transparent); }
 .taste-chips strong { color: var(--accent-bright); font-size: .62rem; }
 .taste-chips small { color: var(--dim); }
+.taste-caveats { color: var(--muted); font-size: .72rem; margin: .4rem 0 .75rem 1rem; }
+.taste-caveats li { margin: .25rem 0; }
+.taste-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .65rem; margin: .55rem 0 .9rem; }
+.taste-for-you { align-items: center; background: var(--accent); border-radius: 999px; color: #fff; display: inline-flex; font-size: .78rem; font-weight: 700; gap: .35rem; padding: .45rem .75rem; text-decoration: none; }
+.taste-for-you:hover { background: var(--accent-bright); }
+.taste-actions small { color: var(--dim); font-size: .68rem; max-width: 36rem; }
 .taste-sample { margin-top: .8rem; }
 .taste-sample summary { color: var(--accent-bright); cursor: pointer; font-size: .72rem; }
+.for-you-seeds, .for-you-failures { color: var(--muted); font-size: .72rem; margin-top: .45rem; }
+.for-you-failures { color: var(--chart-3); }
+.for-you-seeds ul { margin: .35rem 0 0 1rem; }
 .taste-sample ul { color: var(--muted); columns: 2; font-size: .72rem; margin: .45rem 0 0 1rem; }
 .profile-library-section, .profile-lists-section { margin-top: 2.5rem; }
 .profile-library-heading { align-items: flex-end; display: flex; justify-content: space-between; margin-bottom: .9rem; }

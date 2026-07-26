@@ -691,6 +691,7 @@ function passesFilters(
   const genreSet = new Set(genres);
   const tagSet = new Set(tags);
   const has = (values: string[], needle: string) => values.some((value) => value.includes(needle));
+  if (request.exclude_novel_ids?.length && request.exclude_novel_ids.includes(card.id)) return false;
   if (request.language && normalize(card.language) !== normalize(request.language)) return false;
   if ((request.min_rating || 0) > card.rating) return false;
   if ((request.min_rating_votes || 0) > card.rating_votes) return false;

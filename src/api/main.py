@@ -205,6 +205,8 @@ class RecommendRequest(BaseModel):
     require_completed: bool = False
     media_type: str = "all"
     source: str = "all"
+    # Client library / feedback exclusions (matched catalog IDs only).
+    exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)
 
 
 class SlugResolveRequest(BaseModel):
@@ -941,7 +943,11 @@ def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
         'min_chapters': req.min_chapters,
         'media_type': req.media_type,
         'source': req.source,
-        'exclude_novel_ids': [seed_id]
+        # Always drop the seed; merge client library / not-for-me IDs when provided.
+        'exclude_novel_ids': list({
+            seed_id,
+            *[int(nid) for nid in (req.exclude_novel_ids or []) if str(nid).lstrip('-').isdigit()],
+        }),
     }
 
     all_cand_ids = set()

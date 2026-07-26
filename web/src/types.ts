@@ -58,6 +58,8 @@ export interface RecommendRequest {
   require_completed?: boolean;
   media_type?: string;
   source?: string;
+  /** Catalog IDs to drop (library titles, not-for-me, etc.). Static + live. */
+  exclude_novel_ids?: number[];
 }
 
 export interface DatasetManifest {

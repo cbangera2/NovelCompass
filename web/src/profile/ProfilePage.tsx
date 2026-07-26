@@ -6,6 +6,7 @@ import { DatasetManifest, NovelDetail, NovelSearchResult } from '../types';
 import { ProfilePanel } from './ProfilePanel';
 import { loadLocalProfile } from './store';
 import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
+import { computeTasteProfile, TasteProfile } from './taste';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { novelPageUrl } from '../novelLinks';
 import { browseFacetUrl } from '../metadataLinks';
@@ -37,14 +38,10 @@ export default function ProfilePage(): JSX.Element {
   const [rating, setRating] = useState(0);
   const [visibleLibraryCount, setVisibleLibraryCount] = useState(60);
   const [libraryCatalog, setLibraryCatalog] = useState<Map<string, NovelSearchResult>>(new Map());
-  const [taste, setTaste] = useState<{
-    details: NovelDetail[];
-    requested: number;
-    failed: number;
-    genres: Array<[string, number]>;
-    tags: Array<[string, number]>;
-  } | null>(null);
+  const [taste, setTaste] = useState<TasteProfile | null>(null);
+  const [tasteDetails, setTasteDetails] = useState<NovelDetail[]>([]);
   const [tasteLoading, setTasteLoading] = useState(false);
+  const [tasteLoadFailed, setTasteLoadFailed] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,44 +59,46 @@ export default function ProfilePage(): JSX.Element {
   }, [dataMode]);
 
   useEffect(() => {
-    if (!profile || !source) {
+    if (!profile) {
       setTaste(null);
+      setTasteDetails([]);
+      setTasteLoadFailed(0);
       setTasteLoading(false);
       return;
     }
-    const rated = profile.entries
-      .filter((entry) => entry.novel_id != null && entry.rating != null)
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    const completed = profile.entries.filter((entry) => entry.novel_id != null && entry.status === 'completed');
-    const selected = [...rated, ...completed]
-      .filter((entry, index, entries) => entries.findIndex((item) => item.novel_id === entry.novel_id) === index)
-      .slice(0, 12);
-    if (!selected.length) {
-      setTaste({ details: [], requested: 0, failed: 0, genres: [], tags: [] });
+    // Seeds/excludes work without catalog details; facets need detail fetches.
+    const draft = computeTasteProfile(profile, [], {
+      datasetVersion: dataset?.dataset_version || profile.dataset_version,
+    });
+    setTaste(draft);
+    if (!source || (draft.positive_seeds.length === 0 && draft.negative_ids.length === 0)) {
+      setTasteDetails([]);
+      setTasteLoadFailed(0);
       setTasteLoading(false);
       return;
     }
+    const ids = [
+      ...draft.positive_seeds.map((s) => s.novel_id),
+      ...draft.negative_ids,
+    ].filter((id, index, all) => all.indexOf(id) === index).slice(0, 80);
     let cancelled = false;
     setTasteLoading(true);
-    Promise.allSettled(selected.map((entry) => source.getNovel(entry.novel_id!))).then((results) => {
+    Promise.allSettled(ids.map((id) => source.getNovel(id))).then((results) => {
       if (cancelled) return;
-      const details = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
-      const count = (values: string[]) => {
-        const totals = new Map<string, number>();
-        values.forEach((value) => totals.set(value, (totals.get(value) || 0) + 1));
-        return [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-      };
-      setTaste({
-        details,
-        requested: selected.length,
-        failed: results.length - details.length,
-        genres: count(details.flatMap((detail) => detail.genres)).slice(0, 8),
-        tags: count(details.flatMap((detail) => detail.tags)).slice(0, 12)
-      });
+      const details = results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+      setTasteDetails(details);
+      setTasteLoadFailed(results.length - details.length);
+      setTaste(
+        computeTasteProfile(profile, details, {
+          datasetVersion: dataset?.dataset_version || profile.dataset_version,
+        })
+      );
       setTasteLoading(false);
     });
-    return () => { cancelled = true; };
-  }, [profile, source]);
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, source, dataset?.dataset_version]);
 
   const counts = useMemo(() => {
     const next: Record<ReadingStatus, number> = {
@@ -234,40 +233,100 @@ export default function ProfilePage(): JSX.Element {
 
           <Card className="taste-snapshot" aria-labelledby="taste-title">
             <div className="profile-library-heading">
-              <div><span className="eyebrow">Descriptive, not predictive</span><h2 id="taste-title">Taste snapshot</h2></div>
+              <div><span className="eyebrow">Weighted from your library</span><h2 id="taste-title">Taste profile</h2></div>
               <span>{dataset?.dataset_version || profile.dataset_version}</span>
             </div>
-            {tasteLoading && <p className="profile-list-note">Loading known genres and tags from your strongest profile signals…</p>}
-            {!tasteLoading && taste && taste.requested === 0 && (
-              <p className="profile-list-note">Add personal ratings or import Completed titles to create a transparent taste sample.</p>
-            )}
-            {!tasteLoading && taste && taste.requested > 0 && (
+            {tasteLoading && <p className="profile-list-note">Loading catalog metadata for seeds and negatives…</p>}
+            {taste && (
               <>
                 <p className="profile-list-note">
-                  Based on {taste.details.length} of {taste.requested} selected titles: explicitly rated novels first, then Completed titles.
-                  {taste.failed ? ` ${taste.failed} detail file${taste.failed === 1 ? '' : 's'} could not be loaded.` : ''}
-                  {' '}This describes recurring metadata; it does not infer dislikes or predict compatibility.
+                  {taste.positive_seeds.length} positive seeds · {taste.negative_ids.length} negatives ·{' '}
+                  {taste.exclude_ids.length} matched IDs excluded from ranking ·{' '}
+                  {taste.evidence.matched}/{taste.evidence.total_entries} library titles matched to catalog.
+                  {tasteLoadFailed ? ` ${tasteLoadFailed} detail shard${tasteLoadFailed === 1 ? '' : 's'} failed to load.` : ''}
+                  {' '}Facet weights use rating/status/feedback — not equal title counts.
                 </p>
-                <div className="taste-columns">
+                {taste.evidence.caveats.length > 0 && (
+                  <ul className="taste-caveats">
+                    {taste.evidence.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}
+                  </ul>
+                )}
+                <div className="taste-actions">
+                  <a className="taste-for-you" href={appUrl('?view=discover&for_you=1')}>
+                    <Sparkles size={15} /> For You recommendations
+                  </a>
+                  <small>Multi-seed RRF over your positive seeds; works in live API and static Pages mode.</small>
+                </div>
+                <div className="taste-columns taste-columns-4">
                   <div>
-                    <h3>Recurring genres</h3>
+                    <h3>Liked genres</h3>
                     <div className="taste-chips">
-                      {taste.genres.map(([genre, count]) => <a key={genre} href={browseFacetUrl('genre', genre)}>{genre}<strong>{count}/{taste.details.length}</strong></a>)}
-                      {!taste.genres.length && <small>No genre metadata was available.</small>}
+                      {taste.liked_genres.map((facet) => (
+                        <a key={facet.name} href={browseFacetUrl('genre', facet.name)}>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                        </a>
+                      ))}
+                      {!taste.liked_genres.length && <small>Need matched seed details for genres.</small>}
                     </div>
                   </div>
                   <div>
-                    <h3>Recurring tags</h3>
+                    <h3>Liked tags</h3>
                     <div className="taste-chips">
-                      {taste.tags.map(([tag, count]) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}<strong>{count}/{taste.details.length}</strong></a>)}
-                      {!taste.tags.length && <small>No tag metadata was available.</small>}
+                      {taste.liked_tags.map((facet) => (
+                        <a key={facet.name} href={browseFacetUrl('tag', facet.name)}>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                        </a>
+                      ))}
+                      {!taste.liked_tags.length && <small>Need matched seed details for tags.</small>}
+                    </div>
+                  </div>
+                  <div>
+                    <h3>Avoid genres</h3>
+                    <div className="taste-chips taste-chips-avoid">
+                      {taste.avoid_genres.map((facet) => (
+                        <a key={facet.name} href={browseFacetUrl('genre', facet.name)}>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                        </a>
+                      ))}
+                      {!taste.avoid_genres.length && <small>No dropped / low-rated / not-for-me signal yet.</small>}
+                    </div>
+                  </div>
+                  <div>
+                    <h3>Avoid tags</h3>
+                    <div className="taste-chips taste-chips-avoid">
+                      {taste.avoid_tags.map((facet) => (
+                        <a key={facet.name} href={browseFacetUrl('tag', facet.name)}>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                        </a>
+                      ))}
+                      {!taste.avoid_tags.length && <small>No negative tag signal yet.</small>}
                     </div>
                   </div>
                 </div>
-                <details className="taste-sample">
-                  <summary>Titles used in this snapshot</summary>
-                  <ul>{taste.details.map((detail) => <li key={detail.id}>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</li>)}</ul>
+                <details className="taste-sample" open={taste.positive_seeds.length > 0 && taste.positive_seeds.length <= 8}>
+                  <summary>Positive seeds ({taste.positive_seeds.length}) — used for For You</summary>
+                  <ul>
+                    {taste.positive_seeds.map((seed) => (
+                      <li key={seed.novel_id}>
+                        <a href={novelPageUrl(seed.novel_id)}>{seed.title}</a>
+                        {' '}· weight {seed.weight.toFixed(2)} · {seed.reason}
+                      </li>
+                    ))}
+                    {!taste.positive_seeds.length && <li>None yet — rate matched titles 4★+ or mark Completed.</li>}
+                  </ul>
                 </details>
+                {tasteDetails.length > 0 && (
+                  <details className="taste-sample">
+                    <summary>Catalog titles loaded for facets ({tasteDetails.length})</summary>
+                    <ul>
+                      {tasteDetails.map((detail) => (
+                        <li key={detail.id}>
+                          {displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </>
             )}
           </Card>
