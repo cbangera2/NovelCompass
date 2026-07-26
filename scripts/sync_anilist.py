@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import sys
 import os
+import time
+from datetime import datetime
 from pathlib import Path
 
 # Add project root to sys.path
@@ -17,13 +19,18 @@ from src.scraper.anilist_client import AniListClient
 from src.scraper.anilist_ingester import AniListIngester
 
 
+def log(msg: str) -> None:
+    ts = datetime.now().strftime("%H:%M:%S")
+    print(f"[{ts}] {msg}", flush=True)
+
+
 def sync_anilist(
     pages: int = 10,
     per_page: int = 50,
     media_type: str = "all",
     db_path: str = DEFAULT_DB_PATH,
 ) -> None:
-    print(f"Connecting to database at {db_path}...")
+    log(f"Connecting to database at {db_path}...")
     conn = get_connection(db_path)
     client = AniListClient()
     ingester = AniListIngester(conn, client)
@@ -31,16 +38,20 @@ def sync_anilist(
     sync_types = ["anime", "manga"] if media_type == "all" else [media_type]
 
     total_ingested = 0
+    t_start = time.perf_counter()
+
     try:
         for m_type in sync_types:
-            print(f"\n--- Syncing {m_type.upper()} ({pages} page(s), {per_page} items/page) ---")
+            log(f"--- Starting {m_type.upper()} sync ({pages} page(s), {per_page} items/page) ---")
             for p in range(1, pages + 1):
+                log(f"Fetching page {p}/{pages} for {m_type}...")
                 if m_type == "anime":
                     ingested_ids = ingester.sync_popular_anime(page=p, per_page=per_page)
                 else:
                     ingested_ids = ingester.sync_popular_manga(page=p, per_page=per_page)
+                
                 total_ingested += len(ingested_ids)
-                print(f"Page {p}/{pages} [{m_type}]: Ingested {len(ingested_ids)} items (IDs: {ingested_ids[:3]}...)")
+                log(f"✓ Page {p}/{pages} [{m_type}]: Ingested {len(ingested_ids)} items (Total so far: {total_ingested})")
 
         # Summary stats
         anilist_count = conn.execute(
@@ -57,13 +68,14 @@ def sync_anilist(
                WHERE n.source = 'anilist'"""
         ).fetchone()[0]
 
-        print("\n==================================================")
-        print(f"✓ Sync complete!")
-        print(f"  Total items ingested in run: {total_ingested}")
-        print(f"  Total AniList items in DB:   {anilist_count}")
-        print(f"  AniList Direct Recs in DB:   {rec_count}")
-        print(f"  AniList Related Series in DB: {rel_count}")
-        print("==================================================")
+        elapsed = time.perf_counter() - t_start
+        log("==================================================")
+        log(f"✓ Sync complete in {elapsed:.1f}s!")
+        log(f"  Total items ingested in run: {total_ingested}")
+        log(f"  Total AniList items in DB:   {anilist_count}")
+        log(f"  AniList Direct Recs in DB:   {rec_count}")
+        log(f"  AniList Related Series in DB: {rel_count}")
+        log("==================================================")
     finally:
         conn.close()
 
