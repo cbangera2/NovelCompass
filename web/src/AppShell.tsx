@@ -26,7 +26,7 @@ import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
 import type { NovelSearchResult } from './types';
-import { novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { NovelCompassMark } from './NovelCompassMark';
 import {
   Sidebar,
@@ -377,22 +377,35 @@ function GlobalNovelSearch({
                 <Clock3 size={13} /> Recent novels
               </p>
             )}
-            {(query.trim().length >= 2 ? results : recent).map((novel) => (
-              <a key={novel.id} href={novelPageUrl(novel.id)} onClick={() => choose(novel)}>
-                {novel.cover_url ? (
-                  <img src={novel.cover_url} alt="" loading="lazy" />
-                ) : (
+            {(query.trim().length >= 2 ? results : recent).map((novel) => {
+              const badge = getMediaBadgeInfo(novel);
+              return (
+                <a key={novel.id} href={novelPageUrl(novel.id)} onClick={() => choose(novel)}>
+                  {novel.cover_url ? (
+                    <img src={novel.cover_url} alt="" loading="lazy" />
+                  ) : (
+                    <span>
+                      <BookOpen size={16} />
+                    </span>
+                  )}
                   <span>
-                    <BookOpen size={16} />
+                    <div className="suggestion-title-line">
+                      <strong>{novel.title}</strong>
+                      <span className="suggestion-badges">
+                        <span className={`search-badge format-badge ${badge.formatKey}`}>
+                          {badge.formatLabel}
+                        </span>
+                        <span className={`search-badge source-badge ${badge.sourceKey}`}>
+                          {badge.sourceLabel}
+                        </span>
+                      </span>
+                    </div>
+                    <small>{novel.author || 'Catalog novel'}</small>
                   </span>
-                )}
-                <span>
-                  <strong>{novel.title}</strong>
-                  <small>{novel.author || 'Catalog novel'}</small>
-                </span>
-                <ArrowRight size={15} aria-hidden="true" />
-              </a>
-            ))}
+                  <ArrowRight size={15} aria-hidden="true" />
+                </a>
+              );
+            })}
           </div>
           {query.trim().length >= 2 && (
             <a className="shell-search-all" href={browseUrl}>

@@ -34,7 +34,7 @@ import { displayNovelTitle, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
-import { novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
@@ -705,37 +705,50 @@ export default function App(): JSX.Element {
 
         {showSuggestions && suggestions.length > 0 && (
           <div className="suggestions" role="listbox" aria-label="Novel matches">
-            {suggestions.map((novel) => (
-              <div className="suggestion-row" key={novel.id}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={selectedNovel?.id === novel.id}
-                  className="suggestion"
-                  onClick={() => chooseNovel(novel)}
-                >
-                  <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
-                  <span className="suggestion-copy">
-                    <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
-                    <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
-                  </span>
-                  <span className="select-label">Select</span>
-                </button>
-                <div className="suggestion-links">
-                  <Tooltip content="View details">
-                    <a href={novelPageUrl(novel.id)} aria-label={`View details for ${novel.title}`}>
-                      <BookOpen size={16} aria-hidden="true" />
-                    </a>
-                  </Tooltip>
-                  <Tooltip content="Open on Novel Updates">
-                    <a href={novel.novelupdates_url} target="_blank" rel="noopener noreferrer"
-                      aria-label={`Open ${novel.title} on Novel Updates`}>
-                      <ExternalLink size={16} aria-hidden="true" />
-                    </a>
-                  </Tooltip>
+            {suggestions.map((novel) => {
+              const badge = getMediaBadgeInfo(novel);
+              return (
+                <div className="suggestion-row" key={novel.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selectedNovel?.id === novel.id}
+                    className="suggestion"
+                    onClick={() => chooseNovel(novel)}
+                  >
+                    <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
+                    <span className="suggestion-copy">
+                      <span className="suggestion-title-line">
+                        <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
+                        <span className="suggestion-badges">
+                          <span className={`search-badge format-badge ${badge.formatKey}`}>
+                            {badge.formatLabel}
+                          </span>
+                          <span className={`search-badge source-badge ${badge.sourceKey}`}>
+                            {badge.sourceLabel}
+                          </span>
+                        </span>
+                      </span>
+                      <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
+                    </span>
+                    <span className="select-label">Select</span>
+                  </button>
+                  <div className="suggestion-links">
+                    <Tooltip content="View details">
+                      <a href={novelPageUrl(novel.id)} aria-label={`View details for ${novel.title}`}>
+                        <BookOpen size={16} aria-hidden="true" />
+                      </a>
+                    </Tooltip>
+                    <Tooltip content={`Open on ${badge.sourceLabel}`}>
+                      <a href={novel.external_url || novel.novelupdates_url} target="_blank" rel="noopener noreferrer"
+                        aria-label={`Open ${novel.title} on ${badge.sourceLabel}`}>
+                        <ExternalLink size={16} aria-hidden="true" />
+                      </a>
+                    </Tooltip>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
