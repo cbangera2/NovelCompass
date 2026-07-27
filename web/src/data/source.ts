@@ -4,6 +4,7 @@ import {
   BrowseResponse,
   DatasetManifest,
   FilterOptions,
+  GraphData,
   NovelDetail,
   NovelInsights,
   NovelSearchResult,
@@ -24,6 +25,7 @@ export interface RecommendationDataSource {
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse>;
   browseNovels(request: BrowseRequest): Promise<BrowseResponse>;
   getRandomNovel(request: BrowseRequest, randomValue?: number): Promise<BrowseNovel>;
+  getGraphData(): Promise<GraphData>;
 }
 
 export class DataSourceError extends Error {

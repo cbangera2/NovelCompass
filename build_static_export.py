@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from scripts.build_graph_export import build_graph_export
 from src.db.schema import DEFAULT_DB_PATH, get_connection
 from src.engine.candidate_gen import CandidateGenerator
 from src.nlp.taxonomy import HIGH_PRIORITY_TAGS
@@ -573,8 +574,10 @@ def export_static_dataset(
             ),
             "facets_url": "facets.json",
             "options_url": "options.json",
+            "graph_url": "graph.json",
             "bucket_count": 256,
         }
+        build_graph_export(db_path, output / "graph.json")
         _atomic_json(output / "manifest.json", manifest)
         verify_export(
             output,

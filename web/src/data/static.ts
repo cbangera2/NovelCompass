@@ -4,6 +4,7 @@ import {
   BrowseResponse,
   DatasetManifest,
   FilterOptions,
+  GraphData,
   NovelDetail,
   NovelInsights,
   NovelSearchResult,
@@ -683,6 +684,8 @@ export class StaticDataSource implements RecommendationDataSource {
     };
   }
 
+  private graphPromise?: Promise<GraphData>;
+
   async getRandomNovel(request: BrowseRequest, randomValue = Math.random()): Promise<BrowseNovel> {
     const count = await this.browseNovels({ ...request, page: 1, page_size: 1 });
     if (!count.total) throw new DataSourceError('No titles match the active filters.');
@@ -690,6 +693,17 @@ export class StaticDataSource implements RecommendationDataSource {
     const result = await this.browseNovels({ ...request, page, page_size: 1 });
     if (!result.items[0]) throw new DataSourceError('The selected novel is unavailable.');
     return result.items[0];
+  }
+
+  async getGraphData(): Promise<GraphData> {
+    if (!this.graphPromise) {
+      this.graphPromise = (async () => {
+        const manifest = await this.getManifest();
+        const path = manifest.graph_url || 'graph.json';
+        return jsonFetch<GraphData>(joinUrl(this.baseUrl, path));
+      })();
+    }
+    return this.graphPromise;
   }
 }
 
