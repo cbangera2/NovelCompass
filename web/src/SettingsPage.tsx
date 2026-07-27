@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { DataMode } from './data';
 import { useDataModePreference } from './dataModePreference';
 
+import { Select } from './ui';
+
 export default function SettingsPage(): JSX.Element {
   const { settings, updateSettings } = useDisplaySettings();
   const [homeView, setHomeView] = useState(() => loadNavigationPreferences().homeView);
@@ -62,12 +64,12 @@ export default function SettingsPage(): JSX.Element {
       </Card>
       <Card className="settings-card">
         <CardHeader title="Data source" description="Choose how this browser loads catalog and recommendation data." />
-        <label className="settings-data-mode"><span>Catalog source</span><select value={dataMode}
+        <Select label="Catalog source" value={dataMode}
           disabled={Boolean(forcedMode)} onChange={(event) => setDataMode(event.target.value as DataMode)}>
           <option value="auto">Automatic (live API, then static fallback)</option>
           <option value="api">Live database</option>
           <option value="static">Static snapshot</option>
-        </select></label>
+        </Select>
         <p className="settings-disclosure">{forcedMode
           ? `This deployment forces the ${forcedMode === 'static' ? 'static snapshot' : 'live API'} source, so a browser preference cannot override it.`
           : 'Saved locally and synchronized across tabs. If Live database is unavailable, the app shows an error and keeps your choice so you can retry; only Automatic falls back.'}</p>
