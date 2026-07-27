@@ -2,9 +2,12 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
+  Bug,
   Clock3,
+  Code2,
   Database,
   Download,
+  ExternalLink,
   LogOut,
   Search,
   Settings,
@@ -162,6 +165,59 @@ export default function AppShell({
             </SidebarMenu>
           </SidebarGroup>
           <SidebarMediaGroup />
+          <SidebarGroup>
+            <SidebarGroupLabel>Project</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="GitHub Repository">
+                  <a
+                    href="https://github.com/cbangera2/NovelCompass"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Code2 size={18} />
+                    <span>
+                      <strong>GitHub Repo</strong>
+                      <small>Source code & project</small>
+                    </span>
+                    <ExternalLink size={13} className="sidebar-external-icon" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Report an Issue">
+                  <a
+                    href="https://github.com/cbangera2/NovelCompass/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Bug size={18} />
+                    <span>
+                      <strong>Report Issue</strong>
+                      <small>GitHub issue tracker</small>
+                    </span>
+                    <ExternalLink size={13} className="sidebar-external-icon" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Data Repository">
+                  <a
+                    href="https://github.com/cbangera2/novelcompass-data"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Database size={18} />
+                    <span>
+                      <strong>Data Repo</strong>
+                      <small>Catalog dataset</small>
+                    </span>
+                    <ExternalLink size={13} className="sidebar-external-icon" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
@@ -194,16 +250,30 @@ export default function AppShell({
         </header>
         <div className="shell-content">{children}</div>
         <footer className="shell-footer">
-          <span>Novel Compass · personal discovery workspace</span>
+          <span>© 2026 Chirag Bangera · Novel Compass</span>
           <nav aria-label="Footer links">
             <a href={viewUrl('profile')}>Local data</a>
             {!staticDeployment && <a href={viewUrl('scraper')}>Catalog tools</a>}
             <a
-              href="https://github.com/shaido987/novel-dataset"
+              href="https://github.com/cbangera2/novelcompass-data"
               target="_blank"
               rel="noopener noreferrer"
             >
-              Source dataset
+              Data Repo
+            </a>
+            <a
+              href="https://github.com/cbangera2/NovelCompass"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub
+            </a>
+            <a
+              href="https://github.com/cbangera2/NovelCompass/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Report Issue
             </a>
           </nav>
         </footer>

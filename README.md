@@ -51,4 +51,4 @@ TypeScript and React source.
 
 Static export and deployment details are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Novel metadata comes from the [novel-dataset](https://github.com/shaido987/novel-dataset) project and Novel Updates pages captured by the local scraper. Novel Compass is not affiliated with Novel Updates.
+Novel metadata comes from the [novelcompass-data](https://github.com/cbangera2/novelcompass-data) repository and Novel Updates pages captured by the local scraper. Novel Compass is not affiliated with Novel Updates.
