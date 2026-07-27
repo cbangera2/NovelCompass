@@ -343,9 +343,17 @@ export default function BrowsePage(): JSX.Element {
         <DSButton variant="ghost" onClick={() => applyPreset('completed')}>Completed</DSButton>
       </nav>
       <Card className="browse-controls" aria-label="Catalog filters">
-        <label className="browse-search"><Search size={17} /><input value={query}
-          onChange={(event) => resetPage(() => setQuery(event.target.value))}
-          placeholder="Search titles, aliases, or authors…" /></label>
+        <label className="browse-search">
+          <span>Search</span>
+          <div className="browse-search-input-wrap">
+            <Search size={17} />
+            <input
+              value={query}
+              onChange={(event) => resetPage(() => setQuery(event.target.value))}
+              placeholder="Search titles, aliases, or authors…"
+            />
+          </div>
+        </label>
         <Select label="Sort" value={sort} onChange={(event) => resetPage(() => setSort(event.target.value as BrowseSort))}>
           <option value="popular">Most popular</option>
           <option value="rating">Highest rated</option>
