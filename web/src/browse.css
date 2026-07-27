@@ -31,8 +31,10 @@
 
 .browse-presets{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem}
 .browse-presets .ds-button{border:1px solid var(--border);border-radius:999px;font-size:.72rem}
-.browse-controls{grid-template-columns:minmax(240px,2fr) minmax(140px,1fr) auto auto}
-.browse-direction{white-space:nowrap}
+.browse-controls{align-items:end;grid-template-columns:minmax(240px,2fr) minmax(140px,1fr) auto auto}
+.browse-search input{height:38px;box-sizing:border-box}
+.browse-controls .ui-select-trigger{height:38px;box-sizing:border-box}
+.browse-direction,.browse-lucky{align-items:center;box-sizing:border-box;display:inline-flex;height:38px;justify-content:center;white-space:nowrap}
 .browse-advanced .ui-field-group+.ui-field-group{border-top:1px solid var(--border);margin-top:.8rem;padding-top:.8rem}
 .browse-number-filter,.browse-text-filter{display:flex;flex-direction:column;gap:.3rem}
 .browse-number-filter span,.browse-text-filter span{color:var(--muted);font-size:.68rem}
