@@ -59,6 +59,11 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
 
 export function Select({ label, value, defaultValue, onChange, onValueChange, disabled, className = '', children, name, id }: SelectProps) {
   const options = extractOptions(children);
+  const itemsMap: Record<string, ReactNode> = {};
+  options.forEach((opt) => {
+    itemsMap[opt.value] = opt.label;
+  });
+
   const stringValue = value !== undefined ? String(value) : (defaultValue !== undefined ? String(defaultValue) : undefined);
 
   const handleValueChange = (val: string | null) => {
@@ -73,9 +78,11 @@ export function Select({ label, value, defaultValue, onChange, onValueChange, di
   return (
     <label className={`ui-select ${className}`.trim()}>
       {label && <span>{label}</span>}
-      <BaseSelect.Root value={stringValue} onValueChange={handleValueChange} disabled={disabled} name={name} id={id}>
+      <BaseSelect.Root items={itemsMap} value={stringValue} onValueChange={handleValueChange} disabled={disabled} name={name} id={id}>
         <BaseSelect.Trigger className="ui-select-trigger">
-          <BaseSelect.Value placeholder="Select..." />
+          <BaseSelect.Value placeholder="Select...">
+            {(selectedValue: any) => (selectedValue != null && itemsMap[selectedValue] !== undefined ? itemsMap[selectedValue] : selectedValue)}
+          </BaseSelect.Value>
           <BaseSelect.Icon className="ui-select-icon">
             <ChevronDown size={14} />
           </BaseSelect.Icon>
