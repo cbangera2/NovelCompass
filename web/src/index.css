@@ -614,6 +614,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .format-badge.anime { background: rgba(167,139,250,.12); border: 1px solid rgba(167,139,250,.32); color: #c084fc; }
 .source-badge.novelupdates { background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.28); color: #4ade80; }
 .source-badge.anilist { background: rgba(56,189,248,.1); border: 1px solid rgba(56,189,248,.28); color: #38bdf8; }
+.language-badge { align-items: center; background: var(--accent-soft); border: 1px solid rgba(155,135,245,.23); border-radius: 999px; color: #d4cbff; display: inline-flex; font-size: .61rem; line-height: 1; padding: .14rem .38rem; text-decoration: none; text-transform: capitalize; }
 .suggestion-copy strong, .suggestion-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suggestion-copy small { color: var(--muted); font-size: .76rem; }
 .select-label { color: var(--accent-bright); font-size: .72rem; font-weight: 700; }
@@ -757,6 +758,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .card-content { display: flex; flex-direction: column; min-height: 100%; padding: .85rem; }
 .card-main { min-width: 0; }
 .card-primary { display: grid; grid-template-rows: 8.5rem auto 7.2rem; min-width: 0; }
+.card-primary-compact-evidence { grid-template-rows: 8.5rem auto auto; }
 .card-top { display: flex; gap: .85rem; min-height: 8.5rem; }
 .card-cover { background: rgba(255,255,255,.03); border-radius: 8px; flex: 0 0 82px; height: 116px; overflow: hidden; position: relative; }
 .cover-card { height: 116px; object-fit: cover; width: 82px; }
@@ -783,8 +785,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .novel-meta small { color: var(--dim); }
 .card-badges { align-items: center; display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
 .card-badges span:not(.search-badge) { background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .61rem; padding: .14rem .38rem; text-transform: capitalize; }
+.card-badges .search-badge:hover { text-decoration: none; }
+.card-badges .language-badge:hover { border-color: var(--accent); color: var(--text); text-decoration: none; }
 .evidence-label { color: var(--dim); font-size: .62rem; font-weight: 750; letter-spacing: .1em; margin: .85rem 0 .42rem; text-transform: uppercase; }
 .evidence-list { border-top: 1px solid var(--border); height: 7.2rem; list-style: none; overflow: hidden; padding-top: .55rem; }
+.evidence-list-compact { height: auto; overflow: visible; }
 .evidence-item { align-items: flex-start; color: #cac8d3; display: flex; font-size: .73rem; gap: .4rem; line-height: 1.42; margin-bottom: .34rem; }
 .evidence-item > span:last-child { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .evidence-bullet { align-items: center; background: var(--accent-soft); border-radius: 999px; color: var(--accent-bright); display: inline-flex; flex: 0 0 15px; font-size: .57rem; height: 15px; justify-content: center; margin-top: 1px; }
@@ -883,6 +888,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 @container (min-width: 460px) {
   .card-main { display: grid; gap: .8rem; grid-template-columns: minmax(0, 1fr) minmax(112px, 28%); }
   .card-primary { grid-template-rows: 8.5rem auto minmax(7.2rem,auto); }
+  .card-primary-compact-evidence { grid-template-rows: 8.5rem auto auto; }
   .card-tag-rail { border-left: 1px solid var(--border); border-top: 0; margin-top: 0; min-height:0; padding-left: .75rem; padding-top: .1rem; }
   .card-tag-links, .card-tag-more .detail-chips { align-items: flex-start; flex-direction: column; }
   .card-tag-links a, .card-tag-more .detail-chips a { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -911,6 +917,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .card-top { min-height:0; }
   .novel-title { min-height:0; }
   .evidence-list { height:auto; max-height:none; overflow:visible; }
+  .evidence-list-compact { height:auto; max-height:none; overflow:visible; }
   .evidence-item > span:last-child { display:block; overflow:visible; }
   .card-tag-rail { min-height:0; }
   .detail-hero { grid-template-columns: 120px minmax(0, 1fr); padding-right: 1.8rem; }

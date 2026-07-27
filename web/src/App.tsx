@@ -874,7 +874,14 @@ export default function App(): JSX.Element {
                     role="option"
                     aria-selected={selectedNovel?.id === novel.id}
                     className="suggestion"
-                    onClick={() => chooseNovel(novel)}
+                    onClick={() => {
+                      chooseNovel(novel);
+                      pushSeedRoute(novel);
+                      window.requestAnimationFrame(() => {
+                        searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      });
+                      void fetchRecommendations(novel);
+                    }}
                   >
                     <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
                     <span className="suggestion-copy">
@@ -1169,6 +1176,8 @@ export default function App(): JSX.Element {
           <div className="results-grid">
             {filteredRecommendations.slice(0, visibleCount).map((rec, index) => {
               const badge = getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type, source: rec.source });
+              const evidenceBullets = rec.evidence_bullets.filter(Boolean);
+              const compactEvidence = evidenceBullets.length < 3;
               return (
                 <Card
                   key={rec.target_id || index}
@@ -1179,7 +1188,7 @@ export default function App(): JSX.Element {
                 >
                   <div className="card-content">
                     <div className="card-main">
-                      <div className="card-primary">
+                      <div className={`card-primary${compactEvidence ? ' card-primary-compact-evidence' : ''}`}>
                         <div className="card-top">
                           <div className="card-cover">
                             <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
@@ -1225,21 +1234,25 @@ export default function App(): JSX.Element {
                                   {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
                                 </span>
                               )}
-                              {rec.language && <a href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
+                              {rec.language && <a className="language-badge" href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
                               {rec.status_trans && <span>{rec.status_trans}</span>}
                             </div>
                           </div>
                         </div>
 
-                      <div className="evidence-label">Why it matches</div>
-                      <ul className="evidence-list">
-                        {rec.evidence_bullets.map((bullet, i) => (
-                          <li key={i} className="evidence-item">
-                            <span className="evidence-bullet" aria-hidden="true">✓</span>
-                            <span>{bullet}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      {evidenceBullets.length > 0 && (
+                        <>
+                          <div className="evidence-label">Why it matches</div>
+                          <ul className={`evidence-list${compactEvidence ? ' evidence-list-compact' : ''}`}>
+                            {evidenceBullets.map((bullet, i) => (
+                              <li key={i} className="evidence-item">
+                                <span className="evidence-bullet" aria-hidden="true">✓</span>
+                                <span>{bullet}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
                     </div>
 
                     {rec.shared_tags.length > 0 && (
