@@ -6,6 +6,7 @@ import './index.css';
 import { loadNavigationPreferences } from './preferences';
 
 const BrowsePage = lazy(() => import('./BrowsePage'));
+const GraphPage = lazy(() => import('./GraphPage'));
 const NovelPage = lazy(() => import('./NovelPage'));
 const ProfilePage = lazy(() => import('./profile/ProfilePage'));
 const ScraperDashboard = lazy(() => import('./ScraperDashboard'));
@@ -17,7 +18,7 @@ const isDetailView = requestedView === 'novel' || requestedView === 'manga' || r
 const hasExplicitDiscoverSeed = locationParams.has('seed');
 const activeView: AppView = isDetailView
   ? 'novel'
-  : requestedView === 'discover' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings'
+  : requestedView === 'discover' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'graph' || requestedView === 'profile' || requestedView === 'settings'
     ? requestedView
     : hasExplicitDiscoverSeed ? 'discover' : loadNavigationPreferences().homeView;
 
@@ -29,13 +30,15 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           ? <ScraperDashboard />
           : activeView === 'browse'
             ? <BrowsePage />
-            : activeView === 'profile'
-              ? <ProfilePage />
-              : activeView === 'settings'
-              ? <SettingsPage />
-              : activeView === 'novel'
-                ? <NovelPage />
-              : <App />}
+            : activeView === 'graph'
+              ? <GraphPage />
+              : activeView === 'profile'
+                ? <ProfilePage />
+                : activeView === 'settings'
+                ? <SettingsPage />
+                : activeView === 'novel'
+                  ? <NovelPage />
+                : <App />}
       </Suspense>
     </AppShell>
   </React.StrictMode>

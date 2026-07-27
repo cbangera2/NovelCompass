@@ -174,4 +174,9 @@ export class ApiDataSource implements RecommendationDataSource {
     const result = await apiFetch<{ novel: BrowseNovel }>(`/api/browse/random?${params}`);
     return result.novel;
   }
+
+  getGraphData(): Promise<import('../types').GraphData> {
+    const base = import.meta.env.BASE_URL || '/';
+    return apiFetch<import('../types').GraphData>(`${base.replace(/\/$/, '')}/data/graph.json`);
+  }
 }
