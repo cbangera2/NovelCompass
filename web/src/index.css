@@ -608,7 +608,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .suggestion-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .suggestion-title-line { align-items: center; display: flex; flex-wrap: wrap; gap: .45rem; min-width: 0; }
 .suggestion-badges { align-items: center; display: inline-flex; flex-shrink: 0; gap: .25rem; }
-.search-badge { border-radius: 999px; display: inline-flex; font-size: .6rem; font-weight: 750; letter-spacing: .02em; line-height: 1; padding: .14rem .42rem; text-transform: uppercase; }
+.search-badge { align-items: center; border-radius: 999px; display: inline-flex; font-size: .6rem; font-weight: 750; justify-content: center; letter-spacing: .02em; line-height: 1; padding: .14rem .42rem; text-transform: uppercase; }
 .format-badge.novel { background: rgba(147,197,253,.12); border: 1px solid rgba(147,197,253,.32); color: #93c5fd; }
 .format-badge.manga { background: rgba(244,114,182,.12); border: 1px solid rgba(244,114,182,.32); color: #f472b6; }
 .format-badge.anime { background: rgba(167,139,250,.12); border: 1px solid rgba(167,139,250,.32); color: #c084fc; }
