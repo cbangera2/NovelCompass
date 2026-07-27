@@ -111,7 +111,12 @@ export function Select({ label, value, defaultValue, onChange, onValueChange, di
 }
 
 export function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
-  return <fieldset className="ui-field-group"><legend>{label}</legend>{children}</fieldset>;
+  return (
+    <div className="ui-field-group">
+      <span>{label}</span>
+      <div className="ui-field-group-items">{children}</div>
+    </div>
+  );
 }
 
 export function Tooltip({ content, children }: { content: string; children: ReactElement<{ 'aria-describedby'?: string }> }) {
