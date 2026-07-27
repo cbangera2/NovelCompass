@@ -9,7 +9,7 @@ export function Checkbox({ label, description, title, ...props }: Omit<InputHTML
     <label className="ui-checkbox" title={title || description}>
       <input type="checkbox" {...props} />
       <span className="ui-checkbox-mark" aria-hidden="true" />
-      <span><strong>{label}</strong>{description && <small>{description}</small>}</span>
+      <span className="ui-checkbox-label"><strong>{label}</strong>{description && <small>{description}</small>}</span>
     </label>
   );
 }
