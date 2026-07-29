@@ -5,12 +5,14 @@ import { createRoot } from 'react-dom/client';
 import { OpaqueActionRegistry } from '../adapters/action-registry';
 import { parseNovelUpdatesAccountState } from '../adapters/account';
 import { classifyNovelUpdatesDocument } from '../adapters/page-classifier';
+import { parseRankingPage } from '../adapters/ranking';
 import { parseReleasePage } from '../adapters/releases';
 import { parseReviewPage } from '../adapters/reviews';
 import { parseLiveSeriesMetadata } from '../adapters/series-page';
 import { chromeLocalStorageArea, ExtensionStorageRepository } from '../storage';
 import { SeriesRuntimeApp } from '../runtime/SeriesRuntimeApp';
 import { ExtensionFinderApp } from '../ui/ExtensionFinderApp';
+import { ExtensionRankingApp } from '../ui/ExtensionRankingApp';
 import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
 import { ensureReplacementHost } from './replacement-host';
 import { resolveNovelUpdatesNavigation } from './navigation';
@@ -75,13 +77,12 @@ async function bootstrapReplacement(): Promise<void> {
       window.location.href,
       actionRegistry,
     ).account;
-    const routeApp =
-      classification.kind === 'supported' && classification.identity.pageType === 'series-finder'
-        ? createElement(ExtensionFinderApp, {
-            datasetBaseUrl,
-            onShowOriginal: replacementHost.showOriginal,
-          })
-        : createSeriesApp(onFatalError, datasetBaseUrl, actionRegistry);
+    const routeApp = createRouteApp(
+      onFatalError,
+      datasetBaseUrl,
+      actionRegistry,
+      replacementHost.showOriginal,
+    );
     const activeRoute: ExtensionRoute =
       classification.kind === 'supported' ? classification.identity.pageType : 'other';
     const app = createElement(
@@ -114,6 +115,34 @@ async function bootstrapReplacement(): Promise<void> {
     document.documentElement.classList.remove('novel-compass-replacement-active');
     console.error('Novel Compass could not initialize its replacement UI.', error);
   }
+}
+
+function createRouteApp(
+  onFatalError: (error: unknown) => void,
+  datasetBaseUrl: string,
+  actionRegistry: OpaqueActionRegistry,
+  onShowOriginal: () => void,
+): ReactNode {
+  if (classification.kind !== 'supported') {
+    onFatalError(new Error('Replacement UI received an unsupported route.'));
+    return null;
+  }
+  if (classification.identity.pageType === 'series-finder') {
+    return createElement(ExtensionFinderApp, { datasetBaseUrl, onShowOriginal });
+  }
+  if (classification.identity.pageType === 'series-ranking') {
+    const ranking = parseRankingPage(document, window.location.href);
+    if (!ranking.ok) {
+      onFatalError(new Error(ranking.message ?? 'Series Ranking could not be parsed.'));
+      return null;
+    }
+    return createElement(ExtensionRankingApp, {
+      page: ranking.page,
+      onNavigate: navigateHttps,
+      onShowOriginal,
+    });
+  }
+  return createSeriesApp(onFatalError, datasetBaseUrl, actionRegistry);
 }
 
 function createSeriesApp(

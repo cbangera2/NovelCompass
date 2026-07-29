@@ -11,6 +11,7 @@ export const FIXTURE_NAMES = [
   'shell-logged-in.html',
   'shell-logged-out.html',
   'shell-unknown.html',
+  'series-ranking.html',
 ] as const;
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number];

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import finderFixture from '../fixtures/series-finder.html?raw';
+import rankingFixture from '../fixtures/series-ranking.html?raw';
 import seriesFixture from '../fixtures/series-logged-out.html?raw';
 import unsupportedFixture from '../fixtures/unsupported-markup.html?raw';
 
@@ -82,6 +83,19 @@ describe('content bootstrap runtime', () => {
     await waitFor(() =>
       vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/data/manifest.json')),
     );
+  });
+
+  it('mounts Series Ranking inside the shared shell from live page data', async () => {
+    loadPage(rankingFixture, 'https://www.novelupdates.com/series-ranking/?rank=popmonth&pg=2');
+
+    await import('../../src/content/bootstrap');
+    await waitFor(() => document.documentElement.classList.contains(ACTIVE_CLASS));
+
+    const shadow = document.getElementById(HOST_ID)?.shadowRoot;
+    expect(shadow?.textContent).toContain('Series Ranking');
+    expect(shadow?.textContent).toContain('Synthetic Moon');
+    expect(shadow?.textContent).toContain('Popular (Month)');
+    expect(shadow?.querySelector('[aria-current="page"]')?.textContent).toContain('Series ranking');
   });
 
   it.each([

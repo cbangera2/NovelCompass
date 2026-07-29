@@ -8,7 +8,7 @@
 
 export const NOVEL_UPDATES_PARSER_VERSION = 1;
 
-export type SupportedPageType = 'series' | 'series-finder';
+export type SupportedPageType = 'series' | 'series-finder' | 'series-ranking';
 
 export type IdentityConfidence = 'high' | 'medium' | 'low';
 
@@ -191,6 +191,48 @@ export interface LiveSeriesSnapshot extends LiveSeriesMetadata {
   releases: LiveReleasePage;
   reviews: LiveReviewPage;
   capabilities: SeriesPageCapabilities;
+}
+
+export interface RankingFilterOption {
+  label: string;
+  value: string;
+  selected: boolean;
+}
+
+export interface RankingFilters {
+  rankingTypes: RankingFilterOption[];
+  languages: RankingFilterOption[];
+  storyStatuses: RankingFilterOption[];
+  genres: Array<RankingFilterOption & { excluded: boolean }>;
+  minimumChapters?: number;
+}
+
+export interface LiveRankingRow {
+  rank: number;
+  title: string;
+  seriesUrl: string;
+  coverUrl?: string;
+  language?: string;
+  rating?: number;
+  chapterCount?: number;
+  releaseFrequency?: string;
+  readerCount?: number;
+  reviewCount?: number;
+  lastUpdated?: string;
+  description?: string;
+  genres: LinkedLabel[];
+}
+
+export interface LiveRankingPage {
+  title: string;
+  activeRankingLabel?: string;
+  filters: RankingFilters;
+  rows: LiveRankingRow[];
+  currentPage: number;
+  pageLinks: Array<{ page: number; url: string }>;
+  previousUrl?: string;
+  nextUrl?: string;
+  warnings: ParseWarning[];
 }
 
 export type ReplacementBlockReason =

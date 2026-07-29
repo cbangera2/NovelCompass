@@ -6,7 +6,7 @@ describe('matchNovelUpdatesRoute', () => {
   it.each([
     ['/series/example/', 'series', 'bespoke-replacement', true],
     ['/series-finder/', 'series-finder', 'bespoke-replacement', true],
-    ['/series-ranking/', 'series-ranking', 'bespoke-replacement', false],
+    ['/series-ranking/', 'series-ranking', 'bespoke-replacement', true],
     ['/', 'home', 'bespoke-replacement', false],
     ['/page/3/', 'catalog-feed', 'bespoke-replacement', false],
     ['/genre/action/', 'catalog-taxonomy', 'bespoke-replacement', false],
@@ -24,16 +24,13 @@ describe('matchNovelUpdatesRoute', () => {
     ['/wp-admin/profile.php', 'wordpress-internal', 'pass-through', false],
     ['/wp-json/wp/v2/posts', 'machine-readable', 'pass-through', false],
     ['/comments/feed/', 'machine-readable', 'pass-through', false],
-  ] as const)(
-    'maps %s to %s',
-    (pathname, family, policy, uiImplemented) => {
-      expect(matchNovelUpdatesRoute(pathname)).toMatchObject({
-        family,
-        policy,
-        uiImplemented,
-      });
-    },
-  );
+  ] as const)('maps %s to %s', (pathname, family, policy, uiImplemented) => {
+    expect(matchNovelUpdatesRoute(pathname)).toMatchObject({
+      family,
+      policy,
+      uiImplemented,
+    });
+  });
 
   it.each([
     '/series/',

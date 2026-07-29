@@ -106,11 +106,11 @@ export function classifyNovelUpdatesPage(
     return blocked('replacement-not-implemented', parsedUrl.href, route);
   }
 
-  if (route.family === 'series-finder') {
+  if (route.family === 'series-finder' || route.family === 'series-ranking') {
     return {
       kind: 'supported',
       identity: {
-        pageType: 'series-finder',
+        pageType: route.family,
         url: parsedUrl.href,
         parserVersion: NOVEL_UPDATES_PARSER_VERSION,
         confidence: 'high',
@@ -119,7 +119,8 @@ export function classifyNovelUpdatesPage(
     };
   }
 
-  const currentSeriesMatch = route.family === 'series' ? SERIES_PATH.exec(parsedUrl.pathname) : null;
+  const currentSeriesMatch =
+    route.family === 'series' ? SERIES_PATH.exec(parsedUrl.pathname) : null;
   if (!currentSeriesMatch) {
     return blocked('unsupported-route', parsedUrl.href);
   }

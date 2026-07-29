@@ -73,14 +73,13 @@ describe('classifyNovelUpdatesPage', () => {
     },
   );
 
-  it('registers future replacement and native-restyle routes without activating them', () => {
+  it('activates Series Ranking and registers native-restyle routes', () => {
     expect(classifyNovelUpdatesPage('https://www.novelupdates.com/series-ranking/')).toMatchObject({
-      kind: 'blocked',
-      reason: 'replacement-not-implemented',
-      route: {
-        family: 'series-ranking',
-        policy: 'bespoke-replacement',
-        priority: 0,
+      kind: 'supported',
+      identity: {
+        pageType: 'series-ranking',
+        confidence: 'high',
+        resolutionSource: 'exact-route',
       },
     });
     expect(classifyNovelUpdatesPage('https://www.novelupdates.com/account/')).toMatchObject({
