@@ -252,9 +252,7 @@
     .extension-shell-brand > span,
     .extension-shell-nav-group h2,
     .extension-shell-nav-group a span,
-    .extension-shell-sidebar-footer span,
-    .extension-shell-account-links > a:not(:first-child),
-    .extension-shell-account-links > button
+    .extension-shell-sidebar-footer span
   ),
 .extension-shell-sidebar.is-collapsed .extension-shell-sidebar-toggle span {
   display: none;

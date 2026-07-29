@@ -1,15 +1,21 @@
 import {
   Award,
+  Bell,
   BookMarked,
   BookOpen,
+  Heart,
   Home,
   List,
   LogIn,
+  LogOut,
+  Mail,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  Settings,
   User,
+  UserPlus,
   X,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
@@ -302,17 +308,20 @@ function AccountSummary({
         )}
         {account.accountUrl ? (
           <a aria-label="Account settings" href={account.accountUrl} title="Account settings">
-            Account settings
+            <Settings aria-hidden="true" size={17} />
+            <span>Account settings</span>
           </a>
         ) : null}
         {account.followingUrl ? (
           <a aria-label="Following" href={account.followingUrl} title="Following">
-            Following
+            <Heart aria-hidden="true" size={17} />
+            <span>Following</span>
           </a>
         ) : null}
         {account.alertsUrl ? (
           <a aria-label="Alerts" href={account.alertsUrl} title="Alerts">
-            Alerts{account.alertCount === undefined ? '' : ` (${account.alertCount})`}
+            <Bell aria-hidden="true" size={17} />
+            <span>Alerts{account.alertCount === undefined ? '' : ` (${account.alertCount})`}</span>
           </a>
         ) : null}
         {account.messagesUrl ? (
@@ -322,7 +331,8 @@ function AccountSummary({
             rel="noopener noreferrer"
             title="Forum messages"
           >
-            Forum messages
+            <Mail aria-hidden="true" size={17} />
+            <span>Forum messages</span>
           </a>
         ) : null}
         {account.logoutActionId && onInvokeAction ? (
@@ -332,7 +342,8 @@ function AccountSummary({
             title="Log out"
             type="button"
           >
-            Log out
+            <LogOut aria-hidden="true" size={17} />
+            <span>Log out</span>
           </button>
         ) : null}
       </div>
@@ -357,7 +368,8 @@ function AccountSummary({
       </a>
       {account.status === 'logged-out' && account.registerUrl ? (
         <a aria-label="Register" href={account.registerUrl} title="Register">
-          Register
+          <UserPlus aria-hidden="true" size={17} />
+          <span>Register</span>
         </a>
       ) : null}
     </div>

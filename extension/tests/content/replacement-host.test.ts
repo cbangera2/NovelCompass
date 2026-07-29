@@ -14,6 +14,12 @@ describe('ensureReplacementHost runtime preferences', () => {
     document.body.innerHTML = '<main id="native-content">Native Novel Updates</main>';
     const nativeContent = document.getElementById('native-content');
     const controller = ensureReplacementHost(document);
+    const hostStyle = controller.host.shadowRoot?.querySelector('style')?.textContent ?? '';
+
+    expect(hostStyle).toContain('@media (max-width: 900px)');
+    expect(hostStyle).toMatch(
+      /#novel-compass-view-toggle\s*\{[^}]*position:\s*static;/s,
+    );
 
     controller.setTheme('light');
     controller.activate();

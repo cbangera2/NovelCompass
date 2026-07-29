@@ -87,7 +87,17 @@ describe('ExtensionShell', () => {
   });
 
   it('collapses the desktop sidebar and persists the preference', () => {
-    renderShell();
+    const onInvokeAction = vi.fn();
+    renderShell({
+      account: {
+        status: 'logged-in',
+        username: 'Fixture Reader',
+        profileUrl: 'https://www.novelupdates.com/user/fixture-reader/',
+        accountUrl: 'https://www.novelupdates.com/account/',
+        logoutActionId: 'logout',
+      },
+      onInvokeAccountAction: onInvokeAction,
+    });
     const toggle = container.querySelector<HTMLButtonElement>('.extension-shell-sidebar-toggle');
     expect(toggle?.getAttribute('aria-label')).toBe('Collapse sidebar');
 
@@ -108,6 +118,11 @@ describe('ExtensionShell', () => {
         button.textContent?.includes('Original Novel Updates'),
       )?.getAttribute('aria-label'),
     ).toBe('Original Novel Updates');
+    expect(container.querySelector('[aria-label="Account settings"]')).not.toBeNull();
+    const logout = container.querySelector<HTMLButtonElement>('[aria-label="Log out"]');
+    expect(logout).not.toBeNull();
+    act(() => logout?.click());
+    expect(onInvokeAction).toHaveBeenCalledWith('logout');
   });
 });
 

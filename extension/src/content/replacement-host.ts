@@ -155,6 +155,14 @@ function createHostShell(document: Document): {
       outline: 3px solid #38bdf8;
       outline-offset: 3px;
     }
+
+    @media (max-width: 900px) {
+      #novel-compass-view-toggle {
+        bottom: auto;
+        margin: 0.75rem 1rem 1rem auto;
+        position: static;
+      }
+    }
   `;
 
   const productRoot = document.createElement('main');
