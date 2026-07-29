@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Novel Compass settings</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell" aria-labelledby="popup-title">
+      <header class="brand-header">
+        <span class="brand-mark" aria-hidden="true">NC</span>
+        <span>
+          <strong id="popup-title">Novel Compass</strong>
+          <small>for Novel Updates</small>
+        </span>
+        <span class="status-pill" id="status-pill" aria-live="polite">Loading</span>
+      </header>
+
+      <section class="setting-row setting-row--primary">
+        <span>
+          <label for="extension-enabled">Use Novel Compass</label>
+          <small>Restyle Novel Updates pages</small>
+        </span>
+        <input
+          class="switch"
+          id="extension-enabled"
+          type="checkbox"
+          role="switch"
+          aria-describedby="enabled-hint"
+        />
+        <span class="sr-only" id="enabled-hint">Turn the Novel Compass interface on or off</span>
+      </section>
+
+      <section class="settings-group" aria-labelledby="appearance-title">
+        <h2 id="appearance-title">Appearance</h2>
+        <fieldset>
+          <legend>Theme</legend>
+          <div class="segmented-control">
+            <label><input type="radio" name="theme" value="system" />System</label>
+            <label><input type="radio" name="theme" value="light" />Light</label>
+            <label><input type="radio" name="theme" value="dark" />Dark</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Default page view</legend>
+          <div class="segmented-control segmented-control--two">
+            <label>
+              <input type="radio" name="page-mode" value="replacement" />
+              Novel Compass
+            </label>
+            <label><input type="radio" name="page-mode" value="original" />Original</label>
+          </div>
+        </fieldset>
+        <label class="setting-row setting-row--compact" for="show-original-button">
+          <span>
+            <strong>Original-page button</strong>
+            <small>Show the recovery button on restyled pages</small>
+          </span>
+          <input class="switch" id="show-original-button" type="checkbox" role="switch" />
+        </label>
+      </section>
+
+      <section class="settings-group data-pack" aria-labelledby="data-pack-title">
+        <div class="data-pack-heading">
+          <div>
+            <h2 id="data-pack-title">NovelCompass data</h2>
+            <p>Optional enhanced search and similar-novel recommendations.</p>
+          </div>
+          <span class="data-pack-badge" id="data-pack-badge">Checking</span>
+        </div>
+        <p class="data-pack-detail" id="data-pack-detail" aria-live="polite">
+          Checking local data…
+        </p>
+        <div class="data-pack-actions">
+          <button id="data-pack-enable" type="button">Enable data</button>
+          <button id="data-pack-remove" class="button-secondary" type="button" hidden>
+            Remove data
+          </button>
+        </div>
+        <small class="data-pack-note">
+          Downloads JSON only from NovelCompass after you approve access. Restyling and live
+          Novel Updates pages work without it.
+        </small>
+        <p class="data-pack-fallback" id="data-pack-fallback" hidden>
+          Enhanced data is optional. You can still
+          <a href="https://cbangera2.github.io/NovelCompass/" data-external
+            >open NovelCompass <span aria-hidden="true">↗</span></a
+          >
+          or
+          <a href="https://github.com/cbangera2/NovelCompass" data-external
+            >check the project on GitHub <span aria-hidden="true">↗</span></a
+          >.
+        </p>
+      </section>
+
+      <p class="save-status" id="save-status" aria-live="polite"></p>
+
+      <nav class="quick-links" aria-label="Quick links">
+        <a href="https://www.novelupdates.com/" data-external>Novel Updates <span>↗</span></a>
+        <a href="https://www.novelupdates.com/series-finder/" data-external
+          >Find novels <span>↗</span></a
+        >
+        <a href="https://www.novelupdates.com/series-ranking/" data-external
+          >Rankings <span>↗</span></a
+        >
+        <a href="https://cbangera2.github.io/NovelCompass/" data-external
+          >NovelCompass app <span>↗</span></a
+        >
+      </nav>
+
+      <footer>
+        Changes apply when a Novel Updates page is refreshed.
+      </footer>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

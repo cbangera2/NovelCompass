@@ -1,0 +1,490 @@
+.extension-shell {
+  --bg: #090b12;
+  --surface: #111520;
+  --surface-raised: #161b28;
+  --surface-soft: #0e121c;
+  --border: rgb(255 255 255 / 9%);
+  --border-strong: rgb(255 255 255 / 15%);
+  --accent: #9b87f5;
+  --accent-bright: #b8a8ff;
+  --accent-soft: rgb(155 135 245 / 13%);
+  --text: #f5f3ff;
+  --muted: #aaa9b6;
+  --dim: #747482;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    400 16px/1.45 Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  min-height: 100vh;
+}
+
+:host([data-theme='light']) .extension-shell {
+  --bg: #f7f7fb;
+  --surface: #ffffff;
+  --surface-raised: #f0eef6;
+  --surface-soft: #f4f2f8;
+  --border: rgb(51 42 69 / 12%);
+  --border-strong: rgb(51 42 69 / 21%);
+  --accent: #6d5bd0;
+  --accent-bright: #5945bc;
+  --accent-soft: rgb(109 91 208 / 12%);
+  --text: #201b2b;
+  --muted: #625c6e;
+  --dim: #817b8c;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :host([data-theme='system']) .extension-shell {
+    --bg: #f7f7fb;
+    --surface: #ffffff;
+    --surface-raised: #f0eef6;
+    --surface-soft: #f4f2f8;
+    --border: rgb(51 42 69 / 12%);
+    --border-strong: rgb(51 42 69 / 21%);
+    --accent: #6d5bd0;
+    --accent-bright: #5945bc;
+    --accent-soft: rgb(109 91 208 / 12%);
+    --text: #201b2b;
+    --muted: #625c6e;
+    --dim: #817b8c;
+    color-scheme: light;
+  }
+}
+
+.extension-shell *,
+.extension-shell *::before,
+.extension-shell *::after {
+  box-sizing: border-box;
+}
+
+.extension-shell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.extension-shell button,
+.extension-shell input {
+  font: inherit;
+}
+
+.extension-shell button:focus-visible,
+.extension-shell input:focus-visible,
+.extension-shell a:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+.extension-shell-skip-link {
+  background: var(--text);
+  color: var(--bg) !important;
+  left: 1rem;
+  padding: 0.55rem 0.75rem;
+  position: fixed;
+  top: -5rem;
+  z-index: 100;
+}
+
+.extension-shell-skip-link:focus {
+  top: 1rem;
+}
+
+.extension-shell-sidebar,
+.extension-shell-mobile-drawer {
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.extension-shell-sidebar {
+  border-right: 1px solid var(--border);
+  height: 100vh;
+  inset: 0 auto 0 0;
+  position: fixed;
+  width: 250px;
+  z-index: 30;
+  transition:
+    padding 160ms ease,
+    width 160ms ease;
+}
+
+.extension-shell-brand {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+}
+
+.extension-shell-brand .novel-compass-mark {
+  flex: 0 0 38px;
+  height: 38px;
+  width: 38px;
+}
+
+.extension-shell-brand span,
+.extension-shell-nav-group a span,
+.extension-shell-sidebar-footer span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.extension-shell-brand strong {
+  font-size: 0.9rem;
+}
+
+.extension-shell-brand small,
+.extension-shell-nav-group small,
+.extension-shell-sidebar-footer small {
+  color: var(--dim);
+  font-size: 0.62rem;
+}
+
+.extension-shell-sidebar-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.extension-shell-nav-group {
+  margin-top: 1.6rem;
+}
+
+.extension-shell-nav-group h2 {
+  color: var(--dim);
+  font-size: 0.61rem;
+  letter-spacing: 0.12em;
+  margin: 0 0.65rem 0.35rem;
+  text-transform: uppercase;
+}
+
+.extension-shell-nav-group nav {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.extension-shell-nav-group a,
+.extension-shell-sidebar-footer a,
+.extension-shell-sidebar-footer button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted);
+  display: flex;
+  gap: 0.7rem;
+  min-height: 44px;
+  padding: 0.58rem 0.65rem;
+  text-align: left;
+  width: 100%;
+}
+
+.extension-shell-nav-group a:hover,
+.extension-shell-sidebar-footer a:hover,
+.extension-shell-sidebar-footer button:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.extension-shell-nav-group a.is-active {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent-bright);
+}
+
+.extension-shell-nav-group strong,
+.extension-shell-sidebar-footer strong {
+  font-size: 0.76rem;
+}
+
+.extension-shell-sidebar-footer {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.75rem;
+}
+
+.extension-shell-sidebar-footer button {
+  cursor: pointer;
+}
+
+.extension-shell-inset {
+  margin-left: 250px;
+  min-height: 100vh;
+  transition: margin-left 160ms ease;
+}
+
+.extension-shell-sidebar-toggle {
+  align-items: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+  margin-top: 0.65rem;
+  min-height: 36px;
+  width: 100%;
+}
+
+.extension-shell-sidebar-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.extension-shell-sidebar.is-collapsed {
+  align-items: center;
+  padding-inline: 0.65rem;
+  width: 76px;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-brand {
+  justify-content: center;
+}
+
+.extension-shell-sidebar.is-collapsed
+  :is(
+    .extension-shell-brand > span,
+    .extension-shell-nav-group h2,
+    .extension-shell-nav-group a span,
+    .extension-shell-sidebar-footer span
+  ),
+.extension-shell-sidebar.is-collapsed .extension-shell-sidebar-toggle span {
+  display: none;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-sidebar-content,
+.extension-shell-sidebar.is-collapsed .extension-shell-nav-group,
+.extension-shell-sidebar.is-collapsed .extension-shell-nav-group nav,
+.extension-shell-sidebar.is-collapsed .extension-shell-sidebar-footer {
+  width: 100%;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-nav-group {
+  margin-top: 1rem;
+}
+
+.extension-shell-sidebar.is-collapsed
+  :is(
+    .extension-shell-nav-group a,
+    .extension-shell-sidebar-footer a,
+    .extension-shell-sidebar-footer button
+  ) {
+  justify-content: center;
+  padding-inline: 0;
+  position: relative;
+}
+
+.extension-shell-sidebar.is-collapsed
+  :is(a, button, [aria-label]):is(:hover, :focus-visible)::after {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  box-shadow: 0 0.45rem 1.3rem rgb(0 0 0 / 28%);
+  color: var(--text);
+  content: attr(aria-label);
+  font-size: 0.72rem;
+  font-weight: 600;
+  left: calc(100% + 0.65rem);
+  line-height: 1.2;
+  padding: 0.42rem 0.58rem;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  z-index: 80;
+}
+
+.extension-shell-sidebar.is-collapsed :is(a, button, [aria-label]) {
+  position: relative;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-account-links > div {
+  justify-content: center;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-account-links > div span {
+  display: none;
+}
+
+.extension-shell-inset.is-sidebar-collapsed {
+  margin-left: 76px;
+}
+
+.extension-shell-topbar {
+  align-items: center;
+  backdrop-filter: blur(18px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 1rem;
+  height: 64px;
+  padding: 0.65rem clamp(1rem, 3vw, 3rem);
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+
+.extension-shell-topbar form {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--dim);
+  display: flex;
+  gap: 0.55rem;
+  height: 42px;
+  max-width: 620px;
+  padding: 0 0.7rem;
+  width: min(620px, 65vw);
+}
+
+.extension-shell-topbar form:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.extension-shell-topbar input {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.extension-shell-topbar input:focus-visible {
+  outline: 0;
+}
+
+.extension-shell-account-compact {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  font-size: 0.72rem;
+  gap: 0.45rem;
+  margin-left: auto;
+  max-width: 180px;
+  min-height: 38px;
+  overflow: hidden;
+  padding: 0.4rem 0.55rem;
+}
+
+.extension-shell-account-compact span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extension-shell-menu-trigger,
+.extension-shell-mobile-layer {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .extension-shell-sidebar {
+    display: none;
+  }
+
+  .extension-shell-inset {
+    margin-left: 0;
+    padding-top: 58px;
+  }
+
+  .extension-shell-inset.is-sidebar-collapsed {
+    margin-left: 0;
+  }
+
+  .extension-shell-topbar {
+    height: 58px;
+    inset: 0 0 auto;
+    padding: 0.5rem 0.75rem;
+    position: fixed;
+    z-index: 45;
+  }
+
+  .extension-shell-menu-trigger {
+    align-items: center;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    color: var(--text);
+    display: flex;
+    flex: 0 0 38px;
+    height: 38px;
+    justify-content: center;
+  }
+
+  .extension-shell-topbar form {
+    flex: 1;
+    width: auto;
+  }
+
+  .extension-shell-account-compact span {
+    display: none;
+  }
+
+  .extension-shell-mobile-layer {
+    display: block;
+    position: fixed;
+    z-index: 70;
+  }
+
+  .extension-shell-mobile-backdrop {
+    background: rgb(2 4 9 / 72%);
+    border: 0;
+    cursor: default;
+    inset: 0;
+    position: fixed;
+  }
+
+  .extension-shell-mobile-drawer {
+    border-right: 1px solid var(--border);
+    box-shadow: 20px 0 70px rgb(0 0 0 / 50%);
+    height: 100vh;
+    inset: 0 auto 0 0;
+    max-width: 86vw;
+    position: fixed;
+    width: 310px;
+  }
+
+  .extension-shell-mobile-close {
+    align-items: center;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    display: flex;
+    height: 32px;
+    justify-content: center;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.75rem;
+    width: 32px;
+  }
+
+  .extension-shell-mobile-drawer .extension-shell-sidebar-header {
+    padding-right: 2.5rem;
+  }
+}
+
+@media (max-width: 440px) {
+  .extension-shell-account-compact {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .extension-shell * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

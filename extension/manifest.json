@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Novel Compass for Novel Updates",
+  "version": "0.1.0",
+  "description": "A modern Novel Compass interface for supported Novel Updates pages.",
+  "permissions": ["storage"],
+  "optional_host_permissions": ["https://cbangera2.github.io/*"],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Novel Compass settings",
+    "default_popup": "popup/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.novelupdates.com/*"],
+      "js": ["content/bootstrap.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content/style.css", "content/native-theme.css", "data/*", "data/**/*"],
+      "matches": ["https://www.novelupdates.com/*"]
+    }
+  ]
+}

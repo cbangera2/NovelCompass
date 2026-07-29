@@ -1,0 +1,46 @@
+.novel-compass-recommendation-lists { color: #e8edf5; display: grid; gap: 24px; padding: 0 0 36px; }
+.novel-compass-recommendation-lists * { box-sizing: border-box; }
+.extension-list-hero, .extension-list-directory, .extension-list-series, .extension-list-tag-directory, .extension-list-pagination {
+  background: #111a27; border: 1px solid #26364b; border-radius: 18px; padding: 24px;
+}
+.extension-list-hero { align-items: flex-start; display: flex; justify-content: space-between; gap: 24px; }
+.extension-list-hero p, .extension-list-section-heading p { color: #62d7c5; font-size: 12px; font-weight: 750; letter-spacing: .1em; margin: 0 0 6px; text-transform: uppercase; }
+.extension-list-hero h1, .extension-list-section-heading h2 { color: #f8fafc; margin: 0; }
+.extension-list-hero h1 { font-size: clamp(28px, 4vw, 44px); }
+.extension-list-hero span { color: #9eacbe; display: block; line-height: 1.6; margin-top: 8px; max-width: 760px; }
+.extension-list-hero a, .extension-list-directory a, .extension-list-series a, .extension-list-tag-directory a, .extension-list-pagination a { color: #77e1cf; text-decoration: none; }
+.extension-list-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.extension-list-actions a, .extension-list-actions button { background: #192637; border: 1px solid #354b65; border-radius: 10px; color: #e8edf5; cursor: pointer; font: inherit; padding: 10px 14px; white-space: nowrap; }
+.extension-list-section-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 18px; }
+.extension-list-section-heading span { color: #8494aa; }
+.extension-list-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.extension-list-grid > article { background: #162131; border: 1px solid #26384f; border-radius: 14px; display: grid; gap: 13px; padding: 18px; }
+.extension-list-card-heading { align-items: center; display: flex; gap: 12px; }
+.extension-list-card-heading > img, .extension-list-card-heading > svg { border-radius: 50%; height: 42px; object-fit: cover; width: 42px; }
+.extension-list-card-heading h3, .extension-list-series h3 { font-size: 18px; margin: 0 0 4px; }
+.extension-list-card-heading span, .extension-list-card-heading div > a { color: #8494aa; font-size: 13px; }
+.extension-list-description, .extension-list-series article > p { color: #aeb9c8; display: -webkit-box; line-height: 1.6; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.extension-list-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.extension-list-tags a, .extension-list-tags span { background: #1d3042; border: 1px solid #2c4960; border-radius: 999px; color: #8de8da; font-size: 12px; padding: 5px 9px; }
+.extension-list-grid dl { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; }
+.extension-list-grid dl div { color: #8e9eb2; display: flex; font-size: 12px; gap: 5px; }
+.extension-list-grid dt { align-items: center; display: flex; gap: 4px; }
+.extension-list-grid dd { color: #dce4ee; margin: 0; }
+.extension-list-series ol { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.extension-list-series li { background: #162131; border: 1px solid #26384f; border-radius: 14px; display: grid; gap: 18px; grid-template-columns: 72px 1fr; padding: 16px; }
+.extension-list-cover { align-items: center; background: #1e2d40; border-radius: 9px; display: flex; height: 96px; justify-content: center; overflow: hidden; }
+.extension-list-cover img { height: 100%; object-fit: cover; width: 100%; }
+.extension-list-series-title { align-items: center; display: flex; justify-content: space-between; }
+.extension-list-series-title span { align-items: center; color: #f6c768; display: flex; gap: 5px; }
+.extension-list-series blockquote { border-left: 3px solid #62d7c5; color: #cbd5e1; margin: 8px 0; padding-left: 12px; }
+.extension-list-tag-directory > .extension-list-tags { gap: 10px; }
+.extension-list-tag-directory > .extension-list-tags a { font-size: 14px; padding: 8px 12px; }
+.extension-list-pagination { align-items: center; display: flex; justify-content: space-between; }
+.extension-list-pagination > a, .extension-list-pagination div a { align-items: center; display: inline-flex; gap: 5px; padding: 8px; }
+.extension-list-pagination div { display: flex; gap: 5px; }
+.extension-list-pagination a[aria-current='page'] { background: #62d7c5; border-radius: 8px; color: #08131b; }
+@media (max-width: 760px) {
+  .extension-list-hero { flex-direction: column; }
+  .extension-list-actions { justify-content: flex-start; }
+  .extension-list-grid { grid-template-columns: 1fr; }
+}

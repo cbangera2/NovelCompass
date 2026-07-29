@@ -1,0 +1,218 @@
+.novel-compass-catalog {
+  color: #f8fafc;
+  display: grid;
+  gap: 22px;
+  padding: 8px 0 48px;
+}
+
+.extension-catalog-hero,
+.extension-catalog-results {
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 24px;
+  box-shadow: 0 20px 55px rgba(2, 6, 23, 0.25);
+}
+
+.extension-catalog-hero {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 30px;
+}
+
+.extension-catalog-hero p,
+.extension-catalog-results-heading p,
+.extension-catalog-title-row p {
+  color: #a78bfa;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin: 0 0 7px;
+  text-transform: uppercase;
+}
+
+.extension-catalog-hero h1,
+.extension-catalog-results-heading h2 {
+  margin: 0;
+}
+
+.extension-catalog-hero h1 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+}
+
+.extension-catalog-hero span {
+  color: #94a3b8;
+  display: block;
+  margin-top: 8px;
+}
+
+.extension-catalog-hero button {
+  background: rgba(139, 92, 246, 0.14);
+  border: 1px solid rgba(167, 139, 250, 0.38);
+  border-radius: 999px;
+  color: #ddd6fe;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 16px;
+}
+
+.extension-catalog-results {
+  padding: 24px;
+}
+
+.extension-catalog-results-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px 18px;
+}
+
+.extension-catalog-results-heading > span {
+  color: #94a3b8;
+}
+
+.extension-catalog-results ol {
+  display: grid;
+  gap: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.extension-catalog-results li {
+  background: rgba(30, 41, 59, 0.58);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 100px minmax(0, 1fr);
+  padding: 16px;
+}
+
+.extension-catalog-cover {
+  align-items: center;
+  aspect-ratio: 2 / 3;
+  background: #0f172a;
+  border-radius: 12px;
+  color: #64748b;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.extension-catalog-cover img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.extension-catalog-title-row {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.extension-catalog-title-row h3 {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.extension-catalog-title-row h3 a {
+  color: #f8fafc;
+  text-decoration: none;
+}
+
+.extension-catalog-rating {
+  align-items: center;
+  color: #fbbf24;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 5px;
+}
+
+.extension-catalog-description {
+  color: #cbd5e1;
+  display: -webkit-box;
+  line-height: 1.55;
+  margin: 12px 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.extension-catalog-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 11px 0;
+}
+
+.extension-catalog-genres a {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  border-radius: 999px;
+  color: #c4b5fd;
+  font-size: 0.75rem;
+  padding: 4px 9px;
+  text-decoration: none;
+}
+
+.extension-catalog-chapter {
+  align-items: center;
+  color: #67e8f9;
+  display: inline-flex;
+  font-size: 0.83rem;
+  gap: 6px;
+  margin-top: 4px;
+  text-decoration: none;
+}
+
+.extension-catalog-pagination {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.extension-catalog-pagination > a:last-child {
+  justify-self: end;
+}
+
+.extension-catalog-pagination a {
+  align-items: center;
+  border-radius: 10px;
+  color: #cbd5e1;
+  display: inline-flex;
+  gap: 6px;
+  padding: 8px 11px;
+  text-decoration: none;
+}
+
+.extension-catalog-pagination div {
+  display: flex;
+  gap: 5px;
+}
+
+.extension-catalog-pagination a[aria-current='page'] {
+  background: #7c3aed;
+  color: white;
+}
+
+@media (max-width: 680px) {
+  .extension-catalog-hero {
+    align-items: start;
+    flex-direction: column;
+    gap: 18px;
+    padding: 22px;
+  }
+
+  .extension-catalog-results {
+    padding: 14px;
+  }
+
+  .extension-catalog-results li {
+    grid-template-columns: 74px minmax(0, 1fr);
+    padding: 12px;
+  }
+}

@@ -117,3 +117,86 @@ const esbuild = require(`./web/node_modules/.pnpm/${esbuildPackage}/node_modules
     assert [item["id"] for item in payload["search"]] == [1]
     assert payload["requests"][-1] == "/data/catalog.json"
     assert payload["browse"]["total"] == 2
+
+
+def test_extension_factory_uses_injected_fixture_and_resolves_nu_identity():
+    script = r"""
+const fs = require('node:fs');
+const path = require('node:path');
+const esbuildPackage = fs.readdirSync('./web/node_modules/.pnpm')
+  .find((name) => name.startsWith('esbuild@'));
+if (!esbuildPackage) throw new Error('pnpm esbuild package is unavailable');
+const esbuild = require(`./web/node_modules/.pnpm/${esbuildPackage}/node_modules/esbuild`);
+(async () => {
+  const built = await esbuild.build({
+    entryPoints: ['./web/src/data/extension.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+    define: { 'import.meta.env.BASE_URL': '"/"' }
+  });
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`;
+  const {
+    createExtensionStaticDataSource,
+    identityFromNovelUpdatesUrl,
+    resolveNovelUpdatesIdentity
+  } = await import(moduleUrl);
+  const fixtureRoot = path.resolve('tests/fixtures/extension-static-data');
+  const requests = [];
+  const fixtureFetch = async (url) => {
+    requests.push(String(url));
+    const relative = new URL(String(url)).pathname.replace(/^\/fixture\//, '');
+    const file = path.join(fixtureRoot, relative);
+    if (!fs.existsSync(file)) return { ok: false, status: 404, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => JSON.parse(fs.readFileSync(file, 'utf8')) };
+  };
+  const source = await createExtensionStaticDataSource({
+    baseUrl: 'https://extension.invalid/fixture',
+    fetch: fixtureFetch
+  });
+  const identity = identityFromNovelUpdatesUrl(
+    'https://www.novelupdates.com/series/i-became-a-regressed-mercenary/'
+  );
+  const resolved = await resolveNovelUpdatesIdentity(source, identity);
+  const titleResolved = await resolveNovelUpdatesIdentity(source, {
+    slug: 'renamed-page',
+    title: 'Clockwork Blade'
+  });
+  const unresolved = await resolveNovelUpdatesIdentity(source, {
+    slug: 'not-in-the-snapshot',
+    title: 'Not In The Snapshot'
+  });
+  const browse = await source.browseNovels({
+    include_tags: 'Mercenaries',
+    sort: 'rating',
+    direction: 'desc'
+  });
+  process.stdout.write(JSON.stringify({
+    requests,
+    identity,
+    resolved,
+    titleResolved,
+    unresolved,
+    browseIds: browse.items.map((item) => item.id)
+  }));
+})().catch((error) => { console.error(error); process.exit(1); });
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["identity"] == {"slug": "i-became-a-regressed-mercenary"}
+    assert payload["resolved"]["status"] == "resolved"
+    assert payload["resolved"]["matchedBy"] == "slug"
+    assert payload["resolved"]["novel"]["id"] == 101
+    assert payload["titleResolved"]["matchedBy"] == "title"
+    assert payload["titleResolved"]["novel"]["id"] == 102
+    assert payload["unresolved"]["status"] == "unresolved"
+    assert payload["browseIds"] == [102, 101]
+    assert payload["requests"][0].endswith("/manifest.json")

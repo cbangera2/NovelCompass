@@ -1,0 +1,9 @@
+{
+  "genres": ["Action", "Fantasy", "Romance"],
+  "tags": ["Regression", "Mercenaries", "Slow Romance"],
+  "novels": {
+    "101": {"g": [0, 1], "t": [0, 1]},
+    "102": {"g": [0, 1], "t": [1]},
+    "103": {"g": [2], "t": [2]}
+  }
+}
