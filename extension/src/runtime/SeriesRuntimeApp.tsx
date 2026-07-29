@@ -9,6 +9,7 @@ import type {
 import { ExtensionSeriesApp, type SeriesSectionState } from '../ui/ExtensionSeriesApp';
 import type { SimilarNovel } from '../ui/components/SimilarNovels';
 import { loadSeriesSimilarNovels } from './similar';
+import { createBrokeredDatasetFetch } from '../data/client';
 
 export interface SeriesRuntimeAppProps {
   datasetBaseUrl: string;
@@ -28,7 +29,12 @@ export function SeriesRuntimeApp(props: SeriesRuntimeAppProps): JSX.Element {
   useEffect(() => {
     let cancelled = false;
     setSimilar({ status: 'loading' });
-    loadSeriesSimilarNovels(props.datasetBaseUrl, props.identity, props.metadata).then(
+    loadSeriesSimilarNovels(
+      props.datasetBaseUrl,
+      props.identity,
+      props.metadata,
+      createBrokeredDatasetFetch(),
+    ).then(
       (result) => !cancelled && setSimilar(result),
     );
     return () => {

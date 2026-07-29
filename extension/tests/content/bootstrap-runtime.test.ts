@@ -88,7 +88,9 @@ describe('content bootstrap runtime', () => {
     expect(host?.shadowRoot?.textContent).toContain('Loading the Novel Compass catalog');
     expect(fetch).toHaveBeenCalledWith(`${EXTENSION_ORIGIN}content/style.css`);
     await waitFor(() =>
-      vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/data/manifest.json')),
+      vi
+        .mocked(chrome.runtime.sendMessage)
+        .mock.calls.some(([message]) => message.path === 'manifest.json'),
     );
   });
 
@@ -293,6 +295,23 @@ function installChromeApi(storedPreferences?: unknown): void {
   vi.stubGlobal('chrome', {
     runtime: {
       getURL: (resource: string) => `${EXTENSION_ORIGIN}${resource}`,
+      sendMessage: vi.fn(async (message: { path?: string }) => {
+        if (!message.path) return undefined;
+        const response = await fixtureResponse(`${EXTENSION_ORIGIN}data/${message.path}`);
+        return response.ok
+          ? {
+              ok: true,
+              datasetVersion: 'packaged',
+              body: await response.json(),
+              cache: 'packaged',
+            }
+          : {
+              ok: false,
+              code: 'unavailable',
+              message: 'Fixture data is unavailable.',
+              retryable: true,
+            };
+      }),
     },
     storage: {
       local: {

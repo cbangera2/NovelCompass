@@ -5,6 +5,7 @@ import {
   type RecommendationDataSource,
 } from '../../../web/src/data';
 import { extensionFinderNovelUrl } from './finder-links';
+import { createBrokeredDatasetFetch } from '../data/client';
 import './extension-finder.css';
 
 export interface ExtensionFinderAppProps {
@@ -25,7 +26,10 @@ export function ExtensionFinderApp({
     let cancelled = false;
     setSource(null);
     setError('');
-    createExtensionStaticDataSource({ baseUrl: datasetBaseUrl, fetch: fetcher })
+    createExtensionStaticDataSource({
+      baseUrl: datasetBaseUrl,
+      fetch: fetcher ?? createBrokeredDatasetFetch(),
+    })
       .then((next) => !cancelled && setSource(next))
       .catch((reason) => {
         if (!cancelled)

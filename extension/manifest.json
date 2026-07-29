@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "A modern Novel Compass interface for supported Novel Updates pages.",
   "permissions": ["storage"],
+  "optional_host_permissions": ["https://cbangera2.github.io/*"],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
