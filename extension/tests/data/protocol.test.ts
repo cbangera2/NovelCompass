@@ -19,6 +19,12 @@ describe('data broker protocol', () => {
       false,
     );
     expect(isDataBrokerRequest({ type: 'other', protocolVersion: 1 })).toBe(false);
+    expect(
+      isDataBrokerRequest({
+        type: 'novel-compass:data:prepare',
+        protocolVersion: DATA_BROKER_PROTOCOL_VERSION,
+      }),
+    ).toBe(true);
   });
 
   it('allows only relative JSON artifact paths', () => {

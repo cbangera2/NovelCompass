@@ -24,6 +24,10 @@ input {
   font: inherit;
 }
 
+button {
+  border: 0;
+}
+
 .popup-shell {
   padding: 18px;
 }
@@ -143,6 +147,96 @@ input {
   background: rgb(14 18 28 / 72%);
 }
 
+.data-pack-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.data-pack-heading h2 {
+  margin-bottom: 4px;
+}
+
+.data-pack-heading p,
+.data-pack-detail,
+.data-pack-note {
+  color: #aaa9b6;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.data-pack-heading p,
+.data-pack-detail {
+  margin: 0;
+}
+
+.data-pack-badge {
+  flex: none;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: #202536;
+  color: #aaa9b6;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.data-pack-badge[data-state="ready"],
+.data-pack-badge[data-state="not-downloaded"] {
+  background: rgb(155 135 245 / 15%);
+  color: #b8a8ff;
+}
+
+.data-pack-badge[data-state="error"],
+.data-pack-badge[data-state="update-required"] {
+  background: rgb(255 159 159 / 12%);
+  color: #ff9f9f;
+}
+
+.data-pack-detail {
+  min-height: 15px;
+  margin-top: 10px;
+  color: #d8d6e2;
+}
+
+.data-pack-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.data-pack-actions button {
+  min-height: 32px;
+  border: 1px solid #7f6bdf;
+  border-radius: 9px;
+  background: #6d5bd0;
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.data-pack-actions button:hover {
+  background: #7f6bdf;
+}
+
+.data-pack-actions .button-secondary {
+  border-color: rgb(255 255 255 / 14%);
+  background: transparent;
+  color: #d8d6e2;
+}
+
+.data-pack-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.data-pack-note {
+  display: block;
+  margin-top: 9px;
+}
+
 h2 {
   margin: 0 0 14px;
   color: #747482;
@@ -210,6 +304,7 @@ legend {
 }
 
 input:focus-visible,
+button:focus-visible,
 a:focus-visible,
 .segmented-control label:has(input:focus-visible) {
   outline: 2px solid #b8a8ff;
@@ -294,7 +389,9 @@ footer {
   }
 
   .brand-header small,
-  .setting-row small {
+  .setting-row small,
+  .data-pack-heading p,
+  .data-pack-note {
     color: #625c6e;
   }
 
@@ -319,6 +416,15 @@ footer {
   }
 
   legend {
+    color: #554e62;
+  }
+
+  .data-pack-detail {
+    color: #554e62;
+  }
+
+  .data-pack-actions .button-secondary {
+    border-color: rgb(51 42 69 / 16%);
     color: #554e62;
   }
 

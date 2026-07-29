@@ -66,6 +66,34 @@ export class ExtensionDataBroker {
     return (await this.readMetadata()) ?? { state: 'not-downloaded' };
   }
 
+  async prepare(): Promise<DataBrokerResponse> {
+    const prior = await this.readMetadata();
+    try {
+      const manifest = await this.resolveManifest(prior);
+      return {
+        ok: true,
+        status: {
+          state: prior?.state === 'ready' ? 'ready' : 'not-downloaded',
+          datasetVersion: manifest.dataset_version,
+          lastUpdatedAt: prior?.lastUpdatedAt,
+          bytes: prior?.bytes,
+        },
+      };
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : 'Novel Compass data is unavailable.';
+      await this.writeMetadata({
+        ...(prior ?? {}),
+        state: message.includes('update required') ? 'update-required' : 'error',
+        message,
+      });
+      return failure(
+        message.includes('update required') ? 'update-required' : 'unavailable',
+        message,
+        !message.includes('update required'),
+      );
+    }
+  }
+
   async remove(): Promise<DataBrokerResponse> {
     const keys = await this.dependencies.caches.keys();
     await Promise.all(

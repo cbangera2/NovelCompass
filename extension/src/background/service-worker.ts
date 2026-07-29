@@ -24,6 +24,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'novel-compass:data:fetch') operation = broker.fetchArtifact(message.path);
   else if (message.type === 'novel-compass:data:status') {
     operation = broker.getStatus().then((status) => ({ ok: true, status }));
+  } else if (message.type === 'novel-compass:data:prepare') {
+    operation = broker.prepare();
   } else operation = broker.remove();
   operation.then(sendResponse).catch((reason) =>
     sendResponse({

@@ -11,6 +11,10 @@ export type DataBrokerRequest =
       protocolVersion: typeof DATA_BROKER_PROTOCOL_VERSION;
     }
   | {
+      type: 'novel-compass:data:prepare';
+      protocolVersion: typeof DATA_BROKER_PROTOCOL_VERSION;
+    }
+  | {
       type: 'novel-compass:data:remove';
       protocolVersion: typeof DATA_BROKER_PROTOCOL_VERSION;
     };
@@ -51,6 +55,7 @@ export function isDataBrokerRequest(value: unknown): value is DataBrokerRequest 
     candidate.protocolVersion === DATA_BROKER_PROTOCOL_VERSION &&
     (candidate.type === 'novel-compass:data:fetch' ||
       candidate.type === 'novel-compass:data:status' ||
+      candidate.type === 'novel-compass:data:prepare' ||
       candidate.type === 'novel-compass:data:remove')
   );
 }

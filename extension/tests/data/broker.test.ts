@@ -81,6 +81,15 @@ function setup(options: { corrupt?: boolean; offlineAfterWarm?: boolean } = {}) 
 }
 
 describe('ExtensionDataBroker', () => {
+  it('prepares only the small manifest boundary before feature data is requested', async () => {
+    const fixture = setup();
+    await expect(fixture.broker.prepare()).resolves.toMatchObject({
+      ok: true,
+      status: { state: 'not-downloaded', datasetVersion: '2026-07-29' },
+    });
+    expect(fixture.fetcher.mock.calls.some(([url]) => String(url).endsWith('0a.json'))).toBe(false);
+  });
+
   it('validates, caches, reports version, and serves a warm cache offline after restart', async () => {
     const fixture = setup();
     await expect(fixture.broker.fetchArtifact('details/0a.json')).resolves.toMatchObject({

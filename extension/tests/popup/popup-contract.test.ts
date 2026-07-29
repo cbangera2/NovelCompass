@@ -27,7 +27,18 @@ describe('extension action popup', () => {
     expect(html).toContain('name="theme" value="dark"');
     expect(html).toContain('name="page-mode" value="replacement"');
     expect(html).toContain('name="page-mode" value="original"');
+    expect(html).toContain('id="data-pack-enable"');
+    expect(html).toContain('id="data-pack-remove"');
+    expect(html).toContain('Optional enhanced search and similar-novel recommendations.');
+    expect(html).toContain('Restyling and live');
     expect(html).toContain('aria-live="polite"');
+  });
+
+  it('declares only the NovelCompass static origin as optional', async () => {
+    const manifest = JSON.parse(
+      await readFile(new URL('manifest.json', extensionRoot), 'utf8'),
+    ) as { optional_host_permissions?: string[] };
+    expect(manifest.optional_host_permissions).toEqual(['https://cbangera2.github.io/*']);
   });
 
   it('uses the Novel Compass violet palette in both color schemes', async () => {

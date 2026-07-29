@@ -1,13 +1,23 @@
 import { chromeLocalStorageArea } from '../storage/chrome-storage';
 import { ExtensionStorageRepository } from '../storage/repository';
 import type { ExtensionPageMode, ExtensionTheme } from '../storage/types';
+import type { DataPackStatus } from '../data/protocol';
+import {
+  enableDataPack,
+  readDataPackStatus,
+  removeDataPack,
+} from './data-controls';
 
 const repository = new ExtensionStorageRepository(chromeLocalStorageArea());
 
 const enabledInput = requiredInput('extension-enabled');
 const statusPill = requiredElement('status-pill');
 const saveStatus = requiredElement('save-status');
-const controls = Array.from(document.querySelectorAll('input, a[data-external]'));
+const dataPackBadge = requiredElement('data-pack-badge');
+const dataPackDetail = requiredElement('data-pack-detail');
+const dataPackEnable = requiredButton('data-pack-enable');
+const dataPackRemove = requiredButton('data-pack-remove');
+const controls = Array.from(document.querySelectorAll('input, button, a[data-external]'));
 
 void initialize();
 
@@ -31,6 +41,7 @@ async function initialize(): Promise<void> {
     }
     bindEvents();
     setDisabled(false);
+    renderDataPackStatus(await readDataPackStatus());
   } catch {
     renderEnabled(false);
     showStatus('Settings are unavailable. Reload the extension.', true);
@@ -71,6 +82,62 @@ function bindEvents(): void {
       void chrome.tabs.create({ url: link.href });
     });
   });
+
+  dataPackEnable.addEventListener('click', () => {
+    void runDataPackAction(enableDataPack);
+  });
+  dataPackRemove.addEventListener('click', () => {
+    void runDataPackAction(removeDataPack);
+  });
+}
+
+async function runDataPackAction(operation: () => Promise<DataPackStatus>): Promise<void> {
+  dataPackEnable.disabled = true;
+  dataPackRemove.disabled = true;
+  dataPackBadge.textContent = 'Working';
+  dataPackDetail.textContent = 'Updating optional NovelCompass data…';
+  try {
+    renderDataPackStatus(await operation());
+  } catch {
+    renderDataPackStatus({
+      state: 'error',
+      message: 'The data service could not be reached. Try again when you are online.',
+    });
+  }
+}
+
+function renderDataPackStatus(status: DataPackStatus): void {
+  const version = status.datasetVersion ? ` · ${status.datasetVersion}` : '';
+  const size = status.bytes ? ` · ${formatBytes(status.bytes)}` : '';
+  dataPackBadge.dataset.state = status.state;
+  dataPackRemove.hidden = status.state !== 'ready';
+  dataPackRemove.disabled = false;
+  dataPackEnable.disabled = false;
+  if (status.state === 'ready') {
+    dataPackBadge.textContent = 'Ready';
+    dataPackDetail.textContent = `Cached${version}${size}`;
+    dataPackEnable.textContent = 'Check for update';
+  } else if (status.state === 'update-required') {
+    dataPackBadge.textContent = 'Update needed';
+    dataPackDetail.textContent = status.message || 'Update the extension to use the latest data.';
+    dataPackEnable.textContent = 'Retry';
+  } else if (status.state === 'error') {
+    dataPackBadge.textContent = 'Unavailable';
+    dataPackDetail.textContent = status.message || 'Optional data is currently unavailable.';
+    dataPackEnable.textContent = 'Retry';
+  } else {
+    dataPackBadge.textContent = status.datasetVersion ? 'Enabled' : 'Optional';
+    dataPackDetail.textContent = status.datasetVersion
+      ? `Version ${status.datasetVersion} is ready to download as features need it.`
+      : 'No recommendation data has been downloaded.';
+    dataPackEnable.textContent = status.datasetVersion ? 'Check for update' : 'Enable data';
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
 async function save(
@@ -124,5 +191,11 @@ function requiredInput(id: string): HTMLInputElement {
 function requiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing element #${id}.`);
+  return element;
+}
+
+function requiredButton(id: string): HTMLButtonElement {
+  const element = document.getElementById(id);
+  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button #${id}.`);
   return element;
 }
