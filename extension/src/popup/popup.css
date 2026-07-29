@@ -2,8 +2,8 @@
   color-scheme: light dark;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #101312;
-  color: #f5f7f5;
+  background: #090b12;
+  color: #f5f3ff;
 }
 
 * {
@@ -15,8 +15,8 @@ body {
   min-height: 470px;
   margin: 0;
   background:
-    radial-gradient(circle at 90% -10%, rgb(81 158 120 / 24%), transparent 38%),
-    #101312;
+    radial-gradient(circle at 90% -10%, rgb(155 135 245 / 24%), transparent 38%),
+    #090b12;
 }
 
 button,
@@ -41,10 +41,10 @@ input {
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid rgb(130 225 174 / 35%);
+  border: 1px solid rgb(184 168 255 / 38%);
   border-radius: 13px;
-  background: linear-gradient(145deg, #2f9965, #196342);
-  box-shadow: 0 8px 24px rgb(25 99 66 / 28%);
+  background: linear-gradient(145deg, #9b87f5, #5945bc);
+  box-shadow: 0 8px 24px rgb(89 69 188 / 32%);
   color: white;
   font-size: 13px;
   font-weight: 800;
@@ -57,7 +57,7 @@ input {
 }
 
 .brand-header strong {
-  color: #f9fbf9;
+  color: #f5f3ff;
   font-size: 15px;
   letter-spacing: -0.01em;
 }
@@ -65,22 +65,22 @@ input {
 .brand-header small,
 .setting-row small {
   margin-top: 2px;
-  color: #98a39d;
+  color: #aaa9b6;
   font-size: 11px;
 }
 
 .status-pill {
   border-radius: 999px;
   padding: 4px 8px;
-  background: #29302c;
-  color: #b6c0ba;
+  background: #202536;
+  color: #aaa9b6;
   font-size: 10px;
   font-weight: 700;
 }
 
 .status-pill[data-enabled="true"] {
-  background: rgb(52 181 112 / 15%);
-  color: #78dba4;
+  background: rgb(155 135 245 / 15%);
+  color: #b8a8ff;
 }
 
 .setting-row {
@@ -91,13 +91,13 @@ input {
 
 .setting-row--primary {
   padding: 14px;
-  border: 1px solid #303833;
+  border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 14px;
-  background: rgb(29 34 31 / 82%);
+  background: rgb(17 21 32 / 82%);
 }
 
 .setting-row label {
-  color: #f4f7f5;
+  color: #f5f3ff;
   font-size: 13px;
   font-weight: 700;
 }
@@ -106,10 +106,10 @@ input {
   width: 42px;
   height: 24px;
   margin: 0;
-  border: 1px solid #4b554f;
+  border: 1px solid rgb(255 255 255 / 18%);
   border-radius: 999px;
   appearance: none;
-  background: #303732;
+  background: #202536;
   cursor: pointer;
   transition: 160ms ease;
 }
@@ -120,14 +120,14 @@ input {
   height: 18px;
   margin: 2px;
   border-radius: 50%;
-  background: #bec6c1;
+  background: #aaa9b6;
   content: "";
   transition: 160ms ease;
 }
 
 .switch:checked {
-  border-color: #40b978;
-  background: #278f5b;
+  border-color: #b8a8ff;
+  background: #6d5bd0;
 }
 
 .switch:checked::before {
@@ -138,14 +138,14 @@ input {
 .settings-group {
   margin-top: 14px;
   padding: 15px;
-  border: 1px solid #29312c;
+  border: 1px solid rgb(255 255 255 / 9%);
   border-radius: 14px;
-  background: rgb(22 26 24 / 72%);
+  background: rgb(14 18 28 / 72%);
 }
 
 h2 {
   margin: 0 0 14px;
-  color: #88958e;
+  color: #747482;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -165,7 +165,7 @@ fieldset + fieldset {
 
 legend {
   margin-bottom: 7px;
-  color: #d6ddd9;
+  color: #d8d6e2;
   font-size: 11px;
   font-weight: 650;
 }
@@ -175,9 +175,9 @@ legend {
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
   padding: 3px;
-  border: 1px solid #303833;
+  border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 10px;
-  background: #111512;
+  background: #0e121c;
 }
 
 .segmented-control--two {
@@ -190,16 +190,16 @@ legend {
   min-height: 30px;
   place-items: center;
   border-radius: 7px;
-  color: #9ca7a0;
+  color: #aaa9b6;
   cursor: pointer;
   font-size: 11px;
   font-weight: 650;
 }
 
 .segmented-control label:has(input:checked) {
-  background: #2b3530;
+  background: #29223f;
   box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
-  color: #f5f8f6;
+  color: #f5f3ff;
 }
 
 .segmented-control input {
@@ -212,14 +212,14 @@ legend {
 input:focus-visible,
 a:focus-visible,
 .segmented-control label:has(input:focus-visible) {
-  outline: 2px solid #6bdd9f;
+  outline: 2px solid #b8a8ff;
   outline-offset: 2px;
 }
 
 .save-status {
   min-height: 14px;
   margin: 8px 3px 2px;
-  color: #80d9a7;
+  color: #b8a8ff;
   font-size: 10px;
 }
 
@@ -230,7 +230,7 @@ a:focus-visible,
 .quick-links {
   display: grid;
   overflow: hidden;
-  border: 1px solid #29312c;
+  border: 1px solid rgb(255 255 255 / 9%);
   border-radius: 12px;
 }
 
@@ -240,28 +240,28 @@ a:focus-visible,
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  color: #dce3df;
+  color: #d8d6e2;
   font-size: 11px;
   font-weight: 650;
   text-decoration: none;
 }
 
 .quick-links a + a {
-  border-top: 1px solid #29312c;
+  border-top: 1px solid rgb(255 255 255 / 9%);
 }
 
 .quick-links a:hover {
-  background: #1d2520;
-  color: #79dba4;
+  background: #1b1829;
+  color: #b8a8ff;
 }
 
 .quick-links span {
-  color: #66736b;
+  color: #747482;
 }
 
 footer {
   margin-top: 11px;
-  color: #707d75;
+  color: #747482;
   font-size: 9px;
   line-height: 1.4;
   text-align: center;
@@ -278,64 +278,64 @@ footer {
 
 @media (prefers-color-scheme: light) {
   :root {
-    background: #f4f7f4;
-    color: #17201b;
+    background: #f7f7fb;
+    color: #201b2b;
   }
 
   body {
     background:
-      radial-gradient(circle at 90% -10%, rgb(78 178 123 / 18%), transparent 38%),
-      #f4f7f4;
+      radial-gradient(circle at 90% -10%, rgb(109 91 208 / 18%), transparent 38%),
+      #f7f7fb;
   }
 
   .brand-header strong,
   .setting-row label {
-    color: #17201b;
+    color: #201b2b;
   }
 
   .brand-header small,
   .setting-row small {
-    color: #69766e;
+    color: #625c6e;
   }
 
   .setting-row--primary,
   .settings-group {
-    border-color: #dbe4de;
+    border-color: rgb(51 42 69 / 12%);
     background: rgb(255 255 255 / 82%);
   }
 
   .segmented-control {
-    border-color: #d9e1dc;
-    background: #edf2ee;
+    border-color: rgb(51 42 69 / 12%);
+    background: #f0eef6;
   }
 
   .segmented-control label {
-    color: #68756d;
+    color: #625c6e;
   }
 
   .segmented-control label:has(input:checked) {
     background: white;
-    color: #17201b;
+    color: #4c398f;
   }
 
   legend {
-    color: #354139;
+    color: #554e62;
   }
 
   .quick-links {
-    border-color: #dbe4de;
+    border-color: rgb(51 42 69 / 12%);
   }
 
   .quick-links a {
-    color: #344039;
+    color: #554e62;
   }
 
   .quick-links a + a {
-    border-color: #dbe4de;
+    border-color: rgb(51 42 69 / 12%);
   }
 
   .quick-links a:hover {
-    background: #e8f2eb;
-    color: #176d42;
+    background: #ebe7f6;
+    color: #4c398f;
   }
 }

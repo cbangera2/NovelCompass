@@ -29,4 +29,15 @@ describe('extension action popup', () => {
     expect(html).toContain('name="page-mode" value="original"');
     expect(html).toContain('aria-live="polite"');
   });
+
+  it('uses the Novel Compass violet palette in both color schemes', async () => {
+    const css = await readFile(new URL('src/popup/popup.css', extensionRoot), 'utf8');
+
+    expect(css).toContain('#9b87f5');
+    expect(css).toContain('#b8a8ff');
+    expect(css).toContain('#6d5bd0');
+    expect(css).toContain('#5945bc');
+    expect(css).toContain('#ebe7f6');
+    expect(css).not.toMatch(/#(?:2f9965|196342|278f5b|40b978|6bdd9f|79dba4|80d9a7)\b/i);
+  });
 });
