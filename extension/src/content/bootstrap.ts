@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
 import { OpaqueActionRegistry } from '../adapters/action-registry';
+import { parseNovelUpdatesAccountState } from '../adapters/account';
 import { classifyNovelUpdatesDocument } from '../adapters/page-classifier';
 import { parseReleasePage } from '../adapters/releases';
 import { parseReviewPage } from '../adapters/reviews';
@@ -43,20 +44,30 @@ async function bootstrapReplacement(): Promise<void> {
       replacementHost?.fail(error);
     };
     const datasetBaseUrl = chrome.runtime.getURL('data/');
+    const actionRegistry = new OpaqueActionRegistry();
+    const account = parseNovelUpdatesAccountState(
+      document,
+      window.location.href,
+      actionRegistry,
+    ).account;
     const routeApp =
       classification.kind === 'supported' && classification.identity.pageType === 'series-finder'
         ? createElement(ExtensionFinderApp, {
             datasetBaseUrl,
             onShowOriginal: replacementHost.showOriginal,
           })
-        : createSeriesApp(onFatalError, datasetBaseUrl);
+        : createSeriesApp(onFatalError, datasetBaseUrl, actionRegistry);
     const activeRoute: ExtensionRoute =
       classification.kind === 'supported' ? classification.identity.pageType : 'other';
     const app = createElement(
       ExtensionShell,
       {
         activeRoute,
-        account: { state: 'unknown' },
+        account,
+        onInvokeAccountAction: (actionId: string) => {
+          const result = actionRegistry.invoke(actionId);
+          if (result.kind === 'navigate') window.location.assign(result.url);
+        },
         onShowOriginal: replacementHost.showOriginal,
       },
       routeApp,
@@ -83,6 +94,7 @@ async function bootstrapReplacement(): Promise<void> {
 function createSeriesApp(
   onFatalError: (error: unknown) => void,
   datasetBaseUrl: string,
+  registry: OpaqueActionRegistry,
 ): ReactNode {
   if (classification.kind !== 'supported' || classification.identity.pageType !== 'series') {
     onFatalError(new Error('Series UI received a non-series page identity.'));
@@ -95,7 +107,6 @@ function createSeriesApp(
     return null;
   }
 
-  const registry = new OpaqueActionRegistry();
   const releases = parseReleasePage(document, window.location.href, registry).page;
   const reviews = parseReviewPage(document, window.location.href, registry).page;
   return createElement(SeriesRuntimeApp, {

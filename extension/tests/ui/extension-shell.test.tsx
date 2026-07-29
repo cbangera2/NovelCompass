@@ -49,7 +49,7 @@ describe('ExtensionShell', () => {
   it('renders the minimal account contract without inventing logged-in state', () => {
     renderShell({
       account: {
-        state: 'logged-in',
+        status: 'logged-in',
         username: 'Fixture Reader',
         profileUrl: 'https://www.novelupdates.com/user/fixture-reader/',
       },

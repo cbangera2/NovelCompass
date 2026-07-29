@@ -13,27 +13,16 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { NovelCompassMark } from '../../../web/src/NovelCompassMark';
+import type { NovelUpdatesAccountState } from '../adapters/contracts';
 import './extension-shell.css';
 
 export type ExtensionRoute = 'series' | 'series-finder' | 'series-ranking' | 'other';
 
-export type ExtensionAccount =
-  | {
-      state: 'logged-in';
-      username: string;
-      profileUrl?: string;
-    }
-  | {
-      state: 'logged-out';
-      loginUrl?: string;
-      registerUrl?: string;
-    }
-  | { state: 'unknown' };
-
 export interface ExtensionShellProps {
   activeRoute: ExtensionRoute;
-  account?: ExtensionAccount;
+  account?: NovelUpdatesAccountState;
   children?: ReactNode;
+  onInvokeAccountAction?: (actionId: string) => void;
   onShowOriginal: () => void;
 }
 
@@ -87,8 +76,9 @@ const NAV_GROUPS = [
 
 export function ExtensionShell({
   activeRoute,
-  account = { state: 'unknown' },
+  account = { status: 'unknown', warnings: [] },
   children,
+  onInvokeAccountAction,
   onShowOriginal,
 }: ExtensionShellProps): JSX.Element {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -153,7 +143,7 @@ export function ExtensionShell({
         ))}
       </div>
       <footer className="extension-shell-sidebar-footer">
-        <AccountSummary account={account} />
+        <AccountSummary account={account} onInvokeAction={onInvokeAccountAction} />
         <button type="button" onClick={onShowOriginal}>
           <BookOpen aria-hidden="true" size={17} />
           <span>
@@ -224,38 +214,79 @@ export function ExtensionShell({
   );
 }
 
-function AccountSummary({ account }: { account: ExtensionAccount }): JSX.Element {
-  if (account.state === 'logged-in') {
-    const content = (
-      <>
-        <User aria-hidden="true" size={17} />
-        <span>
-          <strong>{account.username}</strong>
-          <small>Novel Updates account</small>
-        </span>
-      </>
+function AccountSummary({
+  account,
+  onInvokeAction,
+}: {
+  account: NovelUpdatesAccountState;
+  onInvokeAction?: (actionId: string) => void;
+}): JSX.Element {
+  if (account.status === 'logged-in') {
+    return (
+      <div className="extension-shell-account-links">
+        {account.profileUrl ? (
+          <a href={account.profileUrl}>
+            <User aria-hidden="true" size={17} />
+            <span>
+              <strong>{account.username}</strong>
+              <small>Novel Updates profile</small>
+            </span>
+          </a>
+        ) : (
+          <div>
+            <User aria-hidden="true" size={17} />
+            <span>
+              <strong>{account.username}</strong>
+              <small>Novel Updates account</small>
+            </span>
+          </div>
+        )}
+        {account.accountUrl ? <a href={account.accountUrl}>Account settings</a> : null}
+        {account.followingUrl ? <a href={account.followingUrl}>Following</a> : null}
+        {account.alertsUrl ? (
+          <a href={account.alertsUrl}>
+            Alerts{account.alertCount === undefined ? '' : ` (${account.alertCount})`}
+          </a>
+        ) : null}
+        {account.messagesUrl ? (
+          <a href={account.messagesUrl} rel="noopener noreferrer">
+            Forum messages
+          </a>
+        ) : null}
+        {account.logoutActionId && onInvokeAction ? (
+          <button type="button" onClick={() => onInvokeAction(account.logoutActionId!)}>
+            Log out
+          </button>
+        ) : null}
+      </div>
     );
-    return account.profileUrl ? <a href={account.profileUrl}>{content}</a> : <div>{content}</div>;
   }
   const loginUrl =
-    account.state === 'logged-out' ? account.loginUrl : 'https://www.novelupdates.com/login/';
+    account.status === 'logged-out' ? account.loginUrl : 'https://www.novelupdates.com/login/';
   return (
-    <a href={loginUrl || 'https://www.novelupdates.com/login/'}>
-      <LogIn aria-hidden="true" size={17} />
-      <span>
-        <strong>{account.state === 'unknown' ? 'Novel Updates account' : 'Log in'}</strong>
-        <small>{account.state === 'unknown' ? 'Open account access' : 'Sync your reading list'}</small>
-      </span>
-    </a>
+    <div className="extension-shell-account-links">
+      <a href={loginUrl || 'https://www.novelupdates.com/login/'}>
+        <LogIn aria-hidden="true" size={17} />
+        <span>
+          <strong>{account.status === 'unknown' ? 'Novel Updates account' : 'Log in'}</strong>
+          <small>
+            {account.status === 'unknown' ? 'Open account access' : 'Sync your reading list'}
+          </small>
+        </span>
+      </a>
+      {account.status === 'logged-out' && account.registerUrl ? (
+        <a href={account.registerUrl}>Register</a>
+      ) : null}
+    </div>
   );
 }
 
-function AccountCompact({ account }: { account: ExtensionAccount }): JSX.Element {
-  const label = account.state === 'logged-in' ? account.username : 'Account';
+function AccountCompact({ account }: { account: NovelUpdatesAccountState }): JSX.Element {
+  const label = account.status === 'logged-in' ? account.username : 'Account';
   const href =
-    account.state === 'logged-in'
+    account.status === 'logged-in'
       ? account.profileUrl || 'https://www.novelupdates.com/'
-      : account.state === 'logged-out'
+      : account.status === 'logged-out'
         ? account.loginUrl || 'https://www.novelupdates.com/login/'
         : 'https://www.novelupdates.com/login/';
   return (
