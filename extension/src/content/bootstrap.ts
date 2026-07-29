@@ -10,6 +10,7 @@ import { parseLiveSeriesMetadata } from '../adapters/series-page';
 import { chromeLocalStorageArea, ExtensionStorageRepository } from '../storage';
 import { SeriesRuntimeApp } from '../runtime/SeriesRuntimeApp';
 import { ExtensionFinderApp } from '../ui/ExtensionFinderApp';
+import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
 import { ensureReplacementHost } from './replacement-host';
 import { resolveNovelUpdatesNavigation } from './navigation';
 
@@ -42,13 +43,24 @@ async function bootstrapReplacement(): Promise<void> {
       replacementHost?.fail(error);
     };
     const datasetBaseUrl = chrome.runtime.getURL('data/');
-    const app =
+    const routeApp =
       classification.kind === 'supported' && classification.identity.pageType === 'series-finder'
         ? createElement(ExtensionFinderApp, {
             datasetBaseUrl,
             onShowOriginal: replacementHost.showOriginal,
           })
         : createSeriesApp(onFatalError, datasetBaseUrl);
+    const activeRoute: ExtensionRoute =
+      classification.kind === 'supported' ? classification.identity.pageType : 'other';
+    const app = createElement(
+      ExtensionShell,
+      {
+        activeRoute,
+        account: { state: 'unknown' },
+        onShowOriginal: replacementHost.showOriginal,
+      },
+      routeApp,
+    );
 
     const root = createRoot(replacementHost.productRoot);
     flushSync(() => {

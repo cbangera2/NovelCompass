@@ -1,0 +1,337 @@
+.extension-shell {
+  --bg: #090b12;
+  --surface: #111520;
+  --surface-raised: #161b28;
+  --surface-soft: #0e121c;
+  --border: rgb(255 255 255 / 9%);
+  --border-strong: rgb(255 255 255 / 15%);
+  --accent: #9b87f5;
+  --accent-bright: #b8a8ff;
+  --accent-soft: rgb(155 135 245 / 13%);
+  --text: #f5f3ff;
+  --muted: #aaa9b6;
+  --dim: #747482;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 16px/1.45 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+.extension-shell *,
+.extension-shell *::before,
+.extension-shell *::after {
+  box-sizing: border-box;
+}
+
+.extension-shell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.extension-shell button,
+.extension-shell input {
+  font: inherit;
+}
+
+.extension-shell button:focus-visible,
+.extension-shell input:focus-visible,
+.extension-shell a:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+.extension-shell-skip-link {
+  background: var(--text);
+  color: var(--bg) !important;
+  left: 1rem;
+  padding: .55rem .75rem;
+  position: fixed;
+  top: -5rem;
+  z-index: 100;
+}
+
+.extension-shell-skip-link:focus {
+  top: 1rem;
+}
+
+.extension-shell-sidebar,
+.extension-shell-mobile-drawer {
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.extension-shell-sidebar {
+  border-right: 1px solid var(--border);
+  height: 100vh;
+  inset: 0 auto 0 0;
+  position: fixed;
+  width: 250px;
+  z-index: 30;
+}
+
+.extension-shell-brand {
+  align-items: center;
+  display: flex;
+  gap: .7rem;
+}
+
+.extension-shell-brand .novel-compass-mark {
+  flex: 0 0 38px;
+  height: 38px;
+  width: 38px;
+}
+
+.extension-shell-brand span,
+.extension-shell-nav-group a span,
+.extension-shell-sidebar-footer span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.extension-shell-brand strong {
+  font-size: .9rem;
+}
+
+.extension-shell-brand small,
+.extension-shell-nav-group small,
+.extension-shell-sidebar-footer small {
+  color: var(--dim);
+  font-size: .62rem;
+}
+
+.extension-shell-sidebar-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.extension-shell-nav-group {
+  margin-top: 1.6rem;
+}
+
+.extension-shell-nav-group h2 {
+  color: var(--dim);
+  font-size: .61rem;
+  letter-spacing: .12em;
+  margin: 0 .65rem .35rem;
+  text-transform: uppercase;
+}
+
+.extension-shell-nav-group nav {
+  display: grid;
+  gap: .28rem;
+}
+
+.extension-shell-nav-group a,
+.extension-shell-sidebar-footer a,
+.extension-shell-sidebar-footer button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted);
+  display: flex;
+  gap: .7rem;
+  min-height: 44px;
+  padding: .58rem .65rem;
+  text-align: left;
+  width: 100%;
+}
+
+.extension-shell-nav-group a:hover,
+.extension-shell-sidebar-footer a:hover,
+.extension-shell-sidebar-footer button:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.extension-shell-nav-group a.is-active {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent-bright);
+}
+
+.extension-shell-nav-group strong,
+.extension-shell-sidebar-footer strong {
+  font-size: .76rem;
+}
+
+.extension-shell-sidebar-footer {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: .3rem;
+  padding-top: .75rem;
+}
+
+.extension-shell-sidebar-footer button {
+  cursor: pointer;
+}
+
+.extension-shell-inset {
+  margin-left: 250px;
+  min-height: 100vh;
+}
+
+.extension-shell-topbar {
+  align-items: center;
+  backdrop-filter: blur(18px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 1rem;
+  height: 64px;
+  padding: .65rem clamp(1rem, 3vw, 3rem);
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+
+.extension-shell-topbar form {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--dim);
+  display: flex;
+  gap: .55rem;
+  height: 42px;
+  max-width: 620px;
+  padding: 0 .7rem;
+  width: min(620px, 65vw);
+}
+
+.extension-shell-topbar form:focus-within {
+  border-color: var(--accent);
+}
+
+.extension-shell-topbar input {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.extension-shell-account-compact {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  font-size: .72rem;
+  gap: .45rem;
+  margin-left: auto;
+  max-width: 180px;
+  min-height: 38px;
+  overflow: hidden;
+  padding: .4rem .55rem;
+}
+
+.extension-shell-account-compact span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extension-shell-menu-trigger,
+.extension-shell-mobile-layer {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .extension-shell-sidebar {
+    display: none;
+  }
+
+  .extension-shell-inset {
+    margin-left: 0;
+    padding-top: 58px;
+  }
+
+  .extension-shell-topbar {
+    height: 58px;
+    inset: 0 0 auto;
+    padding: .5rem .75rem;
+    position: fixed;
+    z-index: 45;
+  }
+
+  .extension-shell-menu-trigger {
+    align-items: center;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    color: var(--text);
+    display: flex;
+    flex: 0 0 38px;
+    height: 38px;
+    justify-content: center;
+  }
+
+  .extension-shell-topbar form {
+    flex: 1;
+    width: auto;
+  }
+
+  .extension-shell-account-compact span {
+    display: none;
+  }
+
+  .extension-shell-mobile-layer {
+    display: block;
+    position: fixed;
+    z-index: 70;
+  }
+
+  .extension-shell-mobile-backdrop {
+    background: rgb(2 4 9 / 72%);
+    border: 0;
+    cursor: default;
+    inset: 0;
+    position: fixed;
+  }
+
+  .extension-shell-mobile-drawer {
+    border-right: 1px solid var(--border);
+    box-shadow: 20px 0 70px rgb(0 0 0 / 50%);
+    height: 100vh;
+    inset: 0 auto 0 0;
+    max-width: 86vw;
+    position: fixed;
+    width: 310px;
+  }
+
+  .extension-shell-mobile-close {
+    align-items: center;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    display: flex;
+    height: 32px;
+    justify-content: center;
+    position: absolute;
+    right: .75rem;
+    top: .75rem;
+    width: 32px;
+  }
+
+  .extension-shell-mobile-drawer .extension-shell-sidebar-header {
+    padding-right: 2.5rem;
+  }
+}
+
+@media (max-width: 440px) {
+  .extension-shell-account-compact {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .extension-shell * {
+    scroll-behavior: auto !important;
+  }
+}

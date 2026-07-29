@@ -2,7 +2,11 @@
   "extends": "../web/tsconfig.json",
   "compilerOptions": {
     "types": ["chrome"],
-    "typeRoots": ["../web/node_modules/@types"]
+    "typeRoots": ["../web/node_modules/@types"],
+    "baseUrl": "..",
+    "paths": {
+      "lucide-react": ["web/node_modules/lucide-react/dist/lucide-react.d.ts"]
+    }
   },
   "include": ["src"]
 }

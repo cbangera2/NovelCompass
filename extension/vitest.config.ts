@@ -6,6 +6,10 @@ export default defineConfig({
     alias: {
       react: new URL('../web/node_modules/react', import.meta.url).pathname,
       'react-dom': new URL('../web/node_modules/react-dom', import.meta.url).pathname,
+      'lucide-react': new URL(
+        '../web/node_modules/lucide-react/dist/esm/lucide-react.mjs',
+        import.meta.url,
+      ).pathname,
     },
   },
   test: {

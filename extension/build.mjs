@@ -46,6 +46,10 @@ const sharedConfig = {
         find: /^react-dom$/,
         replacement: path.join(webRoot, 'node_modules/react-dom/index.js'),
       },
+      {
+        find: /^lucide-react$/,
+        replacement: path.join(webRoot, 'node_modules/lucide-react/dist/esm/lucide-react.mjs'),
+      },
     ],
     dedupe: ['react', 'react-dom'],
   },
