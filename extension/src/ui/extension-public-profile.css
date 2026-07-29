@@ -1,4 +1,4 @@
-.novel-compass-public-profile { color: var(--text); display: grid; gap: 24px; padding-bottom: 36px; }
+.novel-compass-public-profile { color: var(--text); display: grid; gap: clamp(16px, 2vw, 24px); margin: 0 auto; max-width: 1180px; padding: clamp(20px, 2.5vw, 34px) clamp(16px, 3vw, 36px) 48px; width: 100%; }
 .novel-compass-public-profile * { box-sizing: border-box; }
 .extension-profile-hero { align-items: center; background: linear-gradient(135deg, var(--surface-raised), var(--accent-soft)); border: 1px solid var(--border); border-radius: 22px; display: flex; justify-content: space-between; padding: 28px; }
 .extension-profile-identity { align-items: center; display: flex; gap: 20px; min-width: 0; }
@@ -22,7 +22,7 @@
 .extension-profile-section-heading { align-items: end; display: flex; justify-content: space-between; margin-bottom: 18px; }
 .extension-profile-section-heading h2 { font-size: 24px; margin: 0; }
 .extension-profile-section-heading > span { color: var(--muted); }
-.extension-profile-list-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.extension-profile-list-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .extension-profile-list-grid > article { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 15px; display: grid; gap: 13px; padding: 18px; }
 .extension-profile-list-title { align-items: center; display: flex; gap: 10px; }
 .extension-profile-list-title h3 { font-size: 17px; margin: 0; }
@@ -36,7 +36,9 @@
 .extension-profile-list-grid dd { font-size: 12px; font-weight: 700; margin: 0; }
 .extension-profile-empty { align-items: center; color: var(--muted); display: flex; flex-direction: column; padding: 38px; }
 @media (max-width: 680px) {
+  .novel-compass-public-profile { padding: 16px 12px 36px; }
   .extension-profile-hero { align-items: flex-start; flex-direction: column; gap: 20px; padding: 20px; }
   .extension-profile-avatar { flex-basis: 66px; height: 66px; width: 66px; }
   .extension-profile-section-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .extension-profile-list-grid { grid-template-columns: minmax(0, 1fr); }
 }

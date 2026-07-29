@@ -11,8 +11,17 @@ import { ExtensionShell } from '../../src/ui/ExtensionShell';
 
 let container: HTMLDivElement;
 let root: Root;
+const storedPreferences = new Map<string, string>();
 
 beforeEach(() => {
+  storedPreferences.clear();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storedPreferences.get(key) ?? null,
+      setItem: (key: string, value: string) => storedPreferences.set(key, value),
+    },
+  });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -75,6 +84,20 @@ describe('ExtensionShell', () => {
     const close = container.querySelector<HTMLButtonElement>('.extension-shell-mobile-close');
     act(() => close?.click());
     expect(container.querySelector('.extension-shell-mobile-drawer')).toBeNull();
+  });
+
+  it('collapses the desktop sidebar and persists the preference', () => {
+    renderShell();
+    const toggle = container.querySelector<HTMLButtonElement>('.extension-shell-sidebar-toggle');
+    expect(toggle?.getAttribute('aria-label')).toBe('Collapse sidebar');
+
+    act(() => toggle?.click());
+    expect(container.querySelector('.extension-shell-sidebar')?.classList).toContain('is-collapsed');
+    expect(container.querySelector('.extension-shell-inset')?.classList).toContain(
+      'is-sidebar-collapsed',
+    );
+    expect(window.localStorage.getItem('novel-compass:sidebar-collapsed')).toBe('true');
+    expect(toggle?.getAttribute('aria-label')).toBe('Expand sidebar');
   });
 });
 

@@ -6,6 +6,8 @@ import {
   List,
   LogIn,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   User,
   X,
@@ -80,6 +82,7 @@ const NAV_GROUPS = [
     ],
   },
 ];
+const SIDEBAR_COLLAPSED_KEY = 'novel-compass:sidebar-collapsed';
 
 export function ExtensionShell({
   activeRoute,
@@ -89,6 +92,13 @@ export function ExtensionShell({
   onShowOriginal,
 }: ExtensionShellProps): JSX.Element {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -108,6 +118,18 @@ export function ExtensionShell({
     const url = new URL('https://www.novelupdates.com/series-finder/');
     if (query) url.searchParams.set('q', query);
     window.location.assign(url.href);
+  };
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      } catch {
+        // The control remains usable when page storage is unavailable.
+      }
+      return next;
+    });
   };
 
   const navigation = (
@@ -167,8 +189,22 @@ export function ExtensionShell({
       <a className="extension-shell-skip-link" href="#novel-compass-route-content">
         Skip to content
       </a>
-      <aside className="extension-shell-sidebar" aria-label="Primary navigation">
+      <aside
+        className={`extension-shell-sidebar${sidebarCollapsed ? ' is-collapsed' : ''}`}
+        aria-label="Primary navigation"
+      >
         {navigation}
+        <button
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-pressed={sidebarCollapsed}
+          className="extension-shell-sidebar-toggle"
+          onClick={toggleSidebar}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          type="button"
+        >
+          {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          <span>{sidebarCollapsed ? 'Expand' : 'Collapse'}</span>
+        </button>
       </aside>
       {mobileOpen ? (
         <div className="extension-shell-mobile-layer">
@@ -192,7 +228,7 @@ export function ExtensionShell({
           </aside>
         </div>
       ) : null}
-      <div className="extension-shell-inset">
+      <div className={`extension-shell-inset${sidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}>
         <header className="extension-shell-topbar">
           <button
             aria-expanded={mobileOpen}

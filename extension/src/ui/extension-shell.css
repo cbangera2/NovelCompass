@@ -108,6 +108,9 @@
   position: fixed;
   width: 250px;
   z-index: 30;
+  transition:
+    padding 160ms ease,
+    width 160ms ease;
 }
 
 .extension-shell-brand {
@@ -211,6 +214,83 @@
 .extension-shell-inset {
   margin-left: 250px;
   min-height: 100vh;
+  transition: margin-left 160ms ease;
+}
+
+.extension-shell-sidebar-toggle {
+  align-items: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+  margin-top: 0.65rem;
+  min-height: 36px;
+  width: 100%;
+}
+
+.extension-shell-sidebar-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.extension-shell-sidebar.is-collapsed {
+  align-items: center;
+  padding-inline: 0.65rem;
+  width: 76px;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-brand {
+  justify-content: center;
+}
+
+.extension-shell-sidebar.is-collapsed
+  :is(
+    .extension-shell-brand > span,
+    .extension-shell-nav-group h2,
+    .extension-shell-nav-group a span,
+    .extension-shell-sidebar-footer span,
+    .extension-shell-account-links > a:not(:first-child),
+    .extension-shell-account-links > button
+  ),
+.extension-shell-sidebar.is-collapsed .extension-shell-sidebar-toggle span {
+  display: none;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-sidebar-content,
+.extension-shell-sidebar.is-collapsed .extension-shell-nav-group,
+.extension-shell-sidebar.is-collapsed .extension-shell-nav-group nav,
+.extension-shell-sidebar.is-collapsed .extension-shell-sidebar-footer {
+  width: 100%;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-nav-group {
+  margin-top: 1rem;
+}
+
+.extension-shell-sidebar.is-collapsed
+  :is(
+    .extension-shell-nav-group a,
+    .extension-shell-sidebar-footer a,
+    .extension-shell-sidebar-footer button
+  ) {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-account-links > div {
+  justify-content: center;
+}
+
+.extension-shell-sidebar.is-collapsed .extension-shell-account-links > div span {
+  display: none;
+}
+
+.extension-shell-inset.is-sidebar-collapsed {
+  margin-left: 76px;
 }
 
 .extension-shell-topbar {
@@ -288,6 +368,10 @@
   .extension-shell-inset {
     margin-left: 0;
     padding-top: 58px;
+  }
+
+  .extension-shell-inset.is-sidebar-collapsed {
+    margin-left: 0;
   }
 
   .extension-shell-topbar {
@@ -372,5 +456,6 @@
 @media (prefers-reduced-motion: reduce) {
   .extension-shell * {
     scroll-behavior: auto !important;
+    transition: none !important;
   }
 }
