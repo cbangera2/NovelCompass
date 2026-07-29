@@ -16,6 +16,8 @@ const PREFERENCES_KEY = 'novelCompass.preferences.v1';
 const HOST_ID = 'novel-compass-extension-root';
 const ACTIVE_CLASS = 'novel-compass-replacement-active';
 const EXTENSION_ORIGIN = 'chrome-extension://fixture-extension/';
+let storageChangeListener:
+  ((changes: Record<string, chrome.storage.StorageChange>, areaName: string) => void) | undefined;
 
 type PageModes = {
   series: 'replacement' | 'original';
@@ -24,6 +26,7 @@ type PageModes = {
 
 beforeEach(() => {
   vi.resetModules();
+  storageChangeListener = undefined;
   installChromeApi();
   vi.stubGlobal(
     'fetch',
@@ -87,6 +90,44 @@ describe('content bootstrap runtime', () => {
     );
   });
 
+  it('reacts to popup theme and enablement changes without reloading the page', async () => {
+    loadPage(seriesFixture, 'https://www.novelupdates.com/series/fixture-mercenary/');
+
+    await import('../../src/content/bootstrap');
+    await waitFor(() => document.documentElement.classList.contains(ACTIVE_CLASS));
+    const host = document.getElementById(HOST_ID);
+
+    storageChangeListener?.(
+      {
+        [PREFERENCES_KEY]: {
+          newValue: {
+            ...preferences(true, { series: 'replacement', seriesFinder: 'replacement' }),
+            schemaVersion: 2,
+            theme: 'light',
+          },
+        },
+      },
+      'local',
+    );
+    expect(host?.dataset.theme).toBe('light');
+
+    storageChangeListener?.(
+      {
+        [PREFERENCES_KEY]: {
+          newValue: {
+            ...preferences(false, { series: 'replacement', seriesFinder: 'replacement' }),
+            schemaVersion: 2,
+            theme: 'dark',
+          },
+        },
+      },
+      'local',
+    );
+    expect(host?.hidden).toBe(true);
+    expect(document.documentElement.classList.contains(ACTIVE_CLASS)).toBe(false);
+    expect(document.querySelector('.seriestitlenu')?.textContent).toContain('Fixture Mercenary');
+  });
+
   it('mounts Series Ranking inside the shared shell from live page data', async () => {
     loadPage(rankingFixture, 'https://www.novelupdates.com/series-ranking/?rank=popmonth&pg=2');
 
@@ -101,10 +142,7 @@ describe('content bootstrap runtime', () => {
   });
 
   it('mounts Recommendation Lists inside the shared shell from sanitized live page data', async () => {
-    loadPage(
-      recommendationListsFixture,
-      'https://www.novelupdates.com/recommendation-lists/?pg=2',
-    );
+    loadPage(recommendationListsFixture, 'https://www.novelupdates.com/recommendation-lists/?pg=2');
 
     await import('../../src/content/bootstrap');
     await waitFor(() => document.documentElement.classList.contains(ACTIVE_CLASS));
@@ -229,6 +267,18 @@ function installChromeApi(storedPreferences?: unknown): void {
         ),
         set: vi.fn(async () => undefined),
         remove: vi.fn(async () => undefined),
+      },
+      onChanged: {
+        addListener: vi.fn(
+          (
+            listener: (
+              changes: Record<string, chrome.storage.StorageChange>,
+              areaName: string,
+            ) => void,
+          ) => {
+            storageChangeListener = listener;
+          },
+        ),
       },
     },
   });

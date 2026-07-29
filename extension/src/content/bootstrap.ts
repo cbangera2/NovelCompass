@@ -45,13 +45,15 @@ async function bootstrapNativeTheme(): Promise<void> {
     const response = await fetch(chrome.runtime.getURL('content/native-theme.css'));
     if (!response.ok) throw new Error(`Native theme styles failed to load (${response.status}).`);
     controller = installNativeTheme(document, await response.text());
-    if (
-      classification.kind === 'blocked' &&
-      classification.route?.family === 'reading-library'
-    ) {
+    controller.setTheme(preferences.value.theme);
+    if (classification.kind === 'blocked' && classification.route?.family === 'reading-library') {
       installReadingLibraryTheme(document);
     }
     controller.activate();
+    observePreferenceChanges({
+      onEnabledChange: (enabled) => (enabled ? controller?.activate() : controller?.deactivate()),
+      onThemeChange: (theme) => controller?.setTheme(theme),
+    });
   } catch (error) {
     controller?.fail(error);
     document.documentElement.removeAttribute('data-novel-compass-extension');
@@ -74,6 +76,7 @@ async function bootstrapReplacement(): Promise<void> {
     }
 
     replacementHost = ensureReplacementHost(document);
+    replacementHost.setTheme(preferences.value.theme);
     await installProductStyles(replacementHost.productRoot);
 
     let renderFailed = false;
@@ -127,12 +130,44 @@ async function bootstrapReplacement(): Promise<void> {
     }
 
     replacementHost.activate();
+    observePreferenceChanges({
+      onEnabledChange: (enabled) =>
+        enabled ? replacementHost?.showReplacement() : replacementHost?.deactivate(),
+      onThemeChange: (theme) => replacementHost?.setTheme(theme),
+    });
     document.documentElement.dataset.novelCompassExtension = 'active';
   } catch (error) {
     replacementHost?.fail(error);
     document.documentElement.classList.remove('novel-compass-replacement-active');
     console.error('Novel Compass could not initialize its replacement UI.', error);
   }
+}
+
+interface PreferenceChangeHandlers {
+  onEnabledChange(enabled: boolean): void;
+  onThemeChange(theme: 'system' | 'light' | 'dark'): void;
+}
+
+function observePreferenceChanges(handlers: PreferenceChangeHandlers): void {
+  if (!chrome.storage?.onChanged) return;
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local' || !changes['novelCompass.preferences.v1']) return;
+    const next = changes['novelCompass.preferences.v1'].newValue;
+    if (!isRuntimePreferences(next)) return;
+    handlers.onThemeChange(next.theme);
+    handlers.onEnabledChange(next.extensionEnabled);
+  });
+}
+
+function isRuntimePreferences(
+  value: unknown,
+): value is { extensionEnabled: boolean; theme: 'system' | 'light' | 'dark' } {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.extensionEnabled === 'boolean' &&
+    (candidate.theme === 'system' || candidate.theme === 'light' || candidate.theme === 'dark')
+  );
 }
 
 function createRouteApp(
@@ -164,9 +199,7 @@ function createRouteApp(
     const recommendationLists = parseRecommendationListsPage(document, window.location.href);
     if (!recommendationLists.ok) {
       onFatalError(
-        new Error(
-          recommendationLists.message ?? 'Recommendation Lists could not be parsed.',
-        ),
+        new Error(recommendationLists.message ?? 'Recommendation Lists could not be parsed.'),
       );
       return null;
     }

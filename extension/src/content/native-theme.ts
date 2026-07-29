@@ -7,6 +7,8 @@ export const NATIVE_THEME_STYLE_ID = 'novel-compass-native-theme-styles';
 export interface NativeThemeController {
   host: HTMLElement;
   activate(): void;
+  deactivate(): void;
+  setTheme(theme: 'system' | 'light' | 'dark'): void;
   showOriginal(): void;
   showThemed(): void;
   fail(error?: unknown): void;
@@ -107,6 +109,19 @@ export function installNativeTheme(document: Document, css: string): NativeTheme
       color: #f5f3ff; margin: 0; padding: .7rem .95rem;
     }
     :where(a, button):focus-visible { outline: 3px solid #b8a8ff; outline-offset: 2px; }
+    :host([data-theme="light"]) aside {
+      background: #f7f5fc; border-color: #ded9ec; box-shadow: .8rem 0 2.5rem rgb(49 39 74 / 12%);
+      color: #292338;
+    }
+    :host([data-theme="light"]) .brand { color: #1d1827; }
+    :host([data-theme="light"]) .tagline, :host([data-theme="light"]) .nav-label { color: #716b7d; }
+    :host([data-theme="light"]) nav a { color: #554e62; }
+    :host([data-theme="light"]) nav a:hover,
+    :host([data-theme="light"]) nav a:focus-visible,
+    :host([data-theme="light"]) nav a[aria-current="page"] { background: #ebe7f6; color: #4c398f; }
+    :host([data-theme="light"]) .view-toggle {
+      background: #fff; border-color: #d6d0e2; color: #443b52;
+    }
     @media (max-width: 800px) {
       :host { inset: 0 0 auto; }
       aside {
@@ -120,6 +135,18 @@ export function installNativeTheme(document: Document, css: string): NativeTheme
       nav { display: flex; }
       nav a { white-space: nowrap; }
       .view-toggle { flex: 0 0 auto; margin: 0 0 0 auto; white-space: nowrap; }
+    }
+    @media (prefers-color-scheme: light) {
+      :host([data-theme="system"]) aside {
+        background: #f7f5fc; border-color: #ded9ec; color: #292338;
+      }
+      :host([data-theme="system"]) .brand { color: #1d1827; }
+      :host([data-theme="system"]) nav a { color: #554e62; }
+      :host([data-theme="system"]) nav a:hover,
+      :host([data-theme="system"]) nav a:focus-visible,
+      :host([data-theme="system"]) nav a[aria-current="page"] {
+        background: #ebe7f6; color: #4c398f;
+      }
     }
   `;
   sidebar.append(brand, tagline, primaryNav, libraryNav, button);
@@ -145,7 +172,18 @@ export function installNativeTheme(document: Document, css: string): NativeTheme
   };
   const controller: NativeThemeController = {
     host,
-    activate: () => setThemed(true),
+    activate: () => {
+      host.hidden = false;
+      setThemed(true);
+    },
+    deactivate: () => {
+      setThemed(false);
+      host.hidden = true;
+    },
+    setTheme: (theme) => {
+      host.dataset.theme = theme;
+      document.documentElement.dataset.novelCompassTheme = theme;
+    },
     showOriginal: () => setThemed(false),
     showThemed: () => setThemed(true),
     fail: (error?: unknown) => {

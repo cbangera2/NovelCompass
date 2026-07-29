@@ -22,6 +22,34 @@
   padding-bottom: 5rem;
 }
 
+:host([data-theme='light']) .novel-compass-series {
+  --series-bg: #f7f7fb;
+  --series-surface: #fff;
+  --series-raised: #f0eef6;
+  --series-border: rgb(51 42 69 / 12%);
+  --series-border-strong: rgb(51 42 69 / 21%);
+  --series-accent: #6d5bd0;
+  --series-accent-soft: rgb(109 91 208 / 12%);
+  --series-text: #201b2b;
+  --series-muted: #625c6e;
+  --series-dim: #817b8c;
+}
+
+@media (prefers-color-scheme: light) {
+  :host([data-theme='system']) .novel-compass-series {
+    --series-bg: #f7f7fb;
+    --series-surface: #fff;
+    --series-raised: #f0eef6;
+    --series-border: rgb(51 42 69 / 12%);
+    --series-border-strong: rgb(51 42 69 / 21%);
+    --series-accent: #6d5bd0;
+    --series-accent-soft: rgb(109 91 208 / 12%);
+    --series-text: #201b2b;
+    --series-muted: #625c6e;
+    --series-dim: #817b8c;
+  }
+}
+
 .novel-compass-series *,
 .novel-compass-series *::before,
 .novel-compass-series *::after {

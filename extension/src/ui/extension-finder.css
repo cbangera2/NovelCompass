@@ -26,6 +26,42 @@
   min-height: 100vh;
 }
 
+:host([data-theme='light']) .novel-compass-finder {
+  --bg: #f7f7fb;
+  --surface: #fff;
+  --surface-raised: #f0eef6;
+  --surface-soft: #f4f2f8;
+  --border: rgb(51 42 69 / 12%);
+  --border-strong: rgb(51 42 69 / 21%);
+  --accent: #6d5bd0;
+  --accent-bright: #5945bc;
+  --accent-soft: rgb(109 91 208 / 12%);
+  --text: #201b2b;
+  --muted: #625c6e;
+  --dim: #817b8c;
+  --green: #26755d;
+  --red: #b33a4d;
+}
+
+@media (prefers-color-scheme: light) {
+  :host([data-theme='system']) .novel-compass-finder {
+    --bg: #f7f7fb;
+    --surface: #fff;
+    --surface-raised: #f0eef6;
+    --surface-soft: #f4f2f8;
+    --border: rgb(51 42 69 / 12%);
+    --border-strong: rgb(51 42 69 / 21%);
+    --accent: #6d5bd0;
+    --accent-bright: #5945bc;
+    --accent-soft: rgb(109 91 208 / 12%);
+    --text: #201b2b;
+    --muted: #625c6e;
+    --dim: #817b8c;
+    --green: #26755d;
+    --red: #b33a4d;
+  }
+}
+
 .novel-compass-finder *,
 .novel-compass-finder *::before,
 .novel-compass-finder *::after {

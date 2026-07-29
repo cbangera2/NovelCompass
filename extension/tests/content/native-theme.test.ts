@@ -91,4 +91,29 @@ describe('installNativeTheme', () => {
     expect(document.querySelector('button')?.textContent).toBe('Submit');
     expect(errorSpy).toHaveBeenCalled();
   });
+
+  it('applies runtime theme changes and fully restores the native page when disabled', () => {
+    document.body.innerHTML = '<main id="native-content">Native content</main>';
+    const nativeContent = document.getElementById('native-content');
+    const controller = installNativeTheme(document, 'html.novel-compass-native-theme{}');
+
+    controller.setTheme('light');
+    controller.activate();
+    expect(controller.host.dataset.theme).toBe('light');
+    expect(document.documentElement.dataset.novelCompassTheme).toBe('light');
+    expect(document.documentElement.classList.contains(NATIVE_THEME_CLASS)).toBe(true);
+
+    controller.setTheme('dark');
+    expect(controller.host.dataset.theme).toBe('dark');
+    expect(document.documentElement.dataset.novelCompassTheme).toBe('dark');
+
+    controller.deactivate();
+    expect(controller.host.hidden).toBe(true);
+    expect(document.documentElement.classList.contains(NATIVE_THEME_CLASS)).toBe(false);
+    expect(document.getElementById('native-content')).toBe(nativeContent);
+
+    controller.activate();
+    expect(controller.host.hidden).toBe(false);
+    expect(document.documentElement.classList.contains(NATIVE_THEME_CLASS)).toBe(true);
+  });
 });

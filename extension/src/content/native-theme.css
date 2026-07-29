@@ -3,6 +3,93 @@ html.novel-compass-native-theme {
   background: #090b12;
 }
 
+html.novel-compass-native-theme[data-novel-compass-theme='light'] {
+  color-scheme: light;
+  background: #f7f7fb;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light'] body {
+  background: #f7f7fb !important;
+  color: #292338 !important;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light'] body :where(a) {
+  color: #5945bc;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light']
+  body
+  :where(input, select, textarea) {
+  background: #fff !important;
+  border-color: #d6d0e2 !important;
+  color: #292338 !important;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light']
+  body
+  :where(
+    table,
+    .w-box,
+    .w-blog-post,
+    .w-form,
+    .g-cols,
+    .g-cols > div,
+    .l-main,
+    .l-submain,
+    .wpb_wrapper,
+    .panel,
+    .card,
+    .breadcrumb_nu,
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^='profile_content'],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu
+  ) {
+  background-color: #fff !important;
+  border-color: #ded9e8 !important;
+  color: #292338 !important;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light']
+  body
+  :where(
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^='profile_content'],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu
+  )
+  :where(div, span, p, dt, dd, label) {
+  color: #554e62;
+}
+
+@media (prefers-color-scheme: light) {
+  html.novel-compass-native-theme[data-novel-compass-theme='system'] {
+    color-scheme: light;
+    background: #f7f7fb;
+  }
+
+  html.novel-compass-native-theme[data-novel-compass-theme='system'] body {
+    background: #f7f7fb !important;
+    color: #292338 !important;
+  }
+
+  html.novel-compass-native-theme[data-novel-compass-theme='system'] body :where(a) {
+    color: #5945bc;
+  }
+
+  html.novel-compass-native-theme[data-novel-compass-theme='system']
+    body
+    :where(input, select, textarea) {
+    background: #fff !important;
+    border-color: #d6d0e2 !important;
+    color: #292338 !important;
+  }
+}
+
 html.novel-compass-native-theme body {
   background: #090b12 !important;
   color: #e7e5ee !important;

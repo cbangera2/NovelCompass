@@ -10,6 +10,8 @@ export interface ReplacementHost {
   host: HTMLElement;
   productRoot: HTMLElement;
   activate(): void;
+  deactivate(): void;
+  setTheme(theme: 'system' | 'light' | 'dark'): void;
   fail(error?: unknown): void;
   showOriginal(): void;
   showReplacement(): void;
@@ -90,6 +92,14 @@ function createController(
     activate: () => {
       host.dataset.state = 'ready';
       showReplacement();
+    },
+    deactivate: () => {
+      showOriginal();
+      host.hidden = true;
+      host.dataset.state = 'disabled';
+    },
+    setTheme: (theme) => {
+      host.dataset.theme = theme;
     },
     fail: (error?: unknown) => {
       console.error('Novel Compass restored the original page after a fatal error.', error);
