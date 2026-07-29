@@ -251,6 +251,26 @@ Acceptance: the core package builds deterministically below the hard limits and 
 
 Acceptance: a clean script can verify every published artifact from the manifest without running the extension.
 
+Implementation: `scripts/build_extension_data.py` produces the broker-facing
+tree from a normalized static export. It emits compact title/alias prefix
+search shards, low-byte identity/card and novel-facet shards, and reuses the
+existing detail and recommendation buckets. Every JSON artifact is capped at
+2 MiB and recorded with an exact byte count, record count, and SHA-256 digest.
+
+Run it locally with:
+
+```bash
+python scripts/build_extension_data.py
+python scripts/build_extension_data.py --verify-only
+```
+
+The Pages workflow runs both commands before the Vite build. Immutable files
+are written below `extension-data/v1/<dataset-version>/`; `latest.json` is
+replaced only after the release and manifest validate. The service worker's
+configured URL therefore becomes available from the existing Pages origin
+after a successful merge-to-main deployment, without a second repository or
+GitHub setting.
+
 ### Phase 2 — service-worker data broker
 
 - Add narrowly scoped optional host permission.
