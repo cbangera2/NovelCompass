@@ -1,11 +1,12 @@
 # Novel Compass Chrome Extension
 
-## Load the browser-ready local build
+## Build the lightweight extension
 
-The full local build includes the current Novel Compass static dataset:
+The default build is the Chrome Web Store candidate. It includes all Novel
+Updates route restyling, but no recommendation/search snapshot:
 
 ```bash
-pnpm --dir web run build:extension:full
+pnpm --dir web run package:extension
 ```
 
 Then open `chrome://extensions`, enable **Developer mode**, choose
@@ -15,32 +16,35 @@ Then open `chrome://extensions`, enable **Developer mode**, choose
 extension/dist
 ```
 
-Visit either:
-
-- `https://www.novelupdates.com/series/<slug>/`
-- `https://www.novelupdates.com/series-finder/`
-
-Use the fixed **Use original Novel Updates** control to switch back without
-reloading the page.
-
-## Smaller deterministic package
-
-CI and package validation use a three-title fixture instead of the full local
-dataset:
-
-```bash
-pnpm --dir web run test:extension
-pnpm --dir web run package:extension
-```
-
 The validated ZIP is written to:
 
 ```text
 extension/dist/novel-compass-extension.zip
 ```
 
-Running the deterministic package command replaces `extension/dist` with the
-small fixture build. Run `build:extension:full` again before manual testing.
+The validator enforces the core bundle budgets and rejects `.git`, `.DS_Store`,
+source maps, and other packaging debris.
+
+## Deterministic fixture build
+
+Use the three-title dataset for deterministic enhanced-feature tests:
+
+```bash
+pnpm --dir web run test:extension
+pnpm --dir web run package:extension:fixture
+```
+
+## Full offline developer build
+
+The large local snapshot is an explicit developer artifact and is not suitable
+for the Chrome Web Store:
+
+```bash
+pnpm --dir web run package:extension:offline-full
+```
+
+Every build replaces `extension/dist`. The offline copy step excludes nested
+Git metadata and packaging debris.
 
 ## Local fixture server
 

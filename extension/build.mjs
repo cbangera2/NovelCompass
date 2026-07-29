@@ -8,7 +8,14 @@ const repositoryRoot = path.dirname(extensionRoot);
 const webRoot = path.join(repositoryRoot, 'web');
 const outputRoot = path.join(extensionRoot, 'dist');
 const watch = process.argv.includes('--watch');
-const fullData = process.argv.includes('--full-data');
+const fixtureData = process.argv.includes('--fixture-data');
+const offlineFull = process.argv.includes('--offline-full') || process.argv.includes('--full-data');
+
+if (fixtureData && offlineFull) {
+  throw new Error('Choose only one extension dataset mode: --fixture-data or --offline-full.');
+}
+
+const packageMode = offlineFull ? 'offline-full' : fixtureData ? 'fixture' : 'core';
 
 const { build } = await import(path.join(webRoot, 'node_modules/vite/dist/node/index.js'));
 
@@ -112,13 +119,38 @@ await Promise.all([
   }),
 ]);
 
-const datasetSource = fullData
-  ? path.join(webRoot, 'public/data')
-  : path.join(repositoryRoot, 'tests/fixtures/extension-static-data');
-await cp(datasetSource, path.join(outputRoot, 'data'), { recursive: true });
-console.log(`Packaged ${fullData ? 'full local' : 'deterministic mini'} extension dataset.`);
+if (packageMode !== 'core') {
+  const datasetSource =
+    packageMode === 'offline-full'
+      ? path.join(webRoot, 'public/data')
+      : path.join(repositoryRoot, 'tests/fixtures/extension-static-data');
+  await cp(datasetSource, path.join(outputRoot, 'data'), {
+    recursive: true,
+    filter: (source) => !isForbiddenPackagePath(path.relative(datasetSource, source)),
+  });
+}
+
+console.log(
+  packageMode === 'core'
+    ? 'Packaged lightweight core extension without a bundled dataset.'
+    : `Packaged ${packageMode === 'fixture' ? 'deterministic fixture' : 'offline full'} extension dataset.`,
+);
 
 if (watch) {
   process.on('SIGINT', () => process.exit(0));
   await new Promise(() => {});
+}
+
+function isForbiddenPackagePath(relativePath) {
+  if (!relativePath) {
+    return false;
+  }
+  const segments = relativePath.split(path.sep);
+  const name = segments.at(-1) ?? '';
+  return (
+    segments.includes('.git') ||
+    name === '.DS_Store' ||
+    name.endsWith('.map') ||
+    name.endsWith('.log')
+  );
 }
