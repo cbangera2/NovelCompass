@@ -43,6 +43,7 @@ export function parseReadingLibraryPage(
 }
 
 function parseRows(document: Document, currentUrl: string): ReadingLibraryRow[] {
+  const activeListLabel = currentReadingListLabel(document, currentUrl);
   const seriesAnchors = Array.from(
     document.querySelectorAll<HTMLAnchorElement>('a[href*="/series/"]'),
   ).filter((anchor) => SERIES_PATH.test(trustedUrl(anchor.getAttribute('href'), currentUrl)?.pathname ?? ''));
@@ -79,13 +80,13 @@ function parseRows(document: Document, currentUrl: string): ReadingLibraryRow[] 
     const latestUrl = trustedUrl(latestAnchor?.getAttribute('href'), currentUrl);
     const listLabel =
       fieldText(container, '[data-list], .list-name, .rl_list, [data-column="list"]') ??
-      cellValue(cells, /^(?:list|reading list)$/i);
+      cellValue(cells, /^(?:list|reading list)$/i) ??
+      activeListLabel;
     const statusLabel =
-      fieldText(container, '[data-status], .series-status, .rl_status, [data-column="status"]') ??
-      cellValue(cells, /^(?:my )?status$/i);
+      fieldText(container, '[data-status], .series-status, .rl_status, [data-column="status"]');
     const progressLabel =
       fieldText(container, '[data-progress], .reading-progress, .rl_progress, [data-column="progress"]') ??
-      cellValue(cells, /^(?:my )?(?:progress|chapter)$/i) ??
+      cellValue(cells, /^(?:my )?(?:status|progress|chapter)$/i) ??
       text.match(/\b(?:Read|Progress)\s*:?\s*([^|]+?)(?=\s{2,}|Latest|Updated|$)/i)?.[1]?.trim();
     const updatedAt =
       fieldText(container, '[data-updated], .updated, .rl_updated, time') ??
@@ -154,24 +155,36 @@ function controlOrText(element: HTMLElement | undefined): string | undefined {
 
 function parseTabs(document: Document, currentUrl: string): ReadingLibraryTab[] {
   const candidates = document.querySelectorAll<HTMLAnchorElement>(
-    '[data-reading-tabs] a[href], .reading-list-tabs a[href], .rl_tabs a[href], .nav-tabs a[href]',
+    '[data-reading-tabs] a[href], .reading-list-tabs a[href], .rl_tabs a[href], .nav-tabs a[href], a[href*="/reading-list/"]',
   );
+  const current = trustedUrl(currentUrl, currentUrl);
+  const seen = new Set<string>();
   return Array.from(candidates).flatMap((anchor) => {
     const url = trustedUrl(anchor.getAttribute('href'), currentUrl);
     if (!url || url.pathname !== '/reading-list/') return [];
     const raw = cleanText(anchor.textContent);
     const countMatch = raw.match(/\(([\d,]+)\)\s*$/);
     const label = raw.replace(/\s*\([\d,]+\)\s*$/, '');
-    if (!label) return [];
+    const list = url.searchParams.get('list');
+    if (!label || !list || seen.has(list) || !/^(?:Reading|Plan to read|Completed)$/i.test(label)) {
+      return [];
+    }
+    seen.add(list);
     return [{
       label,
       url: url.href,
       ...(countMatch?.[1] ? { count: Number.parseInt(countMatch[1].replace(/,/g, ''), 10) } : {}),
       selected:
         anchor.matches('[aria-current="page"], .active, .is-active') ||
-        anchor.parentElement?.matches('.active, .is-active') === true,
+        anchor.parentElement?.matches('.active, .is-active') === true ||
+        current?.searchParams.get('list') === list ||
+        (!current?.searchParams.has('list') && list === '0'),
     }];
   });
+}
+
+function currentReadingListLabel(document: Document, currentUrl: string): string | undefined {
+  return parseTabs(document, currentUrl).find((tab) => tab.selected)?.label;
 }
 
 function parsePagination(
