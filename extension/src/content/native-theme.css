@@ -15,24 +15,63 @@ html.novel-compass-native-theme body :where(a) {
 }
 
 html.novel-compass-native-theme body :where(input, select, textarea, button) {
-  border-color: rgb(255 255 255 / 15%) !important;
+  border: 1px solid rgb(255 255 255 / 18%) !important;
   border-radius: 8px !important;
+  box-shadow: none !important;
   font: inherit;
 }
 
 html.novel-compass-native-theme body :where(input, select, textarea) {
   background: #111520 !important;
   color: #f5f3ff !important;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.65rem;
 }
 
-html.novel-compass-native-theme body :where(table, .w-box, .g-cols, .l-submain) {
-  background-color: #111520;
+html.novel-compass-native-theme body :where(button, input[type="button"], input[type="submit"]) {
+  background: #6d5bd0 !important;
+  color: #fff !important;
+  cursor: pointer;
+  padding: 0.48rem 0.8rem;
+}
+
+html.novel-compass-native-theme body
+  :where(input, select, textarea, button):focus-visible {
+  border-color: #a99af4 !important;
+  outline: 3px solid rgb(169 154 244 / 28%) !important;
+  outline-offset: 1px;
+}
+
+html.novel-compass-native-theme body
+  :where(
+    table,
+    .w-box,
+    .w-blog-post,
+    .w-form,
+    .g-cols,
+    .g-cols > div,
+    .l-main,
+    .l-submain,
+    .wpb_wrapper,
+    .panel,
+    .card
+  ) {
+  background-color: #111520 !important;
+  background-image: none !important;
   border-color: rgb(255 255 255 / 10%) !important;
-  color: #e7e5ee;
+  color: #e7e5ee !important;
+}
+
+html.novel-compass-native-theme body
+  :where(.w-box, .w-blog-post, .w-form, .l-submain, .panel, .card) {
+  border-radius: 12px;
+  box-shadow: 0 16px 45px rgb(0 0 0 / 20%);
 }
 
 html.novel-compass-native-theme body :where(th, td) {
+  background-color: transparent !important;
   border-color: rgb(255 255 255 / 9%) !important;
+  color: inherit !important;
 }
 
 html.novel-compass-native-theme body
