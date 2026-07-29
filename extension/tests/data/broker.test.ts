@@ -34,7 +34,7 @@ function setup(options: { corrupt?: boolean; offlineAfterWarm?: boolean } = {}) 
           dataset_version: '2026-07-29',
           artifacts: {
             'details/0a.json': {
-              url: `${origin}/v1/2026-07-29/details/0a.json`,
+              url: 'details/0a.json',
               sha256: digest,
               compressed_bytes: body.length,
             },

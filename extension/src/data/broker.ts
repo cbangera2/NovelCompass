@@ -110,11 +110,12 @@ export class ExtensionDataBroker {
     const prior = await this.readMetadata();
     try {
       const manifest = await this.resolveManifest(prior);
+      const resolvedMetadata = await this.readMetadata();
       const descriptor = artifactMap(manifest.artifacts).get(path);
       if (!descriptor) {
         return failure('unsupported-data', `Dataset does not contain ${path}.`, false);
       }
-      const artifactUrl = this.trustedUrl(descriptor.url, prior?.manifestUrl);
+      const artifactUrl = this.trustedUrl(descriptor.url, resolvedMetadata?.manifestUrl);
       const cache = await this.dependencies.caches.open(`${CACHE_PREFIX}${manifest.dataset_version}`);
       const cached = await cache.match(artifactUrl);
       if (cached) {
@@ -139,7 +140,7 @@ export class ExtensionDataBroker {
           datasetVersion: manifest.dataset_version,
           lastUpdatedAt: (this.dependencies.now?.() ?? new Date()).toISOString(),
           bytes: (prior?.bytes ?? 0) + Number(descriptor.compressed_bytes ?? 0),
-          manifestUrl: (await this.readMetadata())?.manifestUrl,
+          manifestUrl: resolvedMetadata?.manifestUrl,
           manifest,
         });
       }
@@ -147,7 +148,9 @@ export class ExtensionDataBroker {
     } catch (reason) {
       let cached: DataBrokerResponse | undefined;
       try {
-        cached = prior?.manifest ? await this.readCached(path, prior.manifest) : undefined;
+        cached = prior?.manifest
+          ? await this.readCached(path, prior.manifest, prior.manifestUrl)
+          : undefined;
       } catch {
         cached = undefined;
       }
@@ -238,11 +241,12 @@ export class ExtensionDataBroker {
   private async readCached(
     path: string,
     manifest: RemoteManifest,
+    manifestUrl?: string,
   ): Promise<DataBrokerResponse | undefined> {
     const descriptor = artifactMap(manifest.artifacts).get(path);
     if (!descriptor) return undefined;
     const cache = await this.dependencies.caches.open(`${CACHE_PREFIX}${manifest.dataset_version}`);
-    const url = this.trustedUrl(descriptor.url);
+    const url = this.trustedUrl(descriptor.url, manifestUrl);
     const response = await cache.match(url);
     return response
       ? this.validatedArtifact(response, descriptor, manifest.dataset_version, 'hit')

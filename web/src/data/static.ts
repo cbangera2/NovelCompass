@@ -102,6 +102,25 @@ function normalize(value: string): string {
     .trim();
 }
 
+function isCompactExtensionManifest(manifest: DatasetManifest): boolean {
+  return Boolean(
+    manifest.extension_identity_url ||
+      manifest.extension_search_index_url ||
+      manifest.artifacts?.['search/index.json']
+  );
+}
+
+async function compactSearchPrefix(value: string): Promise<string> {
+  const folded = value.trim().toLocaleLowerCase();
+  if (!folded) return '';
+  const ascii = folded.replace(/[^a-z0-9]+/g, '');
+  if (ascii) return ascii.slice(0, 2).padEnd(2, '_');
+  const input = new TextEncoder().encode(folded);
+  const digestInput = Uint8Array.from(input);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', digestInput.buffer));
+  return `u${digest[0]!.toString(16).padStart(2, '0')}`;
+}
+
 function inferMediaType(id: number, mediaType?: string | null): string {
   if (mediaType) return String(mediaType).toLowerCase();
   if (id >= 3_000_000) return 'anime';
@@ -152,8 +171,11 @@ export class StaticDataSource implements RecommendationDataSource {
   private bootstrapPromise?: Promise<void>;
   private catalogPromise?: Promise<void>;
   private facetsPromise?: Promise<FacetsFile>;
+  private compactFacetPromises = new Map<string, Promise<Record<string, { g?: number[]; t?: number[] }>>>();
   private detailPromises = new Map<string, Promise<Record<string, any>>>();
   private compactRecommendationPromises = new Map<string, Promise<CompactRecommendationShard>>();
+  private compactSearchPromises = new Map<string, Promise<void>>();
+  private compactIdentityPromises = new Map<string, Promise<void>>();
   private cards = new Map<number, CatalogCard>();
   private aliases = new Map<number, string[]>();
   private languages: string[] = [];
@@ -234,6 +256,10 @@ export class StaticDataSource implements RecommendationDataSource {
             external_url: externalUrl,
             novelupdates_url: externalUrl || novelUpdatesUrl(id)
           });
+          const inlineAliases = at(row, 'aliases');
+          if (Array.isArray(inlineAliases)) {
+            this.aliases.set(id, inlineAliases.map(String));
+          }
     }
     for (const [id, aliases] of catalog.aliases || []) this.aliases.set(id, aliases);
   }
@@ -242,6 +268,7 @@ export class StaticDataSource implements RecommendationDataSource {
     if (!this.bootstrapPromise) {
       this.bootstrapPromise = (async () => {
         const manifest = await this.getManifest();
+        if (isCompactExtensionManifest(manifest)) return;
         const path = manifest.bootstrap_catalog_url || manifest.catalog_url || 'catalog.json';
         this.ingestCatalog(await this.fetchJson<CatalogFile>(path));
       })();
@@ -254,6 +281,7 @@ export class StaticDataSource implements RecommendationDataSource {
       this.catalogPromise = (async () => {
         await this.loadBootstrapCatalog();
         const manifest = await this.getManifest();
+        if (isCompactExtensionManifest(manifest)) return;
         const fullPath = manifest.catalog_url || 'catalog.json';
         const bootstrapPath = manifest.bootstrap_catalog_url || fullPath;
         if (fullPath !== bootstrapPath) {
@@ -262,6 +290,37 @@ export class StaticDataSource implements RecommendationDataSource {
       })();
     }
     return this.catalogPromise;
+  }
+
+  private async loadCompactSearch(value: string): Promise<void> {
+    const prefix = await compactSearchPrefix(value);
+    if (!prefix) return;
+    let promise = this.compactSearchPromises.get(prefix);
+    if (!promise) {
+      promise = this.fetchJson<CatalogFile>(`search/${prefix}.json`)
+        .then((catalog) => this.ingestCatalog(catalog))
+        .catch((reason) => {
+          if (reason instanceof DataSourceError && reason.message.includes('returned 404')) return;
+          throw reason;
+        });
+      this.compactSearchPromises.set(prefix, promise);
+    }
+    await promise;
+  }
+
+  private async loadCompactIdentities(ids: number[]): Promise<void> {
+    const manifest = await this.getManifest();
+    const template = manifest.extension_identity_url || 'identity/{bucket}.json';
+    const buckets = [...new Set(ids.filter(Number.isSafeInteger).map(bucketForNovel))];
+    await Promise.all(buckets.map(async (bucket) => {
+      let promise = this.compactIdentityPromises.get(bucket);
+      if (!promise) {
+        promise = this.fetchJson<CatalogFile>(template.replace('{bucket}', bucket))
+          .then((catalog) => this.ingestCatalog(catalog));
+        this.compactIdentityPromises.set(bucket, promise);
+      }
+      await promise;
+    }));
   }
 
   private warmFullCatalogWhenIdle(): void {
@@ -275,10 +334,32 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   private async loadFacets(): Promise<FacetsFile> {
+    const manifest = await this.getManifest();
+    if (isCompactExtensionManifest(manifest)) {
+      const template = manifest.extension_facet_novels_url || 'facets/novels/{bucket}.json';
+      const buckets = [...new Set([...this.cards.keys()].map(bucketForNovel))];
+      const novels: Record<string, { g?: number[]; t?: number[] }> = {};
+      await Promise.all(buckets.map(async (bucket) => {
+        let promise = this.compactFacetPromises.get(bucket);
+        if (!promise) {
+          promise = this.fetchJson<Record<string, { g?: number[]; t?: number[] }>>(
+            template.replace('{bucket}', bucket)
+          );
+          this.compactFacetPromises.set(bucket, promise);
+        }
+        Object.assign(novels, await promise);
+      }));
+      if (!this.genres.length || !this.tags.length) {
+        const options = await this.fetchJson<OptionsFile>(
+          manifest.extension_facet_options_url || 'facets/options.json'
+        );
+        this.genres = options.genres || this.genres;
+        this.tags = options.tags || this.tags;
+      }
+      return { genres: this.genres, tags: this.tags, novels };
+    }
     if (!this.facetsPromise) {
-      this.facetsPromise = this.getManifest().then((manifest) =>
-        this.fetchJson<FacetsFile>(manifest.facets_url || 'facets.json')
-      );
+      this.facetsPromise = this.fetchJson<FacetsFile>(manifest.facets_url || 'facets.json');
     }
     return this.facetsPromise;
   }
@@ -287,11 +368,13 @@ export class StaticDataSource implements RecommendationDataSource {
     seedId: number,
     manifest: DatasetManifest
   ): Promise<RecommendationPool | undefined> {
-    if (!manifest.recommendation_index_url) return undefined;
+    const template = manifest.recommendation_index_url ||
+      (isCompactExtensionManifest(manifest) ? 'recommendations/{bucket}.json' : undefined);
+    if (!template) return undefined;
     const bucket = bucketForNovel(seedId);
     let promise = this.compactRecommendationPromises.get(bucket);
     if (!promise) {
-      const path = manifest.recommendation_index_url.replace('{bucket}', bucket);
+      const path = template.replace('{bucket}', bucket);
       promise = this.fetchJson<CompactRecommendationShard>(path);
       this.compactRecommendationPromises.set(bucket, promise);
     }
@@ -312,7 +395,9 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async searchNovels(query: string, limit: number): Promise<NovelSearchResult[]> {
-    await this.loadBootstrapCatalog();
+    const manifest = await this.getManifest();
+    if (isCompactExtensionManifest(manifest)) await this.loadCompactSearch(query);
+    else await this.loadBootstrapCatalog();
     const needle = normalize(query);
     if (!needle) return [];
     const tokens = needle.split(/\s+/).filter(Boolean);
@@ -382,7 +467,10 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {
-    await this.loadCatalog();
+    const manifest = await this.getManifest();
+    if (isCompactExtensionManifest(manifest)) {
+      await Promise.all(items.flatMap((item) => [this.loadCompactSearch(item.title), this.loadCompactSearch(item.slug)]));
+    } else await this.loadCatalog();
     const requested = new Set(items.map((item) => item.slug.toLowerCase()));
     const result = new Map<string, NovelSearchResult>();
     for (const card of this.cards.values()) {
@@ -403,7 +491,9 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async resolveNovelIds(ids: number[]): Promise<Map<number, NovelSearchResult>> {
-    await this.loadCatalog();
+    const manifest = await this.getManifest();
+    if (isCompactExtensionManifest(manifest)) await this.loadCompactIdentities(ids);
+    else await this.loadCatalog();
     const result = new Map<number, NovelSearchResult>();
     for (const id of ids) {
       const card = this.cards.get(id);
@@ -524,13 +614,16 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async getRecommendations(request: RecommendRequest): Promise<RecommendResponse> {
-    await this.loadBootstrapCatalog();
+    const manifest = await this.getManifest();
+    if (isCompactExtensionManifest(manifest)) {
+      const requestedSeed = Number(request.query);
+      if (requestedSeed) await this.loadCompactIdentities([requestedSeed]);
+    } else await this.loadBootstrapCatalog();
     const seedId = Number(request.query);
-    if (seedId && !this.cards.has(seedId)) await this.loadCatalog();
+    if (seedId && !this.cards.has(seedId) && !isCompactExtensionManifest(manifest)) await this.loadCatalog();
     const seedCard = this.cards.get(seedId);
     if (!seedId || !seedCard) throw new DataSourceError('Select a novel from the search results.');
     let pool: RecommendationPool;
-    const manifest = await this.getManifest();
     try {
       const compactPool = await this.loadCompactRecommendationPool(seedId, manifest);
       if (compactPool) {
@@ -546,6 +639,9 @@ export class StaticDataSource implements RecommendationDataSource {
         );
       }
       pool = compactPool;
+    }
+    if (isCompactExtensionManifest(manifest)) {
+      await this.loadCompactIdentities(pool.candidates.map((candidate) => candidate.id));
     }
     const needsTagTraits = Boolean(
       request.exclude_harem || request.exclude_bl || request.exclude_yuri ||
@@ -633,7 +729,10 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   async browseNovels(request: BrowseRequest): Promise<BrowseResponse> {
-    await this.loadCatalog();
+    const manifest = await this.getManifest();
+    if (isCompactExtensionManifest(manifest)) {
+      if (request.query?.trim()) await this.loadCompactSearch(request.query);
+    } else await this.loadCatalog();
     const query = normalize(request.query || '');
     const genre = normalize(request.genre || '');
     const tag = normalize(request.tag || '');
