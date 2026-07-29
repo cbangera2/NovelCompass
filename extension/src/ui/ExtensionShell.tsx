@@ -25,6 +25,7 @@ import type { NovelUpdatesAccountState } from '../adapters/contracts';
 import './extension-shell.css';
 
 export type ExtensionRoute =
+  | 'home'
   | 'series'
   | 'series-finder'
   | 'series-ranking'
@@ -46,7 +47,7 @@ const NAV_GROUPS = [
     label: 'Discover',
     items: [
       {
-        route: 'other' as const,
+        route: 'home' as const,
         label: 'Latest releases',
         note: 'What is new',
         href: 'https://www.novelupdates.com/',
@@ -161,7 +162,7 @@ export function ExtensionShell({
             <nav aria-label={group.label}>
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = activeRoute === item.route && item.route !== 'other';
+                const active = activeRoute === item.route;
                 return (
                   <a
                     aria-label={item.label}

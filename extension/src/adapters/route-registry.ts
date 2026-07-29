@@ -35,7 +35,7 @@ const ROUTES: readonly RouteDefinition[] = [
   replacement('series', 0, /^\/series\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/, true),
   replacement('series-finder', 0, /^\/series-finder\/?$/, true),
   replacement('series-ranking', 0, /^\/series-ranking\/?$/, true),
-  replacement('home', 1, /^\/$/),
+  replacement('home', 1, /^\/$/, true),
   replacement('catalog-feed', 1, /^\/(?:novelslisting|latest-series|page\/\d+)\/?$/, true),
   replacement(
     'catalog-taxonomy',

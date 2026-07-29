@@ -109,6 +109,7 @@ export function classifyNovelUpdatesPage(
   if (
     route.family === 'series-finder' ||
     route.family === 'series-ranking' ||
+    route.family === 'home' ||
     route.family === 'catalog-feed' ||
     route.family === 'catalog-taxonomy' ||
     route.family === 'recommendation-lists' ||

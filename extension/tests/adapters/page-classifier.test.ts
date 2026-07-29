@@ -49,6 +49,17 @@ describe('classifyNovelUpdatesPage', () => {
     });
   });
 
+  it('activates the homepage replacement', () => {
+    expect(classifyNovelUpdatesPage('https://www.novelupdates.com/')).toMatchObject({
+      kind: 'supported',
+      identity: {
+        pageType: 'home',
+        confidence: 'high',
+        resolutionSource: 'exact-route',
+      },
+    });
+  });
+
   it.each([
     ['http://www.novelupdates.com/series/example/', 'insecure-origin'],
     ['https://novelupdates.com/series/example/', 'wrong-origin'],

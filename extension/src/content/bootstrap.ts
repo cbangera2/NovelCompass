@@ -6,6 +6,7 @@ import { OpaqueActionRegistry } from '../adapters/action-registry';
 import { parseNovelUpdatesAccountState } from '../adapters/account';
 import { parseCatalogPage } from '../adapters/catalog';
 import { classifyNovelUpdatesDocument } from '../adapters/page-classifier';
+import { parseHomePage } from '../adapters/home';
 import { parseRankingPage } from '../adapters/ranking';
 import { parsePublicProfilePage } from '../adapters/public-profile';
 import { parseRecommendationListsPage } from '../adapters/recommendation-lists';
@@ -16,6 +17,7 @@ import { parseLiveSeriesMetadata } from '../adapters/series-page';
 import { chromeLocalStorageArea, ExtensionStorageRepository } from '../storage';
 import { SeriesRuntimeApp } from '../runtime/SeriesRuntimeApp';
 import { ExtensionFinderApp } from '../ui/ExtensionFinderApp';
+import { ExtensionHomeApp } from '../ui/ExtensionHomeApp';
 import { ExtensionCatalogApp } from '../ui/ExtensionCatalogApp';
 import { ExtensionRankingApp } from '../ui/ExtensionRankingApp';
 import { ExtensionPublicProfileApp } from '../ui/ExtensionPublicProfileApp';
@@ -101,6 +103,7 @@ async function bootstrapReplacement(): Promise<void> {
       classification.kind === 'supported' ? classification.identity.pageType : 'other';
     const activeRoute: ExtensionRoute =
       pageType === 'series' ||
+      pageType === 'home' ||
       pageType === 'series-finder' ||
       pageType === 'series-ranking' ||
       pageType === 'recommendation-lists' ||
@@ -184,6 +187,21 @@ function createRouteApp(
   }
   if (classification.identity.pageType === 'series-finder') {
     return createElement(ExtensionFinderApp, { datasetBaseUrl, onShowOriginal });
+  }
+  if (classification.identity.pageType === 'home') {
+    const home = parseHomePage(document, window.location.href, actionRegistry);
+    if (!home.ok) {
+      onFatalError(new Error(home.message ?? 'Homepage releases could not be parsed.'));
+      return null;
+    }
+    return createElement(ExtensionHomeApp, {
+      page: home.page,
+      onInvokeAction: (actionId: string) => {
+        const result = actionRegistry.invoke(actionId);
+        if (result.kind === 'navigate') window.location.assign(result.url);
+      },
+      onShowOriginal,
+    });
   }
   if (classification.identity.pageType === 'series-ranking') {
     const ranking = parseRankingPage(document, window.location.href);

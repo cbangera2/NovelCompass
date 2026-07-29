@@ -12,6 +12,7 @@ export type SupportedPageType =
   | 'series'
   | 'series-finder'
   | 'series-ranking'
+  | 'home'
   | 'catalog-feed'
   | 'catalog-taxonomy'
   | 'recommendation-lists'
@@ -96,6 +97,25 @@ export interface LiveReleasePage {
   previousUrl?: string;
   nextUrl?: string;
   groupFilterAvailable: boolean;
+}
+
+export interface HomeReleaseRow {
+  title: string;
+  seriesUrl: string;
+  chapterLabel: string;
+  chapterActionId?: string;
+  group: LinkedLabel;
+}
+
+export interface LiveHomePage {
+  dateLabel?: string;
+  rows: HomeReleaseRow[];
+  latestSeries: LinkedLabel[];
+  currentPage: number;
+  pageLinks: Array<{ page: number; url: string }>;
+  previousUrl?: string;
+  nextUrl?: string;
+  warnings: ParseWarning[];
 }
 
 export type ReviewContentBlock =

@@ -7,7 +7,7 @@ describe('matchNovelUpdatesRoute', () => {
     ['/series/example/', 'series', 'bespoke-replacement', true],
     ['/series-finder/', 'series-finder', 'bespoke-replacement', true],
     ['/series-ranking/', 'series-ranking', 'bespoke-replacement', true],
-    ['/', 'home', 'bespoke-replacement', false],
+    ['/', 'home', 'bespoke-replacement', true],
     ['/page/3/', 'catalog-feed', 'bespoke-replacement', true],
     ['/genre/action/', 'catalog-taxonomy', 'bespoke-replacement', true],
     ['/viewlist/123/', 'recommendation-lists', 'bespoke-replacement', true],

@@ -271,23 +271,32 @@ describe('content bootstrap runtime', () => {
     expect(document.querySelector('form')).toBe(originalForm);
   });
 
-  it('themes the homepage while preserving its live feed DOM', async () => {
+  it('replaces the homepage with a normalized live release feed', async () => {
     loadPage(
       `<!doctype html><html><head><title>Novel Updates</title></head><body>
         <header class="l-header">Novel Updates</header>
-        <main id="homepage-feed"><a href="/series/fixture-mercenary/">Fixture Mercenary</a></main>
+        <main id="homepage-feed" class="l-content release">
+          <strong>Wednesday, July 29, 2026</strong>
+          <table id="myTable"><tbody><tr>
+            <td><a href="/series/fixture-mercenary/">Fixture Mercenary</a></td>
+            <td><button class="chp-release">c12</button></td>
+            <td><a href="/group/fixture-group/">Fixture Group</a></td>
+          </tr></tbody></table>
+        </main>
       </body></html>`,
       'https://www.novelupdates.com/',
     );
     const originalFeed = document.getElementById('homepage-feed');
-    const originalLink = document.querySelector('main a');
 
     await import('../../src/content/bootstrap');
-    await waitFor(() => document.documentElement.classList.contains('novel-compass-native-theme'));
+    await waitFor(() =>
+      document.documentElement.classList.contains('novel-compass-replacement-active'),
+    );
 
     expect(document.getElementById('homepage-feed')).toBe(originalFeed);
-    expect(document.querySelector('main a')).toBe(originalLink);
-    expect(originalLink?.getAttribute('href')).toBe('/series/fixture-mercenary/');
+    const host = document.getElementById(HOST_ID);
+    expect(host?.shadowRoot?.textContent).toContain('Latest releases');
+    expect(host?.shadowRoot?.textContent).toContain('Fixture Mercenary');
   });
 });
 
