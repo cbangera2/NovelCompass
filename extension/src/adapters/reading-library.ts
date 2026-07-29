@@ -123,7 +123,9 @@ function tableCellsByHeading(container: HTMLElement): Array<{ heading: string; c
   if (container.tagName !== 'TR') return [];
   const table = container.closest('table');
   const headings = Array.from(
-    table?.querySelectorAll<HTMLElement>('thead tr:last-child th, thead tr:last-child td') ?? [],
+    table?.querySelectorAll<HTMLElement>(
+      'thead tr:last-child th, thead tr:last-child td, tr:first-child th',
+    ) ?? [],
   ).map((heading) => cleanText(heading.textContent));
   return Array.from(container.children).flatMap((cell, index) => {
     const heading = headings[index];
@@ -155,7 +157,7 @@ function controlOrText(element: HTMLElement | undefined): string | undefined {
 
 function parseTabs(document: Document, currentUrl: string): ReadingLibraryTab[] {
   const candidates = document.querySelectorAll<HTMLAnchorElement>(
-    '[data-reading-tabs] a[href], .reading-list-tabs a[href], .rl_tabs a[href], .nav-tabs a[href], a[href*="/reading-list/"]',
+    'a[href]',
   );
   const current = trustedUrl(currentUrl, currentUrl);
   const seen = new Set<string>();
