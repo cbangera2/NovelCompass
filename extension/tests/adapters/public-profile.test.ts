@@ -43,4 +43,22 @@ describe('parsePublicProfilePage', () => {
     expect(result.ok).toBe(false);
     expect(result.message).toContain('trusted');
   });
+
+  it('isolates legacy profile list descriptions from duplicated card metadata', () => {
+    document.body.innerHTML = `
+      <div class="p_m_username">cbboss</div>
+      <div class="lid_box_sub"><div class="b_lid">
+        <div class="lid_link"><a href="/viewlist/83544/">Peak Hidden Gems</a></div>
+        <div class="search_stats">100 Series 41 Comments 186058 Views 873 Follows</div>
+        <div class="uclp_tags"><a class="gennew search listtags" href="/listtag/male-protagonist/">Male Protagonist</a></div>
+        <div>Actual synopsis<span class="dots">... </span><span class="morelink">more&gt;&gt;</span>
+          <span class="testhide"> with useful detail. Part 2: https://www.novelupdates.com/viewlist/88138/</span>
+        </div>
+      </div></div>`;
+    const result = parsePublicProfilePage(
+      document,
+      'https://www.novelupdates.com/user/546333/cbboss/',
+    );
+    expect(result.page.lists[0]?.description).toBe('Actual synopsis with useful detail.');
+  });
 });

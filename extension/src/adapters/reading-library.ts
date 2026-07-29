@@ -151,8 +151,11 @@ function controlOrText(element: HTMLElement | undefined): string | undefined {
   if (!element) return undefined;
   const select = element.querySelector<HTMLSelectElement>('select');
   const selected = cleanText(select?.selectedOptions[0]?.textContent);
+  const release = cleanText(
+    element.querySelector<HTMLAnchorElement>('a.chp-release, a[href*="/extnu/"]')?.textContent,
+  );
   const input = element.querySelector<HTMLInputElement>('input:not([type="checkbox"]):not([type="radio"])');
-  return selected || cleanText(input?.value) || cleanText(element.textContent) || undefined;
+  return selected || release || cleanText(input?.value) || cleanText(element.textContent) || undefined;
 }
 
 function parseTabs(document: Document, currentUrl: string): ReadingLibraryTab[] {

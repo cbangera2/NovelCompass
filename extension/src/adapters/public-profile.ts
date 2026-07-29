@@ -143,9 +143,7 @@ function parseLists(document: Document, currentUrl: string): PublicProfileList[]
         '[data-profile-list], .lid_box_sub, .lbx, .profile-list, .recommendation-list, .list-item, article, li, tr',
       ) ?? anchor.parentElement;
     const text = cleanText(row?.textContent);
-    const description = cleanText(
-      row?.querySelector('[data-list-description], .b_lid, .list-description, .listdesc, p')?.textContent,
-    );
+    const description = parseListDescription(row);
     return [{
       title,
       url: url.href,
@@ -157,6 +155,30 @@ function parseLists(document: Document, currentUrl: string): PublicProfileList[]
       tags: parseListTags(row, currentUrl),
     }];
   });
+}
+
+function parseListDescription(row: HTMLElement | null | undefined): string {
+  if (!row) return '';
+  const explicit = row.querySelector<HTMLElement>(
+    '[data-list-description], .list-description, .listdesc, p',
+  );
+  const source =
+    explicit ??
+    Array.from(row.querySelectorAll<HTMLElement>('.b_lid > div')).find(
+      (element) =>
+        !element.matches('.lid_link, .search_stats, .uclp_tags') &&
+        !element.querySelector('.lid_link, .search_stats'),
+    );
+  if (!source) return '';
+  const clone = source.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('.dots, .morelink, script, style').forEach((element) => element.remove());
+  const text = cleanText(clone.textContent)
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\bPart\s+\d+\s*:\s*/gi, '')
+    .replace(/\s+([,.;!?])/g, '$1')
+    .trim();
+  if (!text || /^No description\.?$/i.test(text)) return '';
+  return text.length > 420 ? `${text.slice(0, 417).trimEnd()}…` : text;
 }
 
 function parseNavigation(document: Document, currentUrl: string) {

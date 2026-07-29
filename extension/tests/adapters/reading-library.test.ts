@@ -56,4 +56,29 @@ describe('parseReadingLibraryPage', () => {
       parseReadingLibraryPage(document, 'https://www.novelupdates.com/reading-list/'),
     ).toMatchObject({ ok: false, message: expect.stringContaining('not supported') });
   });
+
+  it('uses visible Novel Updates chapter links instead of internal input identifiers', () => {
+    document.body.innerHTML = `
+      <a href="/reading-list/?list=0">Reading</a>
+      <a href="/reading-list/?list=1">Plan to read</a>
+      <table id="myTable read">
+        <tr><th></th><th>Series (1)</th><th>My Status</th><th>Latest Release</th></tr>
+        <tr class="rl_links">
+          <td><input type="checkbox"></td>
+          <td><a href="/series/example-novel/">Example Novel</a></td>
+          <td><input id="series42" value="14191349"><a class="chp-release" href="/extnu/1/">c23</a></td>
+          <td><a class="chp-release latest" href="/extnu/2/">c24</a></td>
+        </tr>
+      </table>`;
+    const result = parseReadingLibraryPage(
+      document,
+      'https://www.novelupdates.com/reading-list/?list=0',
+    );
+    expect(result.page.tabs.map((tab) => tab.label)).toEqual(['Reading', 'Plan to read']);
+    expect(result.page.rows[0]).toMatchObject({
+      listLabel: 'Reading',
+      progressLabel: 'c23',
+      latestRelease: { label: 'c24' },
+    });
+  });
 });
