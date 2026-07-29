@@ -1,40 +1,40 @@
-.novel-compass-public-profile { color: var(--extension-text, #e8edf5); display: grid; gap: 24px; padding-bottom: 36px; }
+.novel-compass-public-profile { color: var(--text); display: grid; gap: 24px; padding-bottom: 36px; }
 .novel-compass-public-profile * { box-sizing: border-box; }
-.extension-profile-hero { align-items: center; background: linear-gradient(135deg, rgba(71, 85, 105, .28), rgba(14, 165, 233, .08)); border: 1px solid var(--extension-border, #293445); border-radius: 22px; display: flex; justify-content: space-between; padding: 28px; }
+.extension-profile-hero { align-items: center; background: linear-gradient(135deg, var(--surface-raised), var(--accent-soft)); border: 1px solid var(--border); border-radius: 22px; display: flex; justify-content: space-between; padding: 28px; }
 .extension-profile-identity { align-items: center; display: flex; gap: 20px; min-width: 0; }
-.extension-profile-avatar { align-items: center; background: var(--extension-surface-raised, #172033); border: 1px solid var(--extension-border, #293445); border-radius: 50%; display: flex; flex: 0 0 88px; height: 88px; justify-content: center; overflow: hidden; width: 88px; }
+.extension-profile-avatar { align-items: center; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 50%; display: flex; flex: 0 0 88px; height: 88px; justify-content: center; overflow: hidden; width: 88px; }
 .extension-profile-avatar img { height: 100%; object-fit: cover; width: 100%; }
 .extension-profile-avatar svg { height: 38px; opacity: .7; width: 38px; }
-.extension-profile-hero p, .extension-profile-section-heading p { color: var(--extension-muted, #9aa7ba); font-size: 12px; font-weight: 700; letter-spacing: .12em; margin: 0 0 7px; text-transform: uppercase; }
+.extension-profile-hero p, .extension-profile-section-heading p { color: var(--accent-bright); font-size: 12px; font-weight: 700; letter-spacing: .12em; margin: 0 0 7px; text-transform: uppercase; }
 .extension-profile-hero h1 { font-size: clamp(28px, 4vw, 42px); letter-spacing: -.035em; margin: 0; }
-.extension-profile-byline { align-items: center; color: var(--extension-muted, #9aa7ba); display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 9px; }
+.extension-profile-byline { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 9px; }
 .extension-profile-byline span { align-items: center; display: inline-flex; gap: 6px; }
-.extension-profile-hero button { background: transparent; border: 1px solid var(--extension-border, #3b4658); border-radius: 10px; color: inherit; cursor: pointer; padding: 10px 14px; }
+.extension-profile-hero button { background: var(--accent); border: 1px solid var(--accent); border-radius: 10px; color: white; cursor: pointer; padding: 10px 14px; }
 .extension-profile-navigation { display: flex; flex-wrap: wrap; gap: 8px; }
-.extension-profile-navigation a, .extension-profile-tags a { background: var(--extension-surface-raised, #172033); border: 1px solid var(--extension-border, #293445); border-radius: 999px; color: inherit; padding: 8px 13px; text-decoration: none; }
-.extension-profile-bio, .extension-profile-lists { background: var(--extension-surface, #111827); border: 1px solid var(--extension-border, #293445); border-radius: 18px; padding: 22px; }
+.extension-profile-navigation a, .extension-profile-tags a, .extension-profile-tags span { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 999px; color: inherit; padding: 8px 13px; text-decoration: none; }
+.extension-profile-bio, .extension-profile-lists { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 22px; }
 .extension-profile-bio h2 { margin: 0 0 8px; }
-.extension-profile-bio p { color: var(--extension-muted, #b3bed0); line-height: 1.65; margin: 0; }
+.extension-profile-bio p { color: var(--muted); line-height: 1.65; margin: 0; }
 .extension-profile-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); margin: 0; }
-.extension-profile-stats div { background: var(--extension-surface, #111827); border: 1px solid var(--extension-border, #293445); border-radius: 15px; padding: 17px; }
-.extension-profile-stats dt { color: var(--extension-muted, #9aa7ba); font-size: 12px; text-transform: uppercase; }
+.extension-profile-stats div { background: var(--surface); border: 1px solid var(--border); border-radius: 15px; padding: 17px; }
+.extension-profile-stats dt { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 .extension-profile-stats dd { font-size: 25px; font-weight: 750; margin: 5px 0 0; }
 .extension-profile-section-heading { align-items: end; display: flex; justify-content: space-between; margin-bottom: 18px; }
 .extension-profile-section-heading h2 { font-size: 24px; margin: 0; }
-.extension-profile-section-heading > span { color: var(--extension-muted, #9aa7ba); }
+.extension-profile-section-heading > span { color: var(--muted); }
 .extension-profile-list-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.extension-profile-list-grid > article { background: var(--extension-surface-raised, #172033); border: 1px solid var(--extension-border, #293445); border-radius: 15px; display: grid; gap: 13px; padding: 18px; }
+.extension-profile-list-grid > article { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 15px; display: grid; gap: 13px; padding: 18px; }
 .extension-profile-list-title { align-items: center; display: flex; gap: 10px; }
 .extension-profile-list-title h3 { font-size: 17px; margin: 0; }
 .extension-profile-list-title a { color: inherit; text-decoration: none; }
-.extension-profile-list-grid article > p { color: var(--extension-muted, #b3bed0); line-height: 1.55; margin: 0; }
+.extension-profile-list-grid article > p { color: var(--muted); line-height: 1.55; margin: 0; }
 .extension-profile-tags { display: flex; flex-wrap: wrap; gap: 7px; }
 .extension-profile-tags a { font-size: 12px; padding: 5px 9px; }
 .extension-profile-list-grid dl { display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 0; }
 .extension-profile-list-grid dl div { align-items: center; display: flex; gap: 5px; }
-.extension-profile-list-grid dt { align-items: center; color: var(--extension-muted, #9aa7ba); display: flex; font-size: 12px; gap: 4px; }
+.extension-profile-list-grid dt { align-items: center; color: var(--muted); display: flex; font-size: 12px; gap: 4px; }
 .extension-profile-list-grid dd { font-size: 12px; font-weight: 700; margin: 0; }
-.extension-profile-empty { align-items: center; color: var(--extension-muted, #9aa7ba); display: flex; flex-direction: column; padding: 38px; }
+.extension-profile-empty { align-items: center; color: var(--muted); display: flex; flex-direction: column; padding: 38px; }
 @media (max-width: 680px) {
   .extension-profile-hero { align-items: flex-start; flex-direction: column; gap: 20px; padding: 20px; }
   .extension-profile-avatar { flex-basis: 66px; height: 66px; width: 66px; }

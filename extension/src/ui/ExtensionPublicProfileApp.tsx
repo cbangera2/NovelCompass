@@ -65,7 +65,9 @@ export function ExtensionPublicProfileApp({
                 {list.description ? <p>{list.description}</p> : null}
                 {list.tags.length ? (
                   <div className="extension-profile-tags">
-                    {list.tags.map((tag) => <a href={tag.url} key={tag.url}>{tag.label}</a>)}
+                    {list.tags.map((tag) => tag.url
+                      ? <a href={tag.url} key={tag.url}>{tag.label}</a>
+                      : <span key={tag.label}>{tag.label}</span>)}
                   </div>
                 ) : null}
                 <dl>

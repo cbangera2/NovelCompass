@@ -64,6 +64,7 @@ function parseRows(document: Document, currentUrl: string): ReadingLibraryRow[] 
     const image = container.querySelector<HTMLImageElement>('img[src]');
     const coverUrl = trustedAssetUrl(image?.getAttribute('src'), currentUrl);
     const text = cleanText(container.textContent);
+    const cells = tableCellsByHeading(container);
     const latestAnchor = Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href]')).find(
       (anchor) => {
         if (anchor === seriesAnchor) return false;
@@ -76,17 +77,26 @@ function parseRows(document: Document, currentUrl: string): ReadingLibraryRow[] 
         latestAnchor?.textContent,
     );
     const latestUrl = trustedUrl(latestAnchor?.getAttribute('href'), currentUrl);
-    const listLabel = fieldText(container, '[data-list], .list-name, .rl_list, [data-column="list"]');
-    const statusLabel = fieldText(
-      container,
-      '[data-status], .series-status, .rl_status, [data-column="status"]',
-    );
+    const listLabel =
+      fieldText(container, '[data-list], .list-name, .rl_list, [data-column="list"]') ??
+      cellValue(cells, /^(?:list|reading list)$/i);
+    const statusLabel =
+      fieldText(container, '[data-status], .series-status, .rl_status, [data-column="status"]') ??
+      cellValue(cells, /^(?:my )?status$/i);
     const progressLabel =
       fieldText(container, '[data-progress], .reading-progress, .rl_progress, [data-column="progress"]') ??
+      cellValue(cells, /^(?:my )?(?:progress|chapter)$/i) ??
       text.match(/\b(?:Read|Progress)\s*:?\s*([^|]+?)(?=\s{2,}|Latest|Updated|$)/i)?.[1]?.trim();
     const updatedAt =
       fieldText(container, '[data-updated], .updated, .rl_updated, time') ??
+      cellValue(cells, /^(?:updated|added|last updated)$/i) ??
       text.match(/\b(?:Updated|Added)\s*:?\s*([^|]+)$/i)?.[1]?.trim();
+    const latestCell = matchingCell(cells, /^(?:latest|latest release)$/i);
+    const cellLatestAnchor = latestCell?.querySelector<HTMLAnchorElement>('a[href]');
+    const cellLatestLabel = controlOrText(latestCell);
+    const cellLatestUrl = trustedUrl(cellLatestAnchor?.getAttribute('href'), currentUrl);
+    const effectiveLatestLabel = latestLabel || cellLatestLabel;
+    const effectiveLatestUrl = latestUrl || cellLatestUrl;
 
     return [{
       title,
@@ -94,13 +104,52 @@ function parseRows(document: Document, currentUrl: string): ReadingLibraryRow[] 
       ...(coverUrl ? { coverUrl } : {}),
       ...(listLabel ? { listLabel } : {}),
       ...(statusLabel ? { statusLabel } : {}),
-      ...(latestLabel
-        ? { latestRelease: { label: latestLabel, ...(latestUrl ? { url: latestUrl.href } : {}) } }
+      ...(effectiveLatestLabel
+        ? {
+            latestRelease: {
+              label: effectiveLatestLabel,
+              ...(effectiveLatestUrl ? { url: effectiveLatestUrl.href } : {}),
+            },
+          }
         : {}),
       ...(progressLabel ? { progressLabel } : {}),
       ...(updatedAt ? { updatedAt } : {}),
     }];
   });
+}
+
+function tableCellsByHeading(container: HTMLElement): Array<{ heading: string; cell: HTMLElement }> {
+  if (container.tagName !== 'TR') return [];
+  const table = container.closest('table');
+  const headings = Array.from(
+    table?.querySelectorAll<HTMLElement>('thead tr:last-child th, thead tr:last-child td') ?? [],
+  ).map((heading) => cleanText(heading.textContent));
+  return Array.from(container.children).flatMap((cell, index) => {
+    const heading = headings[index];
+    return heading && cell instanceof HTMLElement ? [{ heading, cell }] : [];
+  });
+}
+
+function matchingCell(
+  cells: Array<{ heading: string; cell: HTMLElement }>,
+  heading: RegExp,
+): HTMLElement | undefined {
+  return cells.find((entry) => heading.test(entry.heading))?.cell;
+}
+
+function cellValue(
+  cells: Array<{ heading: string; cell: HTMLElement }>,
+  heading: RegExp,
+): string | undefined {
+  return controlOrText(matchingCell(cells, heading));
+}
+
+function controlOrText(element: HTMLElement | undefined): string | undefined {
+  if (!element) return undefined;
+  const select = element.querySelector<HTMLSelectElement>('select');
+  const selected = cleanText(select?.selectedOptions[0]?.textContent);
+  const input = element.querySelector<HTMLInputElement>('input:not([type="checkbox"]):not([type="radio"])');
+  return selected || cleanText(input?.value) || cleanText(element.textContent) || undefined;
 }
 
 function parseTabs(document: Document, currentUrl: string): ReadingLibraryTab[] {

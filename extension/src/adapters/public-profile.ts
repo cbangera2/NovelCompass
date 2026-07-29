@@ -25,13 +25,13 @@ export function parsePublicProfilePage(
   const name =
     cleanText(
       document.querySelector(
-        '[data-profile-name], .profile-name, .user-name, .user-profile h1, h1',
+        '[data-profile-name], .p_m_username, .profile-name, .user-name, .user-profile h1, h1',
       )?.textContent,
     ) || profileNameFromPath(current?.pathname);
   const avatarUrl = trustedAssetUrl(
     document
       .querySelector<HTMLImageElement>(
-        '[data-profile-avatar] img[src], img[data-profile-avatar][src], .profile-avatar img[src], .user-avatar img[src], .avatar[src]',
+        '[data-profile-avatar] img[src], img[data-profile-avatar][src], .p_avatar img[src], .profile-avatar img[src], .user-avatar img[src], .avatar[src]',
       )
       ?.getAttribute('src'),
     currentUrl,
@@ -41,13 +41,16 @@ export function parsePublicProfilePage(
       '[data-profile-summary], .profile-summary, .user-profile, #user-profile, main',
     ) ?? document.body;
   const summaryText = cleanText(summaryRoot?.textContent);
+  const pairedStats = parsePairedStats(document);
   const rank =
-    cleanText(document.querySelector('[data-profile-rank], .profile-rank, .user-rank')?.textContent) ||
+    cleanText(document.querySelector('[data-profile-rank], .userrate.urank, .profile-rank, .user-rank')?.textContent) ||
     capture(summaryText, /\b(?:Rank|Role)\s*:?\s*([^|•\n]+?)(?=\s{2,}|Joined|Lists|$)/i);
   const joinedAt =
     cleanText(
       document.querySelector('[data-profile-joined], .profile-joined, time[datetime]')?.textContent,
-    ) || capture(summaryText, /\bJoined\s*:?\s*([^|•\n]+?)(?=\s{2,}|Rank|Lists|$)/i);
+    ) ||
+    pairedStats.find((stat) => /^joined$/i.test(stat.label))?.value ||
+    capture(summaryText, /\bJoined\s*:?\s*([^|•\n]+?)(?=\s{2,}|Rank|Lists|$)/i);
   const bio = cleanText(
     document.querySelector(
       '[data-profile-bio], .profile-bio, .user-description, .profile-description',
@@ -89,7 +92,9 @@ export function parsePublicProfilePage(
 
 function parseStats(document: Document, summaryText: string): PublicProfileStat[] {
   const explicit = Array.from(
-    document.querySelectorAll<HTMLElement>('[data-profile-stat], .profile-stat, .user-stat'),
+    document.querySelectorAll<HTMLElement>(
+      '[data-profile-stat], .p_pairstats .row_pairs, .profile-stat, .user-stat',
+    ),
   ).flatMap((element) => {
     const label =
       cleanText(element.dataset.label) ||
@@ -100,7 +105,9 @@ function parseStats(document: Document, summaryText: string): PublicProfileStat[
       cleanText(element.textContent).replace(label, '').trim();
     return label && value ? [{ label, value }] : [];
   });
-  if (explicit.length) return dedupeStats(explicit);
+  if (explicit.length) {
+    return dedupeStats(explicit).filter((stat) => !/^joined$/i.test(stat.label));
+  }
 
   const patterns = [
     ['Lists', /\b(\d[\d,]*)\s+(?:Created\s+)?Lists?\b/i],
@@ -114,6 +121,16 @@ function parseStats(document: Document, summaryText: string): PublicProfileStat[
   });
 }
 
+function parsePairedStats(document: Document): PublicProfileStat[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('.p_pairstats .row_pairs')).flatMap(
+    (element) => {
+      const label = cleanText(element.querySelector('dt')?.textContent);
+      const value = cleanText(element.querySelector('dd')?.textContent);
+      return label && value ? [{ label, value }] : [];
+    },
+  );
+}
+
 function parseLists(document: Document, currentUrl: string): PublicProfileList[] {
   const seen = new Set<string>();
   return Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]')).flatMap((anchor) => {
@@ -123,11 +140,11 @@ function parseLists(document: Document, currentUrl: string): PublicProfileList[]
     seen.add(url.href);
     const row =
       anchor.closest<HTMLElement>(
-        '[data-profile-list], .profile-list, .recommendation-list, .list-item, article, li, tr',
+        '[data-profile-list], .lid_box_sub, .lbx, .profile-list, .recommendation-list, .list-item, article, li, tr',
       ) ?? anchor.parentElement;
     const text = cleanText(row?.textContent);
     const description = cleanText(
-      row?.querySelector('[data-list-description], .list-description, .listdesc, p')?.textContent,
+      row?.querySelector('[data-list-description], .b_lid, .list-description, .listdesc, p')?.textContent,
     );
     return [{
       title,
@@ -137,7 +154,7 @@ function parseLists(document: Document, currentUrl: string): PublicProfileList[]
       ...numericField(text, 'commentCount', /(\d[\d,]*)\s+Comments?\b/i),
       ...numericField(text, 'viewCount', /(\d[\d,]*)\s+Views?\b/i),
       ...numericField(text, 'followCount', /(\d[\d,]*)\s+Follows?\b/i),
-      tags: parseLinks(row, currentUrl, /^\/(?:listtag|genre|stag)\/[^/]+\/?$/),
+      tags: parseListTags(row, currentUrl),
     }];
   });
 }
@@ -152,10 +169,27 @@ function parseNavigation(document: Document, currentUrl: string) {
 
 function parseToolLinks(document: Document, currentUrl: string) {
   return parseLinks(
-    document.querySelector('[data-profile-tools], .profile-tools, .user-tools'),
+    document.querySelector(
+      '[data-profile-tools], .p_btn_list.profile, .profile-tools, .user-tools',
+    ),
     currentUrl,
-    /^\/(?:userlist|reading-list|account|your-profile|recommendation-lists)(?:\/|$)/,
+    /^\/(?:userlist|reading-list|account|your-profile|recommendation-lists|add-release|add-group|add-series|report-problem|nu-edit-logs)(?:\/|$)/,
   );
+}
+
+function parseListTags(root: ParentNode | null | undefined, currentUrl: string) {
+  if (!root) return [];
+  const linked = parseLinks(root, currentUrl, /^\/(?:listtag|genre|stag)\/[^/]+\/?$/);
+  const seen = new Set(linked.map((tag) => tag.label.toLowerCase()));
+  const plain = Array.from(
+    root.querySelectorAll<HTMLElement>('.gennew.search.listtags span, [data-list-tags] span'),
+  ).flatMap((element) => {
+    const label = cleanText(element.textContent);
+    if (!label || seen.has(label.toLowerCase())) return [];
+    seen.add(label.toLowerCase());
+    return [{ label }];
+  });
+  return [...linked, ...plain];
 }
 
 function parseLinks(root: ParentNode | null | undefined, currentUrl: string, pattern: RegExp) {
