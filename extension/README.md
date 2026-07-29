@@ -1,5 +1,29 @@
 # Novel Compass Chrome Extension
 
+Restyles Novel Updates with Novel Compass navigation while preserving the
+site's live links, releases, reviews, rankings, lists, and account actions.
+
+## Screenshots
+
+### Compact series view
+
+The cover, essential metadata, description, and details fit in the first
+viewport. Overview, chapters, reviews, and similar titles continue down one
+page; the compact section bar provides jump links without hiding content.
+
+![Compact Novel Compass series view](../docs/screenshots/extension/series-detail-saint-dark-fantasy.png)
+
+### Series rankings
+
+![Novel Updates series rankings restyled by Novel Compass](../docs/screenshots/extension/series-rankings.png)
+
+### Latest releases
+
+![Novel Updates latest releases with Novel Compass navigation](../docs/screenshots/extension/home-latest-releases.png)
+
+Screenshots contain page content only. Browser chrome and personal account
+details are excluded or redacted.
+
 ## Build the lightweight extension
 
 The default build is the Chrome Web Store candidate. It includes all Novel

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import type { MouseEvent } from 'react';
 
 import type { LiveReleasePage, LiveReviewPage, LiveSeriesMetadata } from '../adapters/contracts';
 import { ChapterList } from './components/ChapterList';
@@ -22,14 +22,12 @@ export interface ExtensionSeriesAppProps {
   onNavigate: (url: string) => void;
 }
 
-type SeriesTab = 'overview' | 'chapters' | 'reviews' | 'similar';
-
-const TABS: Array<{ id: SeriesTab; label: string }> = [
+const SECTIONS = [
   { id: 'overview', label: 'Overview' },
   { id: 'chapters', label: 'Chapters' },
   { id: 'reviews', label: 'Reviews' },
   { id: 'similar', label: 'Similar' },
-];
+] as const;
 
 const DEFAULT_REVIEWS: SeriesSectionState<LiveReviewPage> = {
   status: 'unavailable',
@@ -48,8 +46,6 @@ export function ExtensionSeriesApp({
   onInvokeAction,
   onNavigate,
 }: ExtensionSeriesAppProps): JSX.Element {
-  const [activeTab, setActiveTab] = useState<SeriesTab>('overview');
-
   return (
     <div className="novel-compass-series">
       <a className="series-skip-link" href="#series-content">
@@ -57,63 +53,64 @@ export function ExtensionSeriesApp({
       </a>
       <SeriesHero metadata={metadata} />
 
-      <nav className="series-tabs" aria-label="Series sections" role="tablist">
-        {TABS.map((tab) => (
-          <button
-            aria-controls={`series-panel-${tab.id}`}
-            aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id ? 'is-active' : undefined}
-            id={`series-tab-${tab.id}`}
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            role="tab"
-            tabIndex={activeTab === tab.id ? 0 : -1}
-            type="button"
+      <nav className="series-section-nav" aria-label="Jump to series section">
+        {SECTIONS.map((section) => (
+          <a
+            href={`#series-${section.id}`}
+            id={`series-nav-${section.id}`}
+            key={section.id}
+            onClick={(event) => scrollToSection(event, section.id)}
           >
-            {tab.label}
-            {tab.id === 'chapters' && releases.rows.length > 0 ? (
+            {section.label}
+            {section.id === 'chapters' && releases.rows.length > 0 ? (
               <span aria-label={`${releases.rows.length} chapters on this page`}>
                 {releases.rows.length}
               </span>
             ) : null}
-          </button>
+          </a>
         ))}
       </nav>
 
       <main className="series-content" id="series-content">
         <section
-          aria-labelledby="series-tab-overview"
-          hidden={activeTab !== 'overview'}
-          id="series-panel-overview"
-          role="tabpanel"
+          aria-labelledby="series-nav-overview"
+          className="series-page-section"
+          id="series-overview"
         >
           <SeriesOverview metadata={metadata} />
         </section>
         <section
-          aria-labelledby="series-tab-chapters"
-          hidden={activeTab !== 'chapters'}
-          id="series-panel-chapters"
-          role="tabpanel"
+          aria-labelledby="series-nav-chapters"
+          className="series-page-section"
+          id="series-chapters"
         >
           <ChapterList page={releases} onInvokeAction={onInvokeAction} onNavigate={onNavigate} />
         </section>
         <section
-          aria-labelledby="series-tab-reviews"
-          hidden={activeTab !== 'reviews'}
-          id="series-panel-reviews"
-          role="tabpanel"
+          aria-labelledby="series-nav-reviews"
+          className="series-page-section"
+          id="series-reviews"
         >
           <ReviewList state={reviews} onInvokeAction={onInvokeAction} />
         </section>
         <section
-          aria-labelledby="series-tab-similar"
-          hidden={activeTab !== 'similar'}
-          id="series-panel-similar"
-          role="tabpanel"
+          aria-labelledby="series-nav-similar"
+          className="series-page-section"
+          id="series-similar"
         >
           <SimilarNovels state={similar} onNavigate={onNavigate} />
         </section>
       </main>
     </div>
   );
+}
+
+function scrollToSection(event: MouseEvent<HTMLAnchorElement>, sectionId: string): void {
+  const root = event.currentTarget.getRootNode() as ParentNode;
+  const section = root.querySelector<HTMLElement>(`#series-${sectionId}`);
+  if (!section) return;
+
+  event.preventDefault();
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.history.replaceState(window.history.state, '', `#series-${sectionId}`);
 }

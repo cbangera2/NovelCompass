@@ -41,15 +41,28 @@ describe('ExtensionSeriesApp', () => {
         'a[href="https://www.novelupdates.com/stag/regression/"]',
       ),
     ).not.toBeNull();
-    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
-      'Overview',
-    );
+    expect(container.querySelector('a[href="#series-overview"]')?.textContent).toBe('Overview');
+    expect(container.querySelector('#series-chapters')).not.toBeNull();
+    expect(container.querySelector('#series-reviews')).not.toBeNull();
+    expect(container.querySelector('#series-similar')).not.toBeNull();
+  });
+
+  it('scrolls shadow-root section links into view', () => {
+    renderApp();
+    const chapters = container.querySelector<HTMLElement>('#series-chapters');
+    const scrollIntoView = vi.fn();
+    chapters!.scrollIntoView = scrollIntoView;
+
+    const link = container.querySelector<HTMLAnchorElement>('a[href="#series-chapters"]');
+    act(() => link?.click());
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(window.location.hash).toBe('#series-chapters');
   });
 
   it('renders actionable and unavailable chapter states without inventing account actions', () => {
     const onInvokeAction = vi.fn();
     renderApp({ onInvokeAction });
-    selectTab('Chapters');
 
     const chapterButtons = Array.from(
       container.querySelectorAll<HTMLButtonElement>('.chapter-list > li > button'),
@@ -71,7 +84,6 @@ describe('ExtensionSeriesApp', () => {
       onInvokeAction,
       reviews: { status: 'ready', data: reviews() },
     });
-    selectTab('Reviews');
 
     expect(container.textContent).toContain('Fixture Reviewer');
     expect(container.textContent).toContain('A safe paragraph.');
@@ -95,7 +107,6 @@ describe('ExtensionSeriesApp', () => {
         message: 'The recommendation snapshot is offline.',
       },
     });
-    selectTab('Similar');
 
     expect(container.textContent).toContain('The recommendation snapshot is offline.');
     expect(container.textContent).toContain('Live Novel Updates chapters and metadata still work.');
@@ -119,7 +130,6 @@ describe('ExtensionSeriesApp', () => {
         ],
       },
     });
-    selectTab('Similar');
 
     const viewButton = Array.from(container.querySelectorAll('button')).find(
       (button) => button.textContent === 'View on Novel Updates',
@@ -143,13 +153,6 @@ function renderApp(overrides: Partial<ComponentProps<typeof ExtensionSeriesApp>>
       />,
     );
   });
-}
-
-function selectTab(label: string): void {
-  const tab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
-    (candidate) => candidate.textContent?.startsWith(label),
-  );
-  act(() => tab?.click());
 }
 
 function metadata(): LiveSeriesMetadata {
