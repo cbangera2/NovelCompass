@@ -40,8 +40,13 @@ describe('matchNovelUpdatesRoute', () => {
     '/viewlist/not-a-number/',
     '/userlist/not-a-number/',
     '/unknown-plugin-action/',
-  ])('does not overmatch %s', (pathname) => {
-    expect(matchNovelUpdatesRoute(pathname)).toBeUndefined();
+    '/latest-alerts/',
+  ])('falls back to native theming for unmodeled safe HTML route %s', (pathname) => {
+    expect(matchNovelUpdatesRoute(pathname)).toMatchObject({
+      family: 'content-page',
+      policy: 'shared-shell-native',
+      uiImplemented: false,
+    });
   });
 
   it('passes numeric WordPress post redirects through without treating normal searches as redirects', () => {

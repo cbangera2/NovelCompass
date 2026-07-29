@@ -70,6 +70,13 @@ const NUMERIC_POST_REDIRECT: NovelUpdatesRouteMatch = {
   uiImplemented: false,
 };
 
+const SAFE_HTML_FALLBACK: NovelUpdatesRouteMatch = {
+  family: 'content-page',
+  policy: 'shared-shell-native',
+  priority: 2,
+  uiImplemented: false,
+};
+
 export function matchNovelUpdatesRoute(
   pathname: string,
   search = '',
@@ -79,7 +86,7 @@ export function matchNovelUpdatesRoute(
   }
   const route = ROUTES.find((candidate) => candidate.pattern.test(pathname));
   if (!route) {
-    return undefined;
+    return pathname.startsWith('/') ? SAFE_HTML_FALLBACK : undefined;
   }
   const { pattern: _pattern, ...match } = route;
   return match;

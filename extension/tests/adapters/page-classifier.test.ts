@@ -42,19 +42,33 @@ describe('classifyNovelUpdatesPage', () => {
 
     expect(
       classifyNovelUpdatesPage('https://www.novelupdates.com/series-finder/results/'),
-    ).toMatchObject({ kind: 'blocked', reason: 'unsupported-route' });
+    ).toMatchObject({
+      kind: 'blocked',
+      reason: 'replacement-not-implemented',
+      route: { policy: 'shared-shell-native' },
+    });
   });
 
   it.each([
     ['http://www.novelupdates.com/series/example/', 'insecure-origin'],
     ['https://novelupdates.com/series/example/', 'wrong-origin'],
     ['https://www.novelupdates.com.evil.test/series/example/', 'wrong-origin'],
-    ['https://www.novelupdates.com/unknown-route/', 'unsupported-route'],
     ['not a URL', 'invalid-url'],
   ])('blocks %s as %s', (url, reason) => {
     expect(classifyNovelUpdatesPage(url)).toMatchObject({
       kind: 'blocked',
       reason,
+    });
+  });
+
+  it('native-themes unknown safe HTML routes instead of leaving visual coverage gaps', () => {
+    expect(classifyNovelUpdatesPage('https://www.novelupdates.com/latest-alerts/')).toMatchObject({
+      kind: 'blocked',
+      reason: 'replacement-not-implemented',
+      route: {
+        family: 'content-page',
+        policy: 'shared-shell-native',
+      },
     });
   });
 
