@@ -1,6 +1,7 @@
 import type { LocalUserProfile } from '../../../web/src/profile/types';
 import {
   EXTENSION_BACKUP_SCHEMA_VERSION,
+  EXTENSION_PREFERENCES_SCHEMA_VERSION,
   EXTENSION_STORAGE_SCHEMA_VERSION,
   type ExtensionBackup,
   type ExtensionPageMode,
@@ -11,6 +12,7 @@ import {
 } from './types';
 import {
   defaultExtensionPreferences,
+  migratePreferences,
   parseBackup,
   parsePreferences,
   parseStoredProfile,
@@ -33,8 +35,13 @@ export class ExtensionStorageRepository {
     if (stored === undefined) return { status: 'missing', value: fallback };
     const parsed = parsePreferences(stored);
     if (parsed) return { status: 'ready', value: parsed };
+    const migrated = migratePreferences(stored);
+    if (migrated) {
+      await this.area.set({ [PREFERENCES_KEY]: migrated });
+      return { status: 'ready', value: migrated };
+    }
     const version = schemaVersionOf(stored);
-    return version !== undefined && version !== EXTENSION_STORAGE_SCHEMA_VERSION
+    return version !== undefined && version !== 1 && version !== EXTENSION_PREFERENCES_SCHEMA_VERSION
       ? { status: 'unsupported', value: fallback, foundSchemaVersion: version }
       : { status: 'corrupt', value: fallback, reason: 'Preferences failed schema validation.' };
   }
@@ -46,7 +53,7 @@ export class ExtensionStorageRepository {
   }
 
   async updatePreferences(
-    update: Partial<Pick<ExtensionPreferences, 'extensionEnabled'>> & {
+    update: Partial<Pick<ExtensionPreferences, 'extensionEnabled' | 'theme'>> & {
       pageModes?: Partial<ExtensionPreferences['pageModes']>;
     },
   ): Promise<ExtensionPreferences> {
@@ -56,6 +63,7 @@ export class ExtensionStorageRepository {
       ...(update.extensionEnabled === undefined
         ? {}
         : { extensionEnabled: update.extensionEnabled }),
+      ...(update.theme === undefined ? {} : { theme: update.theme }),
       pageModes: { ...current.pageModes, ...update.pageModes },
       updatedAt: this.now(),
     };

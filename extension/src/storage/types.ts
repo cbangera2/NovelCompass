@@ -2,12 +2,15 @@ import type { LocalUserProfile } from '../../../web/src/profile/types';
 
 export const EXTENSION_STORAGE_SCHEMA_VERSION = 1;
 export const EXTENSION_BACKUP_SCHEMA_VERSION = 1;
+export const EXTENSION_PREFERENCES_SCHEMA_VERSION = 2;
 
 export type ExtensionPageMode = 'replacement' | 'original';
+export type ExtensionTheme = 'system' | 'light' | 'dark';
 
 export interface ExtensionPreferences {
-  schemaVersion: 1;
+  schemaVersion: 2;
   extensionEnabled: boolean;
+  theme: ExtensionTheme;
   pageModes: {
     series: ExtensionPageMode;
     seriesFinder: ExtensionPageMode;

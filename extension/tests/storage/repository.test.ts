@@ -55,8 +55,9 @@ describe('ExtensionStorageRepository', () => {
     expect(await repository.loadPreferences()).toEqual({
       status: 'missing',
       value: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         extensionEnabled: true,
+        theme: 'system',
         pageModes: { series: 'replacement', seriesFinder: 'replacement' },
         updatedAt: NOW,
       },
@@ -94,17 +95,46 @@ describe('ExtensionStorageRepository', () => {
     });
   });
 
+  it('migrates v1 preferences without losing enablement or page choices', async () => {
+    const area = new MemoryStorage();
+    area.values.set(EXTENSION_STORAGE_KEYS.preferences, {
+      schemaVersion: 1,
+      extensionEnabled: false,
+      pageModes: { series: 'original', seriesFinder: 'replacement' },
+      updatedAt: '2026-07-28T01:00:00.000Z',
+    });
+    const repository = new ExtensionStorageRepository(area, () => NOW);
+
+    expect(await repository.loadPreferences()).toEqual({
+      status: 'ready',
+      value: {
+        schemaVersion: 2,
+        extensionEnabled: false,
+        theme: 'system',
+        pageModes: { series: 'original', seriesFinder: 'replacement' },
+        updatedAt: '2026-07-28T01:00:00.000Z',
+      },
+    });
+    expect(area.values.get(EXTENSION_STORAGE_KEYS.preferences)).toMatchObject({
+      schemaVersion: 2,
+      extensionEnabled: false,
+      theme: 'system',
+    });
+  });
+
   it('persists global enablement and independent original-view choices', async () => {
     const area = new MemoryStorage();
     const repository = new ExtensionStorageRepository(area, () => NOW);
 
     await repository.setEnabled(false);
+    await repository.updatePreferences({ theme: 'dark' });
     await repository.setPageMode('series', 'original');
     const loaded = await repository.loadPreferences();
 
     expect(loaded.status).toBe('ready');
     expect(loaded.value).toMatchObject({
       extensionEnabled: false,
+      theme: 'dark',
       pageModes: {
         series: 'original',
         seriesFinder: 'replacement',

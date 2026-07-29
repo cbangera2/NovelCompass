@@ -1,6 +1,7 @@
 import type { LocalUserProfile, ProfileEntry } from '../../../web/src/profile/types';
 import {
   EXTENSION_BACKUP_SCHEMA_VERSION,
+  EXTENSION_PREFERENCES_SCHEMA_VERSION,
   EXTENSION_STORAGE_SCHEMA_VERSION,
   type ExtensionBackup,
   type ExtensionPreferences,
@@ -9,8 +10,9 @@ import {
 
 export function defaultExtensionPreferences(now = new Date().toISOString()): ExtensionPreferences {
   return {
-    schemaVersion: EXTENSION_STORAGE_SCHEMA_VERSION,
+    schemaVersion: EXTENSION_PREFERENCES_SCHEMA_VERSION,
     extensionEnabled: true,
+    theme: 'system',
     pageModes: {
       series: 'replacement',
       seriesFinder: 'replacement',
@@ -20,10 +22,11 @@ export function defaultExtensionPreferences(now = new Date().toISOString()): Ext
 }
 
 export function parsePreferences(value: unknown): ExtensionPreferences | undefined {
-  if (!isRecord(value) || value.schemaVersion !== EXTENSION_STORAGE_SCHEMA_VERSION)
+  if (!isRecord(value) || value.schemaVersion !== EXTENSION_PREFERENCES_SCHEMA_VERSION)
     return undefined;
   if (
     typeof value.extensionEnabled !== 'boolean' ||
+    !isTheme(value.theme) ||
     !isRecord(value.pageModes) ||
     !isPageMode(value.pageModes.series) ||
     !isPageMode(value.pageModes.seriesFinder) ||
@@ -31,6 +34,36 @@ export function parsePreferences(value: unknown): ExtensionPreferences | undefin
   )
     return undefined;
   return value as unknown as ExtensionPreferences;
+}
+
+/**
+ * Upgrade preferences from schemas shipped by earlier extension builds.
+ * Unknown fields are intentionally discarded while every recognized choice is
+ * retained. The caller decides when to persist the upgraded value.
+ */
+export function migratePreferences(value: unknown): ExtensionPreferences | undefined {
+  const current = parsePreferences(value);
+  if (current) return current;
+  if (
+    !isRecord(value) ||
+    value.schemaVersion !== 1 ||
+    typeof value.extensionEnabled !== 'boolean' ||
+    !isRecord(value.pageModes) ||
+    !isPageMode(value.pageModes.series) ||
+    !isPageMode(value.pageModes.seriesFinder) ||
+    !isIsoDateTime(value.updatedAt)
+  )
+    return undefined;
+  return {
+    schemaVersion: EXTENSION_PREFERENCES_SCHEMA_VERSION,
+    extensionEnabled: value.extensionEnabled,
+    theme: 'system',
+    pageModes: {
+      series: value.pageModes.series,
+      seriesFinder: value.pageModes.seriesFinder,
+    },
+    updatedAt: value.updatedAt,
+  };
 }
 
 export function parseStoredProfile(value: unknown): ExtensionStoredProfile | undefined {
@@ -77,7 +110,7 @@ export function parseBackup(value: unknown): ExtensionBackup | undefined {
     !isIsoDateTime(value.exportedAt)
   )
     return undefined;
-  const preferences = parsePreferences(value.preferences);
+  const preferences = migratePreferences(value.preferences);
   const profile = value.profile === null ? null : parseStoredProfile(value.profile);
   if (!preferences || profile === undefined) return undefined;
   return {
@@ -116,6 +149,10 @@ function isStringArray(value: unknown): value is string[] {
 
 function isPageMode(value: unknown): value is 'replacement' | 'original' {
   return value === 'replacement' || value === 'original';
+}
+
+function isTheme(value: unknown): value is 'system' | 'light' | 'dark' {
+  return value === 'system' || value === 'light' || value === 'dark';
 }
 
 function isIsoDateTime(value: unknown): value is string {
