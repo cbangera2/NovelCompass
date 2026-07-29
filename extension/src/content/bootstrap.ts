@@ -17,6 +17,7 @@ import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
 import { ensureReplacementHost } from './replacement-host';
 import { resolveNovelUpdatesNavigation } from './navigation';
 import { installNativeTheme } from './native-theme';
+import { installReadingLibraryTheme } from './reading-library-theme';
 
 const classification = classifyNovelUpdatesDocument(window.location.href, document);
 
@@ -40,6 +41,12 @@ async function bootstrapNativeTheme(): Promise<void> {
     const response = await fetch(chrome.runtime.getURL('content/native-theme.css'));
     if (!response.ok) throw new Error(`Native theme styles failed to load (${response.status}).`);
     controller = installNativeTheme(document, await response.text());
+    if (
+      classification.kind === 'blocked' &&
+      classification.route?.family === 'reading-library'
+    ) {
+      installReadingLibraryTheme(document);
+    }
     controller.activate();
   } catch (error) {
     controller?.fail(error);

@@ -47,6 +47,10 @@ describe('installNativeTheme', () => {
 
     const style = document.getElementById(NATIVE_THEME_STYLE_ID) as HTMLStyleElement;
     const toggle = controller.host.shadowRoot?.querySelector<HTMLButtonElement>('button');
+    const navigation = controller.host.shadowRoot?.querySelector('aside');
+    expect(navigation?.textContent).toContain('Discover');
+    expect(navigation?.textContent).toContain('Reading list');
+    expect(navigation?.textContent).toContain('Account');
     expect(style.disabled).toBe(false);
     toggle?.click();
 
@@ -64,7 +68,8 @@ describe('installNativeTheme', () => {
   });
 
   it('fails open and leaves the native page usable', () => {
-    document.body.innerHTML = '<main id="native-content"><form><button>Submit</button></form></main>';
+    document.body.innerHTML =
+      '<main id="native-content"><form><button>Submit</button></form></main>';
     const originalMain = document.getElementById('native-content');
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const controller = installNativeTheme(document, 'html.novel-compass-native-theme{}');
@@ -72,7 +77,9 @@ describe('installNativeTheme', () => {
     controller.fail(new Error('fixture failure'));
 
     expect(document.documentElement.classList.contains(NATIVE_THEME_CLASS)).toBe(false);
-    expect((document.getElementById(NATIVE_THEME_STYLE_ID) as HTMLStyleElement).disabled).toBe(true);
+    expect((document.getElementById(NATIVE_THEME_STYLE_ID) as HTMLStyleElement).disabled).toBe(
+      true,
+    );
     expect(controller.host.hidden).toBe(true);
     expect(document.getElementById('native-content')).toBe(originalMain);
     expect(document.querySelector('button')?.textContent).toBe('Submit');
