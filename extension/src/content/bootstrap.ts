@@ -4,15 +4,19 @@ import { createRoot } from 'react-dom/client';
 
 import { OpaqueActionRegistry } from '../adapters/action-registry';
 import { parseNovelUpdatesAccountState } from '../adapters/account';
+import { parseCatalogPage } from '../adapters/catalog';
 import { classifyNovelUpdatesDocument } from '../adapters/page-classifier';
 import { parseRankingPage } from '../adapters/ranking';
+import { parseRecommendationListsPage } from '../adapters/recommendation-lists';
 import { parseReleasePage } from '../adapters/releases';
 import { parseReviewPage } from '../adapters/reviews';
 import { parseLiveSeriesMetadata } from '../adapters/series-page';
 import { chromeLocalStorageArea, ExtensionStorageRepository } from '../storage';
 import { SeriesRuntimeApp } from '../runtime/SeriesRuntimeApp';
 import { ExtensionFinderApp } from '../ui/ExtensionFinderApp';
+import { ExtensionCatalogApp } from '../ui/ExtensionCatalogApp';
 import { ExtensionRankingApp } from '../ui/ExtensionRankingApp';
+import { ExtensionRecommendationListsApp } from '../ui/ExtensionRecommendationListsApp';
 import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
 import { ensureReplacementHost } from './replacement-host';
 import { resolveNovelUpdatesNavigation } from './navigation';
@@ -90,8 +94,15 @@ async function bootstrapReplacement(): Promise<void> {
       actionRegistry,
       replacementHost.showOriginal,
     );
-    const activeRoute: ExtensionRoute =
+    const pageType =
       classification.kind === 'supported' ? classification.identity.pageType : 'other';
+    const activeRoute: ExtensionRoute =
+      pageType === 'series' ||
+      pageType === 'series-finder' ||
+      pageType === 'series-ranking' ||
+      pageType === 'recommendation-lists'
+        ? pageType
+        : 'other';
     const app = createElement(
       ExtensionShell,
       {
@@ -146,6 +157,35 @@ function createRouteApp(
     return createElement(ExtensionRankingApp, {
       page: ranking.page,
       onNavigate: navigateHttps,
+      onShowOriginal,
+    });
+  }
+  if (classification.identity.pageType === 'recommendation-lists') {
+    const recommendationLists = parseRecommendationListsPage(document, window.location.href);
+    if (!recommendationLists.ok) {
+      onFatalError(
+        new Error(
+          recommendationLists.message ?? 'Recommendation Lists could not be parsed.',
+        ),
+      );
+      return null;
+    }
+    return createElement(ExtensionRecommendationListsApp, {
+      page: recommendationLists.page,
+      onShowOriginal,
+    });
+  }
+  if (
+    classification.identity.pageType === 'catalog-feed' ||
+    classification.identity.pageType === 'catalog-taxonomy'
+  ) {
+    const catalog = parseCatalogPage(document, window.location.href);
+    if (!catalog.ok) {
+      onFatalError(new Error(catalog.message ?? 'Catalog page could not be parsed.'));
+      return null;
+    }
+    return createElement(ExtensionCatalogApp, {
+      page: catalog.page,
       onShowOriginal,
     });
   }

@@ -107,6 +107,18 @@ describe('classifyNovelUpdatesPage', () => {
   });
 
   it.each([
+    ['https://www.novelupdates.com/genre/comedy/', 'catalog-taxonomy'],
+    ['https://www.novelupdates.com/stag/time-travel/', 'catalog-taxonomy'],
+    ['https://www.novelupdates.com/novelslisting/', 'catalog-feed'],
+    ['https://www.novelupdates.com/latest-series/', 'catalog-feed'],
+  ])('activates the catalog replacement for %s', (url, pageType) => {
+    expect(classifyNovelUpdatesPage(url)).toMatchObject({
+      kind: 'supported',
+      identity: { pageType, resolutionSource: 'exact-route' },
+    });
+  });
+
+  it.each([
     'https://www.novelupdates.com/logout/?_wpnonce=secret',
     'https://www.novelupdates.com/extnu/123/',
     'https://www.novelupdates.com/report/review/42/',

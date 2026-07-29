@@ -106,7 +106,13 @@ export function classifyNovelUpdatesPage(
     return blocked('replacement-not-implemented', parsedUrl.href, route);
   }
 
-  if (route.family === 'series-finder' || route.family === 'series-ranking') {
+  if (
+    route.family === 'series-finder' ||
+    route.family === 'series-ranking' ||
+    route.family === 'catalog-feed' ||
+    route.family === 'catalog-taxonomy' ||
+    route.family === 'recommendation-lists'
+  ) {
     return {
       kind: 'supported',
       identity: {

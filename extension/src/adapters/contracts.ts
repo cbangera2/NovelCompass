@@ -8,7 +8,13 @@
 
 export const NOVEL_UPDATES_PARSER_VERSION = 1;
 
-export type SupportedPageType = 'series' | 'series-finder' | 'series-ranking';
+export type SupportedPageType =
+  | 'series'
+  | 'series-finder'
+  | 'series-ranking'
+  | 'catalog-feed'
+  | 'catalog-taxonomy'
+  | 'recommendation-lists';
 
 export type IdentityConfidence = 'high' | 'medium' | 'low';
 
@@ -228,6 +234,67 @@ export interface LiveRankingPage {
   activeRankingLabel?: string;
   filters: RankingFilters;
   rows: LiveRankingRow[];
+  currentPage: number;
+  pageLinks: Array<{ page: number; url: string }>;
+  previousUrl?: string;
+  nextUrl?: string;
+  warnings: ParseWarning[];
+}
+
+export interface LiveCatalogRow {
+  title: string;
+  seriesUrl: string;
+  coverUrl?: string;
+  description?: string;
+  language?: string;
+  rating?: number;
+  latestChapter?: LinkedLabel;
+  genres: LinkedLabel[];
+}
+
+export interface LiveCatalogPage {
+  title: string;
+  subtitle?: string;
+  rows: LiveCatalogRow[];
+  currentPage: number;
+  pageLinks: Array<{ page: number; url: string }>;
+  previousUrl?: string;
+  nextUrl?: string;
+  warnings: ParseWarning[];
+}
+
+export interface RecommendationListCard {
+  title: string;
+  url: string;
+  creator?: LinkedLabel;
+  avatarUrl?: string;
+  description?: string;
+  seriesCount?: number;
+  commentCount?: number;
+  viewCount?: number;
+  followCount?: number;
+  updatedAt?: string;
+  tags: LinkedLabel[];
+}
+
+export interface RecommendationListSeries {
+  title: string;
+  url: string;
+  coverUrl?: string;
+  description?: string;
+  rating?: number;
+  note?: string;
+  tags: LinkedLabel[];
+}
+
+export interface LiveRecommendationListsPage {
+  kind: 'directory' | 'detail' | 'tags';
+  title: string;
+  description?: string;
+  creator?: LinkedLabel;
+  lists: RecommendationListCard[];
+  series: RecommendationListSeries[];
+  tags: LinkedLabel[];
   currentPage: number;
   pageLinks: Array<{ page: number; url: string }>;
   previousUrl?: string;
