@@ -21,10 +21,7 @@
   "web_accessible_resources": [
     {
       "resources": ["content/style.css", "data/*", "data/**/*"],
-      "matches": [
-        "https://www.novelupdates.com/series/*",
-        "https://www.novelupdates.com/series-finder/"
-      ]
+      "matches": ["https://www.novelupdates.com/*"]
     }
   ]
 }

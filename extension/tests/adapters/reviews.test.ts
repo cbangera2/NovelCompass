@@ -112,6 +112,16 @@ describe('parseReviewPage', () => {
     expect(review.actionIds.report).toBeUndefined();
   });
 
+  it('removes Novel Updates expand and collapse text artifacts from review bodies', () => {
+    const document = fixtureDocument(
+      '<div id="body"><p>A useful review... more&gt;&gt; hidden text &lt;less</p></div>',
+    );
+
+    expect(normalizeReviewBody(document.querySelector<HTMLElement>('#body')!)).toEqual([
+      { type: 'paragraph', text: 'A useful review hidden text' },
+    ]);
+  });
+
   it('parses the current live w-comments wrapper and metadata layout', () => {
     const document = fixtureDocument(`
       <div id="comments" class="w-comments has_form">

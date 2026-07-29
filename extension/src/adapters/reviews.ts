@@ -180,7 +180,10 @@ function safeElementText(element: HTMLElement): string {
   clone
     .querySelectorAll('script, style, template, button, input, textarea, select')
     .forEach((node) => node.remove());
-  return cleanText(clone.textContent);
+  return cleanText(clone.textContent)
+    .replace(/\s*(?:\.\.\.\s*)?more\s*>>\s*/gi, ' ')
+    .replace(/\s*<\s*less\s*/gi, ' ')
+    .trim();
 }
 
 function parseLinkedLabel(

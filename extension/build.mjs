@@ -21,6 +21,13 @@ const sharedConfig = {
   root: extensionRoot,
   publicDir: false,
   logLevel: 'info',
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production'),
+  },
+  esbuild: {
+    jsx: 'automatic',
+    jsxImportSource: 'react',
+  },
   resolve: {
     alias: [
       {

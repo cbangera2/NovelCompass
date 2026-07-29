@@ -13,6 +13,7 @@ const expectedMatches = [
   'https://www.novelupdates.com/series/*',
   'https://www.novelupdates.com/series-finder/',
 ];
+const expectedResourceMatches = ['https://www.novelupdates.com/*'];
 
 await access(path.join(distRoot, 'background/service-worker.js'));
 await access(path.join(distRoot, 'content/bootstrap.js'));
@@ -21,6 +22,7 @@ await access(path.join(distRoot, 'data/manifest.json'));
 await access(path.join(distRoot, 'data/catalog.json'));
 
 const manifest = JSON.parse(await readFile(path.join(distRoot, 'manifest.json'), 'utf8'));
+const contentScript = await readFile(path.join(distRoot, 'content/bootstrap.js'), 'utf8');
 assert(manifest.manifest_version === 3, 'manifest_version must be 3');
 assert(
   manifest.background?.service_worker === 'background/service-worker.js',
@@ -41,9 +43,17 @@ assert(
 );
 assert(!JSON.stringify(manifest).includes('<all_urls>'), 'manifest must not request <all_urls>');
 assert(
+  !contentScript.includes('process.env.'),
+  'content script must not retain Node process.env references',
+);
+assert(
+  !contentScript.includes('React.createElement'),
+  'content script must not rely on an undeclared classic JSX React global',
+);
+assert(
   JSON.stringify(manifest.web_accessible_resources?.[0]?.matches) ===
-    JSON.stringify(expectedMatches),
-  'web-accessible resources must stay restricted to supported routes',
+    JSON.stringify(expectedResourceMatches),
+  'web-accessible resources must stay restricted to the Novel Updates origin',
 );
 assert(
   JSON.stringify(manifest.web_accessible_resources?.[0]?.resources) ===
