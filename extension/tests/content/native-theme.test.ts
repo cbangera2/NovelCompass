@@ -8,6 +8,7 @@ import {
   NATIVE_THEME_HOST_ID,
   NATIVE_THEME_STYLE_ID,
 } from '../../src/content/native-theme';
+import { READING_LIBRARY_HEADER_ID } from '../../src/content/reading-library-theme';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -33,6 +34,9 @@ describe('installNativeTheme', () => {
     const main = document.getElementById('native-content');
     const form = document.querySelector('form');
     const nonce = document.querySelector<HTMLInputElement>('input[name="_wpnonce"]');
+    const routeEnhancement = document.createElement('section');
+    routeEnhancement.id = READING_LIBRARY_HEADER_ID;
+    document.body.prepend(routeEnhancement);
 
     const controller = installNativeTheme(document, 'html.novel-compass-native-theme{color:red}');
     controller.activate();
@@ -62,9 +66,11 @@ describe('installNativeTheme', () => {
     expect(document.querySelector('form')).toBe(form);
     expect(document.getElementById(NATIVE_THEME_HOST_ID)).toBe(controller.host);
     expect(toggle?.textContent).toBe('Use Novel Compass theme');
+    expect(routeEnhancement.hidden).toBe(true);
 
     toggle?.click();
     expect(document.documentElement.classList.contains(NATIVE_THEME_CLASS)).toBe(true);
+    expect(routeEnhancement.hidden).toBe(false);
   });
 
   it('fails open and leaves the native page usable', () => {

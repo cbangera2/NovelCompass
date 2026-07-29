@@ -1,5 +1,5 @@
 const READING_LIBRARY_CLASS = 'novel-compass-reading-library';
-const READING_LIBRARY_HEADER_ID = 'novel-compass-reading-library-header';
+export const READING_LIBRARY_HEADER_ID = 'novel-compass-reading-library-header';
 
 /**
  * Adds a small, route-specific frame around Novel Updates' live reading-list UI.

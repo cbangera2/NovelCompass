@@ -1,3 +1,5 @@
+import { READING_LIBRARY_HEADER_ID } from './reading-library-theme';
+
 export const NATIVE_THEME_CLASS = 'novel-compass-native-theme';
 export const NATIVE_THEME_HOST_ID = 'novel-compass-native-theme-root';
 export const NATIVE_THEME_STYLE_ID = 'novel-compass-native-theme-styles';
@@ -135,6 +137,8 @@ export function installNativeTheme(document: Document, css: string): NativeTheme
       document.documentElement.dataset.novelCompassExtension = originalExtensionMarker;
     }
     style.disabled = !themed;
+    const routeEnhancement = document.getElementById(READING_LIBRARY_HEADER_ID);
+    if (routeEnhancement) routeEnhancement.hidden = !themed;
     host.dataset.view = themed ? 'themed' : 'original';
     button.textContent = themed ? 'Use original Novel Updates' : 'Use Novel Compass theme';
     button.setAttribute('aria-pressed', String(themed));

@@ -19,14 +19,17 @@ export interface CatalogParseResult {
 
 export function parseCatalogPage(document: Document, currentUrl: string): CatalogParseResult {
   const warnings: ParseWarning[] = [];
+  const current = new URL(currentUrl);
   const rows = parseRows(document, currentUrl);
   const pagination = parsePagination(document, currentUrl);
-  const title =
-    cleanText(
-      document.querySelector(
-        'h1, .genre-title, .search_title, .l-title, [data-catalog-heading]',
-      )?.textContent,
-    ) || fallbackTitle(new URL(currentUrl).pathname);
+  const isTaxonomy = TAXONOMY_PATH.test(current.pathname);
+  const title = isTaxonomy
+    ? fallbackTitle(current.pathname)
+    : cleanText(
+        document.querySelector(
+          'h1, .genre-title, .l-title, [data-catalog-heading]',
+        )?.textContent,
+      ) || fallbackTitle(current.pathname);
   const subtitle =
     cleanText(
       document.querySelector(
@@ -82,12 +85,10 @@ function parseRows(document: Document, currentUrl: string): LiveCatalogRow[] {
     const text = cleanText(element.textContent);
     const image = element.querySelector<HTMLImageElement>('img[src]');
     const coverUrl = trustedAssetUrl(image?.getAttribute('src'), currentUrl);
-    const description =
-      cleanDescription(
-        element.querySelector(
-          '.search_body_nu, .novel-description, .series-synopsis, [data-description]',
-        )?.textContent,
-      ) || undefined;
+    const descriptionRoot = element.querySelector<HTMLElement>(
+      '.search_body_nu, .novel-description, .series-synopsis, [data-description]',
+    );
+    const description = cleanDescriptionElement(descriptionRoot) || undefined;
     const language =
       cleanText(element.querySelector('[data-language], .search_stats span')?.textContent).match(
         /\b(Chinese|Japanese|Korean|Thai|Vietnamese|Filipino|Indonesian|Khmer|Malaysian)\b/i,
@@ -215,10 +216,35 @@ function cleanDescription(value: string | null | undefined): string {
     .trim();
 }
 
+function cleanDescriptionElement(element: HTMLElement | null): string {
+  if (!element) return '';
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone
+    .querySelectorAll(
+      [
+        'script',
+        'style',
+        'template',
+        '.search_title',
+        '.search_stats',
+        '.search_genre',
+        '.search_ratings',
+        '.search_stars',
+        '.rl_icons_en',
+        '.genre_rank',
+        '.morelink',
+        '[data-catalog-metadata]',
+      ].join(','),
+    )
+    .forEach((node) => node.remove());
+  return cleanDescription(clone.textContent);
+}
+
 function fallbackTitle(pathname: string): string {
   if (/latest-series/.test(pathname)) return 'Latest Series';
   if (/novelslisting|page\/\d+/.test(pathname)) return 'All Novels';
   const segments = pathname.split('/').filter(Boolean);
   const slug = segments[segments.length - 1] ?? 'Catalog';
-  return slug.replace(/-/g, ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase());
+  const label = slug.replace(/-/g, ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase());
+  return segments[0] === 'genre' || segments[0] === 'stag' ? `${label} Novels` : label;
 }
