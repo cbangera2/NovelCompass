@@ -14,7 +14,8 @@ export type SupportedPageType =
   | 'series-ranking'
   | 'catalog-feed'
   | 'catalog-taxonomy'
-  | 'recommendation-lists';
+  | 'recommendation-lists'
+  | 'reading-library';
 
 export type IdentityConfidence = 'high' | 'medium' | 'low';
 
@@ -295,6 +296,35 @@ export interface LiveRecommendationListsPage {
   lists: RecommendationListCard[];
   series: RecommendationListSeries[];
   tags: LinkedLabel[];
+  currentPage: number;
+  pageLinks: Array<{ page: number; url: string }>;
+  previousUrl?: string;
+  nextUrl?: string;
+  warnings: ParseWarning[];
+}
+
+export interface ReadingLibraryTab {
+  label: string;
+  url: string;
+  count?: number;
+  selected: boolean;
+}
+
+export interface ReadingLibraryRow {
+  title: string;
+  seriesUrl: string;
+  coverUrl?: string;
+  listLabel?: string;
+  statusLabel?: string;
+  latestRelease?: LinkedLabel;
+  progressLabel?: string;
+  updatedAt?: string;
+}
+
+export interface LiveReadingLibraryPage {
+  title: string;
+  rows: ReadingLibraryRow[];
+  tabs: ReadingLibraryTab[];
   currentPage: number;
   pageLinks: Array<{ page: number; url: string }>;
   previousUrl?: string;

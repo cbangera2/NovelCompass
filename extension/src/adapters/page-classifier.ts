@@ -111,7 +111,8 @@ export function classifyNovelUpdatesPage(
     route.family === 'series-ranking' ||
     route.family === 'catalog-feed' ||
     route.family === 'catalog-taxonomy' ||
-    route.family === 'recommendation-lists'
+    route.family === 'recommendation-lists' ||
+    route.family === 'reading-library'
   ) {
     return {
       kind: 'supported',

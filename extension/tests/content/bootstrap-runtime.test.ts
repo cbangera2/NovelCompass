@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import finderFixture from '../fixtures/series-finder.html?raw';
 import catalogFixture from '../fixtures/catalog-comedy.html?raw';
 import rankingFixture from '../fixtures/series-ranking.html?raw';
+import readingListFixture from '../fixtures/reading-list.html?raw';
 import recommendationListsFixture from '../fixtures/recommendation-lists.html?raw';
 import seriesFixture from '../fixtures/series-logged-out.html?raw';
 import unsupportedFixture from '../fixtures/unsupported-markup.html?raw';
@@ -158,6 +159,24 @@ describe('content bootstrap runtime', () => {
     expect(shadow?.querySelector('[aria-current="page"]')?.textContent).toContain(
       'Recommendation lists',
     );
+  });
+
+  it('mounts the Reading List replacement while preserving authenticated native controls', async () => {
+    loadPage(readingListFixture, 'https://www.novelupdates.com/reading-list/?list=0&pg=2');
+    const nativeForm = document.getElementById('reading-list-actions');
+
+    await import('../../src/content/bootstrap');
+    await waitFor(() => document.documentElement.classList.contains(ACTIVE_CLASS));
+
+    const shadow = document.getElementById(HOST_ID)?.shadowRoot;
+    expect(shadow?.textContent).toContain('Your live Novel Updates account');
+    expect(shadow?.textContent).toContain('Example Novel');
+    expect(shadow?.textContent).toContain('Continue with Chapter 24');
+    expect(shadow?.querySelector('[aria-current="page"]')?.textContent).toContain('Reading list');
+    expect(document.getElementById('reading-list-actions')).toBe(nativeForm);
+    expect(
+      document.querySelector<HTMLInputElement>('input[name="_wpnonce"]')?.value,
+    ).toBe('fixture-redacted');
   });
 
   it('mounts a catalog taxonomy replacement from live page data', async () => {

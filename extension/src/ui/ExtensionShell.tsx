@@ -21,6 +21,7 @@ export type ExtensionRoute =
   | 'series-finder'
   | 'series-ranking'
   | 'recommendation-lists'
+  | 'reading-library'
   | 'other';
 
 export interface ExtensionShellProps {
@@ -62,7 +63,7 @@ const NAV_GROUPS = [
     label: 'Library & community',
     items: [
       {
-        route: 'other' as const,
+        route: 'reading-library' as const,
         label: 'Reading list',
         note: 'Your saved novels',
         href: 'https://www.novelupdates.com/reading-list/',

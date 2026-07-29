@@ -8,6 +8,7 @@ import { parseCatalogPage } from '../adapters/catalog';
 import { classifyNovelUpdatesDocument } from '../adapters/page-classifier';
 import { parseRankingPage } from '../adapters/ranking';
 import { parseRecommendationListsPage } from '../adapters/recommendation-lists';
+import { parseReadingLibraryPage } from '../adapters/reading-library';
 import { parseReleasePage } from '../adapters/releases';
 import { parseReviewPage } from '../adapters/reviews';
 import { parseLiveSeriesMetadata } from '../adapters/series-page';
@@ -17,11 +18,11 @@ import { ExtensionFinderApp } from '../ui/ExtensionFinderApp';
 import { ExtensionCatalogApp } from '../ui/ExtensionCatalogApp';
 import { ExtensionRankingApp } from '../ui/ExtensionRankingApp';
 import { ExtensionRecommendationListsApp } from '../ui/ExtensionRecommendationListsApp';
+import { ExtensionReadingLibraryApp } from '../ui/ExtensionReadingLibraryApp';
 import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
 import { ensureReplacementHost } from './replacement-host';
 import { resolveNovelUpdatesNavigation } from './navigation';
 import { installNativeTheme } from './native-theme';
-import { installReadingLibraryTheme } from './reading-library-theme';
 
 const classification = classifyNovelUpdatesDocument(window.location.href, document);
 
@@ -46,9 +47,6 @@ async function bootstrapNativeTheme(): Promise<void> {
     if (!response.ok) throw new Error(`Native theme styles failed to load (${response.status}).`);
     controller = installNativeTheme(document, await response.text());
     controller.setTheme(preferences.value.theme);
-    if (classification.kind === 'blocked' && classification.route?.family === 'reading-library') {
-      installReadingLibraryTheme(document);
-    }
     controller.activate();
     observePreferenceChanges({
       onEnabledChange: (enabled) => (enabled ? controller?.activate() : controller?.deactivate()),
@@ -103,7 +101,8 @@ async function bootstrapReplacement(): Promise<void> {
       pageType === 'series' ||
       pageType === 'series-finder' ||
       pageType === 'series-ranking' ||
-      pageType === 'recommendation-lists'
+      pageType === 'recommendation-lists' ||
+      pageType === 'reading-library'
         ? pageType
         : 'other';
     const app = createElement(
@@ -205,6 +204,17 @@ function createRouteApp(
     }
     return createElement(ExtensionRecommendationListsApp, {
       page: recommendationLists.page,
+      onShowOriginal,
+    });
+  }
+  if (classification.identity.pageType === 'reading-library') {
+    const library = parseReadingLibraryPage(document, window.location.href);
+    if (!library.ok) {
+      onFatalError(new Error(library.message ?? 'Reading List could not be parsed.'));
+      return null;
+    }
+    return createElement(ExtensionReadingLibraryApp, {
+      page: library.page,
       onShowOriginal,
     });
   }
