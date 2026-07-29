@@ -4,10 +4,10 @@ import {
   type PageClassification,
   type ReplacementBlockReason,
 } from './contracts';
+import { matchNovelUpdatesRoute, type NovelUpdatesRouteMatch } from './route-registry';
 
 const NOVEL_UPDATES_ORIGIN = 'https://www.novelupdates.com';
 const SERIES_PATH = /^\/series\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/;
-const FINDER_PATH = /^\/series-finder\/?$/;
 const LOGIN_PATH = /^\/(?:login|wp-login\.php|register|lostpassword)(?:\/|$)/;
 
 const CHALLENGE_MARKERS = [
@@ -33,6 +33,7 @@ export interface NovelUpdatesPageSignals {
   hasCloudflareChallenge?: boolean;
   hasLoginForm?: boolean;
   hasSeriesTitle?: boolean;
+  contentType?: string;
 }
 
 /**
@@ -56,6 +57,7 @@ export function readPageSignals(document: Document): NovelUpdatesPageSignals {
     hasSeriesTitle: Boolean(
       document.querySelector("h1.seriestitlenu, .seriestitlenu, .series-title, [itemprop='name']"),
     ),
+    contentType: document.contentType,
   };
 }
 
@@ -81,6 +83,9 @@ export function classifyNovelUpdatesPage(
   if (parsedUrl.origin !== NOVEL_UPDATES_ORIGIN) {
     return blocked('wrong-origin', parsedUrl.href);
   }
+  if (signals.contentType && !isHtmlContentType(signals.contentType)) {
+    return blocked('non-html-document', parsedUrl.href);
+  }
 
   const documentBlock = detectDocumentBlock(signals);
   if (documentBlock) {
@@ -90,7 +95,18 @@ export function classifyNovelUpdatesPage(
     return blocked('login-page', parsedUrl.href);
   }
 
-  if (FINDER_PATH.test(parsedUrl.pathname)) {
+  const route = matchNovelUpdatesRoute(parsedUrl.pathname, parsedUrl.search);
+  if (!route) {
+    return blocked('unsupported-route', parsedUrl.href);
+  }
+  if (route.policy === 'pass-through') {
+    return blocked('pass-through-route', parsedUrl.href, route);
+  }
+  if (!route.uiImplemented) {
+    return blocked('replacement-not-implemented', parsedUrl.href, route);
+  }
+
+  if (route.family === 'series-finder') {
     return {
       kind: 'supported',
       identity: {
@@ -103,7 +119,7 @@ export function classifyNovelUpdatesPage(
     };
   }
 
-  const currentSeriesMatch = SERIES_PATH.exec(parsedUrl.pathname);
+  const currentSeriesMatch = route.family === 'series' ? SERIES_PATH.exec(parsedUrl.pathname) : null;
   if (!currentSeriesMatch) {
     return blocked('unsupported-route', parsedUrl.href);
   }
@@ -124,6 +140,11 @@ export function classifyNovelUpdatesPage(
     kind: 'supported',
     identity: resolveSeriesIdentity(parsedUrl, currentSlug, signals),
   };
+}
+
+function isHtmlContentType(value: string): boolean {
+  const normalized = value.split(';', 1)[0]?.trim().toLowerCase();
+  return normalized === 'text/html' || normalized === 'application/xhtml+xml';
 }
 
 function resolveSeriesIdentity(
@@ -209,6 +230,10 @@ function parseUrl(value: string | URL | undefined): URL | undefined {
   }
 }
 
-function blocked(reason: ReplacementBlockReason, url?: string): PageClassification {
-  return { kind: 'blocked', reason, ...(url ? { url } : {}) };
+function blocked(
+  reason: ReplacementBlockReason,
+  url?: string,
+  route?: NovelUpdatesRouteMatch,
+): PageClassification {
+  return { kind: 'blocked', reason, ...(url ? { url } : {}), ...(route ? { route } : {}) };
 }

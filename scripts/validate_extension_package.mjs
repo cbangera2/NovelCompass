@@ -9,10 +9,7 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const extensionRoot = path.join(repositoryRoot, 'extension');
 const distRoot = path.join(extensionRoot, 'dist');
 const packagePath = path.join(distRoot, 'novel-compass-extension.zip');
-const expectedMatches = [
-  'https://www.novelupdates.com/series/*',
-  'https://www.novelupdates.com/series-finder/',
-];
+const expectedMatches = ['https://www.novelupdates.com/*'];
 const expectedResourceMatches = ['https://www.novelupdates.com/*'];
 
 await access(path.join(distRoot, 'background/service-worker.js'));
@@ -31,7 +28,7 @@ assert(
 assert(manifest.background?.type === 'module', 'service worker must be a module');
 assert(
   JSON.stringify(manifest.content_scripts?.[0]?.matches) === JSON.stringify(expectedMatches),
-  'content-script matches must stay restricted to supported Novel Updates routes',
+  'content-script matches must stay restricted to the Novel Updates origin',
 );
 assert(
   JSON.stringify(manifest.permissions) === JSON.stringify(['storage']),

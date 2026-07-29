@@ -49,7 +49,7 @@ describe('classifyNovelUpdatesPage', () => {
     ['http://www.novelupdates.com/series/example/', 'insecure-origin'],
     ['https://novelupdates.com/series/example/', 'wrong-origin'],
     ['https://www.novelupdates.com.evil.test/series/example/', 'wrong-origin'],
-    ['https://www.novelupdates.com/', 'unsupported-route'],
+    ['https://www.novelupdates.com/unknown-route/', 'unsupported-route'],
     ['not a URL', 'invalid-url'],
   ])('blocks %s as %s', (url, reason) => {
     expect(classifyNovelUpdatesPage(url)).toMatchObject({
@@ -70,6 +70,58 @@ describe('classifyNovelUpdatesPage', () => {
         kind: 'blocked',
         reason,
       });
+    },
+  );
+
+  it('registers future replacement and native-restyle routes without activating them', () => {
+    expect(classifyNovelUpdatesPage('https://www.novelupdates.com/series-ranking/')).toMatchObject({
+      kind: 'blocked',
+      reason: 'replacement-not-implemented',
+      route: {
+        family: 'series-ranking',
+        policy: 'bespoke-replacement',
+        priority: 0,
+      },
+    });
+    expect(classifyNovelUpdatesPage('https://www.novelupdates.com/account/')).toMatchObject({
+      kind: 'blocked',
+      reason: 'replacement-not-implemented',
+      route: {
+        family: 'account-form',
+        policy: 'shared-shell-native',
+      },
+    });
+  });
+
+  it.each([
+    'https://www.novelupdates.com/logout/?_wpnonce=secret',
+    'https://www.novelupdates.com/extnu/123/',
+    'https://www.novelupdates.com/report/review/42/',
+    'https://www.novelupdates.com/wp-admin/profile.php',
+    'https://www.novelupdates.com/wp-json/wp/v2/posts',
+    'https://www.novelupdates.com/?p=123',
+  ])('always passes through security-sensitive or machine routes: %s', (url) => {
+    expect(classifyNovelUpdatesPage(url)).toMatchObject({
+      kind: 'blocked',
+      reason: 'pass-through-route',
+      route: { policy: 'pass-through' },
+    });
+  });
+
+  it.each(['application/json', 'application/rss+xml', 'image/png', 'text/plain'])(
+    'blocks non-HTML content type %s before route activation',
+    (contentType) => {
+      expect(classifyNovelUpdatesPage(seriesUrl, { contentType })).toMatchObject({
+        kind: 'blocked',
+        reason: 'non-html-document',
+      });
+    },
+  );
+
+  it.each(['text/html', 'text/html; charset=UTF-8', 'application/xhtml+xml'])(
+    'accepts HTML content type %s',
+    (contentType) => {
+      expect(classifyNovelUpdatesPage(seriesUrl, { contentType }).kind).toBe('supported');
     },
   );
 

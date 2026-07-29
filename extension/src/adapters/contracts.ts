@@ -136,6 +136,29 @@ export interface SeriesPageCapabilities {
   isLoggedIn: boolean | 'unknown';
 }
 
+export type NovelUpdatesAccountState =
+  | {
+      status: 'logged-in';
+      username: string;
+      avatarUrl?: string;
+      profileUrl?: string;
+      accountUrl?: string;
+      followingUrl?: string;
+      alertsUrl?: string;
+      alertCount?: number;
+      messagesUrl?: string;
+      logoutActionId?: string;
+    }
+  | {
+      status: 'logged-out';
+      loginUrl?: string;
+      registerUrl?: string;
+    }
+  | {
+      status: 'unknown';
+      warnings: ParseWarning[];
+    };
+
 export interface LiveSeriesMetadata {
   identity: NovelUpdatesPageIdentity;
   title: string;
@@ -177,6 +200,9 @@ export type ReplacementBlockReason =
   | 'login-page'
   | 'challenge-page'
   | 'maintenance-page'
+  | 'non-html-document'
+  | 'pass-through-route'
+  | 'replacement-not-implemented'
   | 'unsupported-markup'
   | 'unsupported-route'
   | 'invalid-series-slug';
@@ -190,4 +216,5 @@ export type PageClassification =
       kind: 'blocked';
       reason: ReplacementBlockReason;
       url?: string;
+      route?: import('./route-registry').NovelUpdatesRouteMatch;
     };

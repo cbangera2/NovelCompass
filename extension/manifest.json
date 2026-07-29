@@ -10,10 +10,7 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://www.novelupdates.com/series/*",
-        "https://www.novelupdates.com/series-finder/"
-      ],
+      "matches": ["https://www.novelupdates.com/*"],
       "js": ["content/bootstrap.js"],
       "run_at": "document_idle"
     }
