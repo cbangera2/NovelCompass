@@ -49,6 +49,16 @@ function ensureVisibilityStyle(document: Document): void {
   const style = document.createElement('style');
   style.id = VISIBILITY_STYLE_ID;
   style.textContent = `
+    html.${REPLACEMENT_ACTIVE_CLASS},
+    html.${REPLACEMENT_ACTIVE_CLASS} body {
+      border: 0 !important;
+      border-radius: 0 !important;
+      margin: 0 !important;
+      min-height: 100% !important;
+      padding: 0 !important;
+      width: 100% !important;
+    }
+
     html.${REPLACEMENT_ACTIVE_CLASS} body > :not(#${REPLACEMENT_HOST_ID}) {
       display: none !important;
     }
