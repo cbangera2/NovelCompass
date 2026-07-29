@@ -9,6 +9,7 @@ import finderFixture from '../fixtures/series-finder.html?raw';
 import catalogFixture from '../fixtures/catalog-comedy.html?raw';
 import rankingFixture from '../fixtures/series-ranking.html?raw';
 import readingListFixture from '../fixtures/reading-list.html?raw';
+import publicProfileFixture from '../fixtures/public-profile.html?raw';
 import recommendationListsFixture from '../fixtures/recommendation-lists.html?raw';
 import seriesFixture from '../fixtures/series-logged-out.html?raw';
 import unsupportedFixture from '../fixtures/unsupported-markup.html?raw';
@@ -177,6 +178,20 @@ describe('content bootstrap runtime', () => {
     expect(
       document.querySelector<HTMLInputElement>('input[name="_wpnonce"]')?.value,
     ).toBe('fixture-redacted');
+  });
+
+  it('mounts a public profile replacement from sanitized read-only profile data', async () => {
+    loadPage(publicProfileFixture, 'https://www.novelupdates.com/user/42/fixture-curator/');
+
+    await import('../../src/content/bootstrap');
+    await waitFor(() => document.documentElement.classList.contains(ACTIVE_CLASS));
+
+    const shadow = document.getElementById(HOST_ID)?.shadowRoot;
+    expect(shadow?.textContent).toContain('Fixture Curator');
+    expect(shadow?.textContent).toContain('Created lists');
+    expect(shadow?.textContent).toContain('Fantasy with sharp edges');
+    expect(shadow?.querySelector('a[href="https://www.novelupdates.com/reading-list/"]')).not.toBeNull();
+    expect(shadow?.textContent).not.toContain('evil.test');
   });
 
   it('mounts a catalog taxonomy replacement from live page data', async () => {

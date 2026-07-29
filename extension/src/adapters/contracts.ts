@@ -15,6 +15,7 @@ export type SupportedPageType =
   | 'catalog-feed'
   | 'catalog-taxonomy'
   | 'recommendation-lists'
+  | 'public-profile'
   | 'reading-library';
 
 export type IdentityConfidence = 'high' | 'medium' | 'low';
@@ -329,6 +330,35 @@ export interface LiveReadingLibraryPage {
   pageLinks: Array<{ page: number; url: string }>;
   previousUrl?: string;
   nextUrl?: string;
+  warnings: ParseWarning[];
+}
+
+export interface PublicProfileStat {
+  label: string;
+  value: string;
+}
+
+export interface PublicProfileList {
+  title: string;
+  url: string;
+  description?: string;
+  seriesCount?: number;
+  commentCount?: number;
+  viewCount?: number;
+  followCount?: number;
+  tags: LinkedLabel[];
+}
+
+export interface LivePublicProfilePage {
+  name: string;
+  avatarUrl?: string;
+  rank?: string;
+  joinedAt?: string;
+  bio?: string;
+  stats: PublicProfileStat[];
+  lists: PublicProfileList[];
+  navigation: LinkedLabel[];
+  toolLinks: LinkedLabel[];
   warnings: ParseWarning[];
 }
 

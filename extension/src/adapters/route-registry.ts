@@ -49,7 +49,7 @@ const ROUTES: readonly RouteDefinition[] = [
     /^\/(?:recommendation-lists|list-tags)\/?$|^\/(?:viewlist\/\d+|listtag\/[^/]+)\/?$/,
     true,
   ),
-  replacement('public-profile', 1, /^\/user(?:\/\d+)?(?:\/[^/]+)?\/?$/),
+  replacement('public-profile', 1, /^\/user(?:\/\d+)?(?:\/[^/]+)?\/?$/, true),
   replacement('reading-library', 1, /^\/reading-list\/?$/, true),
   replacement('reading-library', 1, /^\/following\/?$/),
   native('account-form', 1, /^\/(?:account|your-profile|release-filtering|series-filtering)\/?$/),

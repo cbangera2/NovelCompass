@@ -112,6 +112,7 @@ export function classifyNovelUpdatesPage(
     route.family === 'catalog-feed' ||
     route.family === 'catalog-taxonomy' ||
     route.family === 'recommendation-lists' ||
+    route.family === 'public-profile' ||
     route.family === 'reading-library'
   ) {
     return {

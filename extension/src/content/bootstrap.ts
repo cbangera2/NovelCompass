@@ -7,6 +7,7 @@ import { parseNovelUpdatesAccountState } from '../adapters/account';
 import { parseCatalogPage } from '../adapters/catalog';
 import { classifyNovelUpdatesDocument } from '../adapters/page-classifier';
 import { parseRankingPage } from '../adapters/ranking';
+import { parsePublicProfilePage } from '../adapters/public-profile';
 import { parseRecommendationListsPage } from '../adapters/recommendation-lists';
 import { parseReadingLibraryPage } from '../adapters/reading-library';
 import { parseReleasePage } from '../adapters/releases';
@@ -17,6 +18,7 @@ import { SeriesRuntimeApp } from '../runtime/SeriesRuntimeApp';
 import { ExtensionFinderApp } from '../ui/ExtensionFinderApp';
 import { ExtensionCatalogApp } from '../ui/ExtensionCatalogApp';
 import { ExtensionRankingApp } from '../ui/ExtensionRankingApp';
+import { ExtensionPublicProfileApp } from '../ui/ExtensionPublicProfileApp';
 import { ExtensionRecommendationListsApp } from '../ui/ExtensionRecommendationListsApp';
 import { ExtensionReadingLibraryApp } from '../ui/ExtensionReadingLibraryApp';
 import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
@@ -102,6 +104,7 @@ async function bootstrapReplacement(): Promise<void> {
       pageType === 'series-finder' ||
       pageType === 'series-ranking' ||
       pageType === 'recommendation-lists' ||
+      pageType === 'public-profile' ||
       pageType === 'reading-library'
         ? pageType
         : 'other';
@@ -204,6 +207,17 @@ function createRouteApp(
     }
     return createElement(ExtensionRecommendationListsApp, {
       page: recommendationLists.page,
+      onShowOriginal,
+    });
+  }
+  if (classification.identity.pageType === 'public-profile') {
+    const profile = parsePublicProfilePage(document, window.location.href);
+    if (!profile.ok) {
+      onFatalError(new Error(profile.message ?? 'Public profile could not be parsed.'));
+      return null;
+    }
+    return createElement(ExtensionPublicProfileApp, {
+      page: profile.page,
       onShowOriginal,
     });
   }

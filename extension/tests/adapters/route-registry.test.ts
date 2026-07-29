@@ -11,7 +11,7 @@ describe('matchNovelUpdatesRoute', () => {
     ['/page/3/', 'catalog-feed', 'bespoke-replacement', true],
     ['/genre/action/', 'catalog-taxonomy', 'bespoke-replacement', true],
     ['/viewlist/123/', 'recommendation-lists', 'bespoke-replacement', true],
-    ['/user/42/reader/', 'public-profile', 'bespoke-replacement', false],
+    ['/user/42/reader/', 'public-profile', 'bespoke-replacement', true],
     ['/reading-list/', 'reading-library', 'bespoke-replacement', true],
     ['/account/', 'account-form', 'shared-shell-native', false],
     ['/userlist/123/', 'account-form', 'shared-shell-native', false],

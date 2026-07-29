@@ -21,6 +21,7 @@ export type ExtensionRoute =
   | 'series-finder'
   | 'series-ranking'
   | 'recommendation-lists'
+  | 'public-profile'
   | 'reading-library'
   | 'other';
 

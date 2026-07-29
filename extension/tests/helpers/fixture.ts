@@ -15,6 +15,7 @@ export const FIXTURE_NAMES = [
   'recommendation-lists.html',
   'recommendation-list-detail.html',
   'recommendation-list-tags.html',
+  'public-profile.html',
 ] as const;
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number];
