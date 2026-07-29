@@ -5,7 +5,9 @@
 Build a Manifest V3 Chrome extension that replaces the visual interface of
 supported Novel Updates pages with a modern Novel Compass experience while
 preserving Novel Updates as the source of live page data, authentication,
-chapter navigation, and account actions.
+chapter navigation, and account actions. On Novel Updates' Series Finder route,
+the extension instead uses the existing Novel Compass catalog and Browse
+experience as the search engine.
 
 The extension must progressively enhance Novel Updates rather than behave as a
 separate crawler or unofficial replacement backend. When the extension cannot
@@ -28,17 +30,24 @@ On a supported Novel Updates series page, the user should receive:
 - a persistent one-click switch to the untouched original interface;
 - safe fallback to the original interface when parsing or rendering fails.
 
+On the Series Finder route, the user should receive the existing Novel Compass
+Browse experience with its richer cards, include/exclude filters, sorting, and
+links into redesigned series pages. The untouched NU finder remains available
+through the original-view toggle for specialized filters that Novel Compass
+does not yet support.
+
 The extension should eventually support additional Novel Updates surfaces, but
-the first complete milestone is the series page.
+the first complete milestone includes series pages and Series Finder.
 
 ## 3. Scope
 
-### 3.1 Milestone 1: series-page replacement
+### 3.1 Milestone 1: series-page and Series Finder replacement
 
-Supported route:
+Supported routes:
 
 ```text
 https://www.novelupdates.com/series/<slug>/
+https://www.novelupdates.com/series-finder/
 ```
 
 Milestone 1 includes:
@@ -57,11 +66,21 @@ Milestone 1 includes:
 - logged-out fixtures and a user-captured logged-in fixture workflow;
 - unit, integration, extension-build, and browser smoke tests.
 
+Series Finder additionally includes:
+
+- an extension-compatible reuse of the existing Novel Compass `BrowsePage`;
+- `StaticDataSource` search, browse, filters, sorting, and result cards;
+- NU series URLs for navigable Novel Updates catalog results;
+- extension route-state handling without taking over unrelated NU routes;
+- original-view fallback for translation-group, publisher, release-frequency,
+  review-count, release-date, and account reading-list filters that are not
+  currently represented by Novel Compass Browse.
+
 ### 3.2 Follow-up milestones
 
 These are architecturally anticipated but are not required for Milestone 1:
 
-1. Search results and series finder.
+1. General Novel Updates search results and advanced search.
 2. Latest releases and homepage feeds.
 3. Reading-list and profile replacement.
 4. Recommendation-list pages.
@@ -81,6 +100,8 @@ Milestone 1 will not:
 - bundle or execute remotely hosted JavaScript;
 - require the Python API, SQLite, or scraper to run in the browser;
 - replace every Novel Updates route in the first release;
+- claim exact parity between Novel Compass Browse results and NU's native
+  server-side Series Finder;
 - remove the existing standalone Novel Compass website.
 
 ## 4. Observed Series-Page Behavior
@@ -109,6 +130,19 @@ The inspected logged-out release rows did not contain direct outbound chapter
 URLs. Chapter labels were rendered as spans, and Novel Updates loaded its own
 chapter-link script. The authenticated contract must therefore be verified with
 a user-captured logged-in fixture before chapter behavior is considered stable.
+
+### 4.1 Observed Series Finder boundary
+
+The native `/series-finder/` route is a legacy POST-backed form with additional
+filters that Novel Compass does not currently expose, including translation
+groups, publishers, release frequency, review count, release dates, and an
+account-only reading-list filter.
+
+Milestone 1 will not reproduce or proxy that form. The route is a Novel
+Compass-owned replacement surface backed by the extension's static dataset.
+The UI must identify itself as Novel Compass search and retain the reversible
+original-view control so the native finder remains available when those
+specialized semantics are required.
 
 ## 5. Architecture
 
@@ -192,6 +226,7 @@ extension/
       series-actions.ts
     ui/
       ExtensionSeriesApp.tsx
+      ExtensionFinderApp.tsx
       ExtensionErrorBoundary.tsx
       components/
         SeriesHero.tsx
@@ -226,10 +261,10 @@ behavior stable.
 
 ```ts
 type NovelUpdatesPageIdentity = {
-  pageType: 'series';
+  pageType: 'series' | 'series-finder';
   url: string;
   canonicalUrl?: string;
-  slug: string;
+  slug?: string;
   novelUpdatesId?: number;
   parserVersion: number;
 };
@@ -677,6 +712,7 @@ background bootstrap, extension HTML entry points
 **Acceptance:**
 
 - supported series pages classify deterministically;
+- the exact `/series-finder/` route classifies independently from series pages;
 - challenge/login/unsupported pages do not activate replacement;
 - identity confidence is explicit;
 - fixture sanitization is documented.
@@ -782,6 +818,29 @@ visibility controller, error boundary
 - keyboard navigation works;
 - original view remains reachable;
 - no account capability is implied when absent.
+
+### EP-320: Novel Compass Series Finder replacement
+
+**Suggested ownership:** extension finder entry UI, narrowly extracted shared
+Browse components, and extension-specific route/link adaptation
+**Dependencies:** EP-100, EP-200, EP-300, EP-400
+**Can run with:** EP-310, EP-410, EP-500
+**Deliverables:**
+
+- `/series-finder/` replacement using Novel Compass Browse;
+- extension-compatible filtering, sorting, pagination, and route state;
+- result navigation to Novel Updates series URLs;
+- clear Novel Compass identity and original-finder fallback;
+- no dependence on NU's native finder POST form.
+
+**Acceptance:**
+
+- existing Novel Compass filter behavior is preserved;
+- returned cards come from the configured static dataset;
+- selecting an NU novel navigates to its NU series route;
+- unsupported NU-only filters are not falsely represented;
+- original view restores the native Series Finder;
+- standalone website Browse behavior remains unchanged.
 
 ### EP-400: shared Novel Compass data integration
 
@@ -924,8 +983,9 @@ implementation files and fixtures where possible.
 ### Wave 3: product integration
 
 - Agent A: EP-310 redesigned interface.
-- Agent B: EP-410 caching and release data loading.
-- Agent C: EP-500 local storage and migration.
+- Agent B: EP-320 Novel Compass Series Finder replacement.
+- Agent C: EP-410 caching and release data loading.
+- Next available agent: EP-500 local storage and migration.
 - Primary agent: merge integration, contract adjustments, and end-to-end review.
 
 ### Wave 4: validation
@@ -959,13 +1019,17 @@ authenticated action support before a sanitized logged-in fixture exists.
 Milestone 1 is complete only when:
 
 - the extension builds as Manifest V3 and installs unpacked;
-- only supported Novel Updates series pages are replaced;
+- only supported Novel Updates series pages and the exact Series Finder route
+  are replaced;
 - the original page remains intact and recoverable;
 - series metadata, chapters, and reviews render from the live document;
 - chapter behavior works in confirmed logged-out and logged-in states;
 - review sorting/expansion and available actions delegate safely;
 - Novel Compass recommendations and insights load without Python;
 - recommendation failure never blocks live NU content;
+- Series Finder renders the Novel Compass Browse experience without claiming
+  parity with NU-only filters;
+- Series Finder result links enter the redesigned NU series-page flow;
 - permissions are narrow and documented;
 - profile data remains local;
 - unit, component, browser, existing frontend, and Python checks pass;
@@ -976,7 +1040,7 @@ Milestone 1 is complete only when:
 
 The following defaults are recommended:
 
-1. **Initial route:** series pages only.
+1. **Initial routes:** series pages and `/series-finder/`.
 2. **Activation:** redesign enabled by user preference, with per-page original
    view.
 3. **Navigation:** normal NU page loads, not client-side interception.
@@ -989,6 +1053,8 @@ The following defaults are recommended:
    otherwise choose based on the APIs actually used.
 10. **Distribution:** unpacked local testing first; Web Store work after browser
     acceptance.
+11. **Series Finder ownership:** Novel Compass `BrowsePage` and static data,
+    with the native NU finder available only through original view.
 
 Unless the user changes these decisions, implementation tasks should treat them
 as the approved baseline.

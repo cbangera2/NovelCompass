@@ -8,6 +8,13 @@
     "build": "tsc && vite build",
     "build:static": "tsc && VITE_DATA_MODE=static vite build",
     "build:pages": "tsc && VITE_DATA_MODE=static vite build --base=/NovelCompass/",
+    "build:extension": "tsc -p ../extension/tsconfig.json && node ../extension/build.mjs",
+    "build:extension:full": "tsc -p ../extension/tsconfig.json && node ../extension/build.mjs --full-data",
+    "dev:extension": "node ../extension/build.mjs --watch",
+    "fixtures:extension": "node ../scripts/serve_extension_fixtures.mjs",
+    "package:extension": "pnpm run build:extension && node ../scripts/validate_extension_package.mjs",
+    "test:extension": "vitest run --config ../extension/vitest.config.ts",
+    "validate:extension": "node ../scripts/validate_extension_package.mjs",
     "check": "pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm run test && pnpm run build",
     "format": "prettier --write --ignore-path ../.prettierignore package.json ../README.md ../DEPLOYMENT.md '../.github/workflows/*.yml'",
     "format:check": "prettier --check --ignore-path ../.prettierignore package.json ../README.md ../DEPLOYMENT.md '../.github/workflows/*.yml'",
@@ -27,12 +34,15 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@types/chrome": "^0.2.2",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.0",
+    "happy-dom": "^18.0.1",
     "oxlint": "^1.75.0",
     "prettier": "^3.9.6",
     "typescript": "^5.0.2",
-    "vite": "^4.3.9"
+    "vite": "^4.3.9",
+    "vitest": "^3.2.7"
   }
 }

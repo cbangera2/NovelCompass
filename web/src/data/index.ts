@@ -65,3 +65,10 @@ export function createDataSource(
 
 export type { RecommendationDataSource } from './source';
 export { bucketForNovel, externalMediaUrl, sourceDisplayName } from './source';
+export type { StaticDataSourceOptions } from './static';
+export {
+  createExtensionStaticDataSource,
+  identityFromNovelUpdatesUrl,
+  resolveNovelUpdatesIdentity
+} from './extension';
+export type { CatalogResolution, NovelUpdatesSeriesIdentity } from './extension';

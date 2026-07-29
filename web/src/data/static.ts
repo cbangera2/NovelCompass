@@ -124,8 +124,24 @@ function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
 }
 
-async function jsonFetch<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+export type StaticDataSourceOptions = {
+  /**
+   * Directory containing manifest.json. Extension callers should pass an
+   * explicit chrome.runtime.getURL(...) value rather than relying on Vite's
+   * website base URL.
+   */
+  baseUrl?: string;
+  /**
+   * Injectable for extension cache/service-worker adapters and deterministic
+   * tests. It deliberately follows the small subset of fetch used for JSON.
+   */
+  fetch?: typeof fetch;
+  /** Disable the website-only idle full-catalog warmup. */
+  warmCatalogWhenIdle?: boolean;
+};
+
+async function jsonFetch<T>(url: string, fetcher: typeof fetch): Promise<T> {
+  const response = await fetcher(url);
   if (!response.ok) throw new DataSourceError(`Static dataset returned ${response.status} for ${url}`);
   return response.json() as Promise<T>;
 }
@@ -144,12 +160,25 @@ export class StaticDataSource implements RecommendationDataSource {
   private statuses: string[] = [];
   private genres: string[] = [];
   private tags: string[] = [];
+  private readonly baseUrl: string;
+  private readonly fetcher: typeof fetch;
+  private readonly shouldWarmCatalogWhenIdle: boolean;
 
-  constructor(private readonly baseUrl = `${import.meta.env.BASE_URL}data`) {}
+  constructor(options: string | StaticDataSourceOptions = {}) {
+    // Keep the string form for existing website callers and contract tests.
+    const normalized = typeof options === 'string' ? { baseUrl: options } : options;
+    this.baseUrl = normalized.baseUrl || `${import.meta.env.BASE_URL}data`;
+    this.fetcher = normalized.fetch || globalThis.fetch.bind(globalThis);
+    this.shouldWarmCatalogWhenIdle = normalized.warmCatalogWhenIdle ?? true;
+  }
+
+  private fetchJson<T>(path: string): Promise<T> {
+    return jsonFetch<T>(joinUrl(this.baseUrl, path), this.fetcher);
+  }
 
   async getManifest(): Promise<DatasetManifest> {
     if (!this.manifestPromise) {
-      this.manifestPromise = jsonFetch<DatasetManifest>(joinUrl(this.baseUrl, 'manifest.json'))
+      this.manifestPromise = this.fetchJson<DatasetManifest>('manifest.json')
         .then((manifest) => {
           if (manifest.schema_version !== SUPPORTED_SCHEMA) {
             throw new DataSourceError(
@@ -214,7 +243,7 @@ export class StaticDataSource implements RecommendationDataSource {
       this.bootstrapPromise = (async () => {
         const manifest = await this.getManifest();
         const path = manifest.bootstrap_catalog_url || manifest.catalog_url || 'catalog.json';
-        this.ingestCatalog(await jsonFetch<CatalogFile>(joinUrl(this.baseUrl, path)));
+        this.ingestCatalog(await this.fetchJson<CatalogFile>(path));
       })();
     }
     return this.bootstrapPromise;
@@ -228,7 +257,7 @@ export class StaticDataSource implements RecommendationDataSource {
         const fullPath = manifest.catalog_url || 'catalog.json';
         const bootstrapPath = manifest.bootstrap_catalog_url || fullPath;
         if (fullPath !== bootstrapPath) {
-          this.ingestCatalog(await jsonFetch<CatalogFile>(joinUrl(this.baseUrl, fullPath)));
+          this.ingestCatalog(await this.fetchJson<CatalogFile>(fullPath));
         }
       })();
     }
@@ -236,7 +265,7 @@ export class StaticDataSource implements RecommendationDataSource {
   }
 
   private warmFullCatalogWhenIdle(): void {
-    if (this.catalogPromise || typeof window === 'undefined') return;
+    if (!this.shouldWarmCatalogWhenIdle || this.catalogPromise || typeof window === 'undefined') return;
     const connection = (navigator as Navigator & {
       connection?: { saveData?: boolean; effectiveType?: string };
     }).connection;
@@ -248,7 +277,7 @@ export class StaticDataSource implements RecommendationDataSource {
   private async loadFacets(): Promise<FacetsFile> {
     if (!this.facetsPromise) {
       this.facetsPromise = this.getManifest().then((manifest) =>
-        jsonFetch<FacetsFile>(joinUrl(this.baseUrl, manifest.facets_url || 'facets.json'))
+        this.fetchJson<FacetsFile>(manifest.facets_url || 'facets.json')
       );
     }
     return this.facetsPromise;
@@ -263,7 +292,7 @@ export class StaticDataSource implements RecommendationDataSource {
     let promise = this.compactRecommendationPromises.get(bucket);
     if (!promise) {
       const path = manifest.recommendation_index_url.replace('{bucket}', bucket);
-      promise = jsonFetch<CompactRecommendationShard>(joinUrl(this.baseUrl, path));
+      promise = this.fetchJson<CompactRecommendationShard>(path);
       this.compactRecommendationPromises.set(bucket, promise);
     }
     const shard = await promise;
@@ -321,9 +350,7 @@ export class StaticDataSource implements RecommendationDataSource {
   async getOptions(): Promise<FilterOptions> {
     try {
       const manifest = await this.getManifest();
-      const options = await jsonFetch<OptionsFile>(
-        joinUrl(this.baseUrl, manifest.options_url || 'options.json')
-      );
+      const options = await this.fetchJson<OptionsFile>(manifest.options_url || 'options.json');
       this.genres = options.genres || [];
       this.tags = options.tags || [];
       this.languages = options.languages || [];
@@ -394,7 +421,7 @@ export class StaticDataSource implements RecommendationDataSource {
     const bucket = bucketForNovel(id);
     let detailBucketPromise = this.detailPromises.get(bucket);
     if (!detailBucketPromise) {
-      detailBucketPromise = jsonFetch<Record<string, any>>(joinUrl(this.baseUrl, `details/${bucket}.json`));
+      detailBucketPromise = this.fetchJson<Record<string, any>>(`details/${bucket}.json`);
       this.detailPromises.set(bucket, detailBucketPromise);
     }
     try {
@@ -402,9 +429,7 @@ export class StaticDataSource implements RecommendationDataSource {
       detail = shard[String(id)] || {};
     } catch {
       try {
-        detail = await jsonFetch<any>(
-          joinUrl(this.baseUrl, `details/${bucket}/${id}.json`)
-        );
+        detail = await this.fetchJson<any>(`details/${bucket}/${id}.json`);
       } catch (err) {
         if (!(err instanceof DataSourceError) || !err.message.includes('returned 404')) throw err;
       }
@@ -511,9 +536,7 @@ export class StaticDataSource implements RecommendationDataSource {
       if (compactPool) {
         pool = compactPool;
       } else {
-        pool = await jsonFetch<RecommendationPool>(
-          joinUrl(this.baseUrl, `recs/${bucketForNovel(seedId)}/${seedId}.json`)
-        );
+        pool = await this.fetchJson<RecommendationPool>(`recs/${bucketForNovel(seedId)}/${seedId}.json`);
       }
     } catch {
       const compactPool = await this.loadCompactRecommendationPool(seedId, manifest);

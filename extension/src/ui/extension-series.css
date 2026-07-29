@@ -1,0 +1,561 @@
+.novel-compass-series {
+  --series-bg: #090b12;
+  --series-surface: #111520;
+  --series-raised: #171c29;
+  --series-border: rgb(255 255 255 / 10%);
+  --series-border-strong: rgb(255 255 255 / 17%);
+  --series-accent: #a792ff;
+  --series-accent-soft: rgb(167 146 255 / 14%);
+  --series-text: #f7f5ff;
+  --series-muted: #aaa9b7;
+  --series-dim: #747482;
+  background:
+    radial-gradient(circle at 75% -10%, rgb(126 99 230 / 16%), transparent 33rem), var(--series-bg);
+  color: var(--series-text);
+  font:
+    400 16px/1.55 Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  min-height: 100vh;
+  padding-bottom: 5rem;
+}
+
+.novel-compass-series *,
+.novel-compass-series *::before,
+.novel-compass-series *::after {
+  box-sizing: border-box;
+}
+
+.novel-compass-series a {
+  color: inherit;
+}
+
+.series-skip-link {
+  background: var(--series-text);
+  color: var(--series-bg) !important;
+  left: 1rem;
+  padding: 0.6rem 0.8rem;
+  position: fixed;
+  top: -5rem;
+  z-index: 30;
+}
+
+.series-skip-link:focus {
+  top: 1rem;
+}
+
+.series-hero {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: clamp(2rem, 7vw, 5.5rem) clamp(1rem, 4vw, 2.5rem) 2.75rem;
+}
+
+.series-hero-cover {
+  align-items: center;
+  aspect-ratio: 2 / 3;
+  background: linear-gradient(145deg, #29223f, #151927);
+  border: 1px solid var(--series-border-strong);
+  border-radius: 12px;
+  box-shadow: 0 1.2rem 3rem rgb(0 0 0 / 32%);
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.series-hero-cover img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.series-hero-cover > span {
+  color: var(--series-accent);
+  font-size: 4rem;
+  font-weight: 700;
+}
+
+.series-hero-copy {
+  align-self: center;
+}
+
+.series-eyebrow {
+  color: var(--series-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+}
+
+.series-hero h1 {
+  font-size: clamp(2.25rem, 6vw, 4.6rem);
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  margin: 0;
+  max-width: 15ch;
+}
+
+.series-facts,
+.series-byline {
+  color: var(--series-muted);
+  margin: 0.85rem 0 0;
+}
+
+.series-byline a {
+  text-decoration-color: var(--series-dim);
+  text-underline-offset: 0.18em;
+}
+
+.series-rating {
+  align-items: baseline;
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 1.1rem;
+}
+
+.series-rating strong {
+  font-size: 1.5rem;
+}
+
+.series-rating > span {
+  color: #f5c868;
+}
+
+.series-rating small {
+  color: var(--series-muted);
+  margin-left: 0.35rem;
+}
+
+.series-genre-row,
+.series-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.series-genre-row {
+  margin-top: 1.25rem;
+}
+
+.series-genre-row span,
+.series-tag-cloud span {
+  background: var(--series-accent-soft);
+  border: 1px solid rgb(167 146 255 / 23%);
+  border-radius: 999px;
+  color: #d8ceff;
+  font-size: 0.76rem;
+  padding: 0.3rem 0.6rem;
+}
+
+.series-tabs {
+  background: rgb(9 11 18 / 92%);
+  border-block: 1px solid var(--series-border);
+  display: flex;
+  gap: 0.2rem;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 0 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.series-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--series-muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  padding: 0.9rem clamp(0.8rem, 3vw, 1.5rem);
+}
+
+.series-tabs button.is-active {
+  border-bottom-color: var(--series-accent);
+  color: var(--series-text);
+}
+
+.series-tabs button:focus-visible,
+.novel-compass-series button:focus-visible,
+.novel-compass-series a:focus-visible {
+  outline: 3px solid var(--series-accent);
+  outline-offset: 3px;
+}
+
+.series-tabs button span {
+  background: var(--series-raised);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  margin-left: 0.45rem;
+  padding: 0.1rem 0.4rem;
+}
+
+.series-content {
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 2rem clamp(1rem, 4vw, 2.5rem);
+}
+
+.series-overview {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.8fr);
+}
+
+.series-overview-main,
+.series-overview-side {
+  display: grid;
+  gap: 1rem;
+}
+
+.series-overview-side {
+  align-content: start;
+}
+
+.series-card,
+.series-section-card,
+.series-section-status {
+  background: var(--series-surface);
+  border: 1px solid var(--series-border);
+  border-radius: 13px;
+}
+
+.series-card {
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.series-card h2,
+.series-section-heading h2 {
+  font-size: 1rem;
+  margin: 0 0 1rem;
+}
+
+.series-description {
+  color: #d5d2df;
+  margin: 0;
+  max-width: 75ch;
+  white-space: pre-line;
+}
+
+.series-empty-copy,
+.series-empty-state p,
+.series-section-status,
+.series-inline-notice {
+  color: var(--series-muted);
+}
+
+.series-plain-list,
+.series-linked-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.series-detail-list,
+.series-ranks dl {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+
+.series-detail-list > div,
+.series-ranks dl > div {
+  display: grid;
+  gap: 0.1rem;
+  grid-template-columns: minmax(7rem, 0.8fr) minmax(0, 1.2fr);
+}
+
+.series-detail-list dt,
+.series-ranks dt {
+  color: var(--series-dim);
+  font-size: 0.78rem;
+}
+
+.series-detail-list dd,
+.series-ranks dd {
+  margin: 0;
+}
+
+.series-list-count {
+  display: flex;
+  flex-direction: column;
+}
+
+.series-list-count strong {
+  font-size: 1.8rem;
+}
+
+.series-list-count span {
+  color: var(--series-muted);
+  font-size: 0.78rem;
+}
+
+.series-ranks {
+  margin-top: 1rem;
+}
+
+.series-ranks h3 {
+  color: var(--series-muted);
+  font-size: 0.78rem;
+  margin: 0 0 0.5rem;
+}
+
+.series-section-card {
+  overflow: hidden;
+}
+
+.series-section-heading {
+  align-items: center;
+  border-bottom: 1px solid var(--series-border);
+  display: flex;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem;
+}
+
+.series-section-heading h2,
+.series-section-heading p {
+  margin-bottom: 0;
+}
+
+.series-section-heading > span {
+  color: var(--series-muted);
+  font-size: 0.78rem;
+}
+
+.chapter-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chapter-list li {
+  border-bottom: 1px solid var(--series-border);
+}
+
+.chapter-list li > button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 1rem;
+  grid-template-columns: minmax(5rem, 0.6fr) minmax(8rem, 1.4fr) auto;
+  padding: 0.9rem 1.25rem;
+  text-align: left;
+  width: 100%;
+}
+
+.chapter-list li > button:hover:not(:disabled) {
+  background: var(--series-accent-soft);
+}
+
+.chapter-list li > button:disabled {
+  color: var(--series-dim);
+  cursor: not-allowed;
+}
+
+.chapter-list li > small {
+  color: var(--series-dim);
+  display: block;
+  padding: 0 1.25rem 0.75rem;
+}
+
+.chapter-label {
+  font-weight: 700;
+}
+
+.chapter-group,
+.chapter-list time {
+  color: var(--series-muted);
+}
+
+.chapter-list time {
+  font-size: 0.78rem;
+}
+
+.chapter-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 1rem 1.25rem;
+}
+
+.chapter-pagination button,
+.review-card button,
+.similar-card button {
+  background: var(--series-raised);
+  border: 1px solid var(--series-border-strong);
+  border-radius: 7px;
+  color: var(--series-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.4rem 0.65rem;
+}
+
+.chapter-pagination button[aria-current='page'] {
+  background: var(--series-accent);
+  color: #120d24;
+}
+
+.series-inline-notice {
+  background: var(--series-accent-soft);
+  border-bottom: 1px solid var(--series-border);
+  margin: 0;
+  padding: 0.75rem 1.25rem;
+}
+
+.review-list {
+  display: grid;
+}
+
+.review-card {
+  border-bottom: 1px solid var(--series-border);
+  padding: 1.25rem;
+}
+
+.review-card:last-child {
+  border-bottom: 0;
+}
+
+.review-card header,
+.review-card footer {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+  justify-content: space-between;
+}
+
+.review-card header > div {
+  display: grid;
+}
+
+.review-card header span,
+.review-progress,
+.review-card footer {
+  color: var(--series-muted);
+  font-size: 0.78rem;
+}
+
+.review-body {
+  color: #d5d2df;
+  margin: 1rem 0;
+  max-width: 78ch;
+}
+
+.review-body blockquote {
+  border-left: 3px solid var(--series-accent);
+  margin-left: 0;
+  padding-left: 1rem;
+}
+
+.review-card footer {
+  justify-content: flex-start;
+}
+
+.review-card footer > span {
+  margin-right: auto;
+}
+
+.similar-grid {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.similar-card {
+  background: var(--series-surface);
+  border-right: 1px solid var(--series-border);
+  padding: 1.25rem;
+}
+
+.similar-card > div {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.similar-card h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.similar-card span {
+  color: var(--series-accent);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.similar-card p {
+  color: var(--series-muted);
+}
+
+.similar-genres {
+  font-size: 0.76rem;
+}
+
+.series-empty-state,
+.series-section-status {
+  padding: clamp(2rem, 8vw, 5rem) 1rem;
+  text-align: center;
+}
+
+.series-empty-state h3 {
+  margin: 0;
+}
+
+.series-section-status small {
+  display: block;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 760px) {
+  .series-hero {
+    grid-template-columns: 100px minmax(0, 1fr);
+  }
+
+  .series-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .similar-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .series-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .series-hero-cover {
+    max-width: 150px;
+  }
+
+  .series-tabs {
+    justify-content: flex-start;
+  }
+
+  .chapter-list li > button {
+    gap: 0.2rem;
+    grid-template-columns: 1fr auto;
+  }
+
+  .chapter-group {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .novel-compass-series *,
+  .novel-compass-series *::before,
+  .novel-compass-series *::after {
+    scroll-behavior: auto !important;
+  }
+}
