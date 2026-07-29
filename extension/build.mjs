@@ -20,6 +20,11 @@ await cp(
   path.join(extensionRoot, 'src/content/native-theme.css'),
   path.join(outputRoot, 'content/native-theme.css'),
 );
+await mkdir(path.join(outputRoot, 'popup'), { recursive: true });
+await Promise.all([
+  cp(path.join(extensionRoot, 'src/popup/index.html'), path.join(outputRoot, 'popup/index.html')),
+  cp(path.join(extensionRoot, 'src/popup/popup.css'), path.join(outputRoot, 'popup/popup.css')),
+]);
 
 const sharedConfig = {
   configFile: false,
@@ -90,6 +95,18 @@ await Promise.all([
         name: 'NovelCompassContent',
         formats: ['iife'],
         fileName: () => 'bootstrap.js',
+      },
+    },
+  }),
+  build({
+    ...sharedConfig,
+    build: {
+      ...sharedConfig.build,
+      outDir: path.join(outputRoot, 'popup'),
+      lib: {
+        entry: path.join(extensionRoot, 'src/popup/popup.ts'),
+        formats: ['es'],
+        fileName: () => 'popup.js',
       },
     },
   }),

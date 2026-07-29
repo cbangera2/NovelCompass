@@ -8,6 +8,10 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
+  "action": {
+    "default_title": "Novel Compass settings",
+    "default_popup": "popup/index.html"
+  },
   "content_scripts": [
     {
       "matches": ["https://www.novelupdates.com/*"],
