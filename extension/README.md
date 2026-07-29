@@ -17,10 +17,6 @@ page; the compact section bar provides jump links without hiding content.
 
 ![Novel Updates series rankings restyled by Novel Compass](../docs/screenshots/extension/series-rankings.png)
 
-### Latest releases
-
-![Novel Updates latest releases with Novel Compass navigation](../docs/screenshots/extension/home-latest-releases.png)
-
 Screenshots contain page content only. Browser chrome and personal account
 details are excluded or redacted.
 

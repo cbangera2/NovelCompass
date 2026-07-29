@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   installNativeTheme,
   NATIVE_THEME_CLASS,
+  NATIVE_THEME_HOME_CLASS,
   NATIVE_THEME_HOST_ID,
   NATIVE_THEME_STYLE_ID,
 } from '../../src/content/native-theme';
@@ -19,6 +20,17 @@ afterEach(() => {
 });
 
 describe('installNativeTheme', () => {
+  it('applies and removes the homepage-specific layout class', () => {
+    window.history.replaceState({}, '', '/');
+    const controller = installNativeTheme(document, 'html.novel-compass-native-theme{}');
+
+    controller.activate();
+    expect(document.documentElement.classList.contains(NATIVE_THEME_HOME_CLASS)).toBe(true);
+
+    controller.showOriginal();
+    expect(document.documentElement.classList.contains(NATIVE_THEME_HOME_CLASS)).toBe(false);
+  });
+
   it('preserves host node and form identity while toggling the scoped theme', () => {
     document.documentElement.className = 'nu-existing';
     document.documentElement.style.setProperty('--nu-setting', 'kept');

@@ -3,6 +3,7 @@ import { READING_LIBRARY_HEADER_ID } from './reading-library-theme';
 export const NATIVE_THEME_CLASS = 'novel-compass-native-theme';
 export const NATIVE_THEME_HOST_ID = 'novel-compass-native-theme-root';
 export const NATIVE_THEME_STYLE_ID = 'novel-compass-native-theme-styles';
+export const NATIVE_THEME_HOME_CLASS = 'novel-compass-home';
 
 export interface NativeThemeController {
   host: HTMLElement;
@@ -156,6 +157,10 @@ export function installNativeTheme(document: Document, css: string): NativeTheme
   const originalExtensionMarker = document.documentElement.dataset.novelCompassExtension;
   const setThemed = (themed: boolean) => {
     document.documentElement.classList.toggle(NATIVE_THEME_CLASS, themed);
+    document.documentElement.classList.toggle(
+      NATIVE_THEME_HOME_CLASS,
+      themed && document.location.pathname === '/',
+    );
     if (themed) {
       document.documentElement.dataset.novelCompassExtension = 'native-theme';
     } else if (originalExtensionMarker === undefined) {
