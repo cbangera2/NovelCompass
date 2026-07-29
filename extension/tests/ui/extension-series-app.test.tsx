@@ -36,6 +36,11 @@ describe('ExtensionSeriesApp', () => {
     expect(container.textContent).toContain('A mercenary returns to his youth.');
     expect(container.textContent).toContain('1,234');
     expect(container.textContent).toContain('Regression');
+    expect(
+      container.querySelector<HTMLAnchorElement>(
+        'a[href="https://www.novelupdates.com/stag/regression/"]',
+      ),
+    ).not.toBeNull();
     expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
       'Overview',
     );
@@ -163,7 +168,10 @@ function metadata(): LiveSeriesMetadata {
     authors: [{ label: 'Fixture Author' }],
     artists: [],
     genres: [{ label: 'Action' }, { label: 'Fantasy' }],
-    tags: [{ label: 'Regression' }, { label: 'Mercenaries' }],
+    tags: [
+      { label: 'Regression', url: 'https://www.novelupdates.com/stag/regression/' },
+      { label: 'Mercenaries' },
+    ],
     language: { label: 'Korean' },
     novelType: { label: 'Web Novel' },
     year: 2024,

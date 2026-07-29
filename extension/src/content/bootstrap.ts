@@ -25,7 +25,7 @@ if (classification.kind === 'supported') {
 } else if (
   classification.kind === 'blocked' &&
   classification.reason === 'replacement-not-implemented' &&
-  classification.route?.policy === 'shared-shell-native'
+  classification.route?.policy !== 'pass-through'
 ) {
   void bootstrapNativeTheme();
 }

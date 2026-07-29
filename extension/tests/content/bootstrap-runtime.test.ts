@@ -159,6 +159,25 @@ describe('content bootstrap runtime', () => {
     expect(document.getElementById('account-content')).toBe(originalMain);
     expect(document.querySelector('form')).toBe(originalForm);
   });
+
+  it('themes the homepage while preserving its live feed DOM', async () => {
+    loadPage(
+      `<!doctype html><html><head><title>Novel Updates</title></head><body>
+        <header class="l-header">Novel Updates</header>
+        <main id="homepage-feed"><a href="/series/fixture-mercenary/">Fixture Mercenary</a></main>
+      </body></html>`,
+      'https://www.novelupdates.com/',
+    );
+    const originalFeed = document.getElementById('homepage-feed');
+    const originalLink = document.querySelector('main a');
+
+    await import('../../src/content/bootstrap');
+    await waitFor(() => document.documentElement.classList.contains('novel-compass-native-theme'));
+
+    expect(document.getElementById('homepage-feed')).toBe(originalFeed);
+    expect(document.querySelector('main a')).toBe(originalLink);
+    expect(originalLink?.getAttribute('href')).toBe('/series/fixture-mercenary/');
+  });
 });
 
 function installChromeApi(storedPreferences?: unknown): void {

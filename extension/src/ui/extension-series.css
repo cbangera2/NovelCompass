@@ -143,13 +143,20 @@
 }
 
 .series-genre-row span,
-.series-tag-cloud span {
+.series-tag-cloud span,
+.series-tag-cloud a {
   background: var(--series-accent-soft);
   border: 1px solid rgb(167 146 255 / 23%);
   border-radius: 999px;
   color: #d8ceff;
   font-size: 0.76rem;
   padding: 0.3rem 0.6rem;
+  text-decoration: none;
+}
+
+.series-tag-cloud a:hover {
+  border-color: var(--series-accent);
+  color: #fff;
 }
 
 .series-tabs {

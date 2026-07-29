@@ -33,7 +33,13 @@ export function SeriesOverview({ metadata }: SeriesOverviewProps): JSX.Element {
             <h2>Tags</h2>
             <div className="series-tag-cloud">
               {metadata.tags.map((tag) => (
-                <span key={tag.label}>{tag.label}</span>
+                tag.url ? (
+                  <a href={tag.url} key={tag.label}>
+                    {tag.label}
+                  </a>
+                ) : (
+                  <span key={tag.label}>{tag.label}</span>
+                )
               ))}
             </div>
           </section>
