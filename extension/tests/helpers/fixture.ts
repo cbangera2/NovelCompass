@@ -8,6 +8,9 @@ export const FIXTURE_NAMES = [
   'login.html',
   'maintenance.html',
   'unsupported-markup.html',
+  'shell-logged-in.html',
+  'shell-logged-out.html',
+  'shell-unknown.html',
 ] as const;
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number];
