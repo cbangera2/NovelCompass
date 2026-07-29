@@ -16,7 +16,12 @@ import { NovelCompassMark } from '../../../web/src/NovelCompassMark';
 import type { NovelUpdatesAccountState } from '../adapters/contracts';
 import './extension-shell.css';
 
-export type ExtensionRoute = 'series' | 'series-finder' | 'series-ranking' | 'other';
+export type ExtensionRoute =
+  | 'series'
+  | 'series-finder'
+  | 'series-ranking'
+  | 'recommendation-lists'
+  | 'other';
 
 export interface ExtensionShellProps {
   activeRoute: ExtensionRoute;
@@ -64,7 +69,7 @@ const NAV_GROUPS = [
         icon: BookMarked,
       },
       {
-        route: 'other' as const,
+        route: 'recommendation-lists' as const,
         label: 'Recommendation lists',
         note: 'Reader-curated lists',
         href: 'https://www.novelupdates.com/recommendation-lists/',
