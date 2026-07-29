@@ -1058,3 +1058,157 @@ The following defaults are recommended:
 
 Unless the user changes these decisions, implementation tasks should treat them
 as the approved baseline.
+
+## 18. Milestone 2: Novel Updates-Wide Novel Compass Experience
+
+The approved product direction now extends beyond the two Milestone 1 routes.
+Every safe, human-facing page on `https://www.novelupdates.com/` should receive
+the Novel Compass visual system and shared navigation. This does **not** mean
+reimplementing every native form or copying untrusted page HTML into React.
+Route handling is split into three explicit strategies:
+
+1. `bespoke`: parse a stable, normalized contract and render a purpose-built
+   Novel Compass view in the extension Shadow DOM;
+2. `native-theme`: retain the original nodes, forms, handlers, and pagination
+   in place while applying the shared shell and a tightly scoped light-DOM
+   theme;
+3. `blocked`: leave security-sensitive, non-HTML, redirect, challenge, or
+   mutation endpoints untouched.
+
+The classifier must choose a strategy before the original page is hidden.
+Unknown safe `GET` pages default to `native-theme`; ambiguous document states
+fail open to the original Novel Updates page.
+
+### 18.1 Shared shell
+
+All transformed routes share an extension-owned `ExtensionShell` containing:
+
+- Novel Compass branding and visual tokens;
+- desktop sidebar with a persisted collapsed state;
+- mobile header and accessible navigation drawer;
+- active-route indication;
+- global Novel Compass catalog search;
+- an always-reachable Original View action;
+- DOM-derived Novel Updates account status and account navigation;
+- links to Home, Random Novel, Series Finder, Series Listing, Series Ranking,
+  Latest Series, Recommendation Lists, Reading List, Release Filtering, Series
+  Filtering, Following, account settings, user profile, and the forum when
+  available.
+
+The website `AppShell` is not embedded directly because it assumes
+NovelCompass query routes, local profile state, and website data-mode controls.
+Low-level sidebar primitives, the Novel Compass mark, and visual tokens may be
+reused. Extension persistence uses `chrome.storage`, never Novel Updates'
+`localStorage`.
+
+### 18.2 Route registry
+
+The ordered route registry owns matching and strategy selection.
+
+Initial bespoke routes:
+
+- `^/series/[a-z0-9]+(?:-[a-z0-9]+)*/?$`
+- `^/series-finder/?$`
+- `^/series-ranking/?$`
+- normal home/search responses on `^/$`
+- `^/(novelslisting|latest-series)/?$`
+- `^/(genre|stag|language|ntype|nauthor|nartist|opublisher|epublisher|group)/[^/]+/?$`
+- `^/(recommendation-lists|list-tags)/?$`
+- `^/(viewlist/\d+|listtag/[^/]+)/?$`
+- public user, reading-list, and following route families after fixtures
+  stabilize their contracts.
+
+Native-theme routes include account/profile pages, release and series
+filtering, list editing, contribution forms, report forms, edit logs, legal
+pages, ordinary WordPress content, and safe route families without a stable
+adapter. Native-theme mode never relocates or clones eventful host nodes.
+
+Blocked or pass-through routes include:
+
+- login, logout, registration, password reset, and WordPress administration;
+- `/extnu/<id>/` protected chapter redirects;
+- nonce-bearing report/action destinations;
+- JSON, XML, RSS, media, and API endpoints;
+- random-novel and numeric canonical redirects while navigation is resolving;
+- CAPTCHA, Cloudflare, maintenance, and authentication interstitials detected
+  independently of route.
+
+### 18.3 Account/session contract
+
+Account state is derived only from visible server-rendered DOM:
+
+```ts
+type NovelUpdatesSession =
+  | {
+      status: 'logged-in';
+      username: string;
+      avatarUrl?: string;
+      profileUrl?: string;
+      accountUrl?: string;
+      followingUrl?: string;
+      alertsUrl?: string;
+      alertCount?: number;
+      messagesUrl?: string;
+      logoutActionId?: string;
+    }
+  | {
+      status: 'logged-out';
+      loginUrl?: string;
+      registerUrl?: string;
+    }
+  | {
+      status: 'unknown';
+      warnings: ParseWarning[];
+    };
+```
+
+The extension never reads cookies, tokens, hidden fields, inline script state,
+or WordPress user globals. Logout and other nonce-bearing actions are exposed
+only as generation-scoped opaque actions delegated to the preserved native
+element after a direct user gesture. Missing or ambiguous markup produces
+`unknown`, not a guessed logged-out state.
+
+### 18.4 Series Ranking
+
+`/series-ranking/` preserves Novel Updates' live ranking semantics. It must not
+map Novel Updates rank periods or categories onto Novel Compass popularity
+sorts. The adapter normalizes selected controls, rank rows, series identity,
+metadata, and pagination; safe `GET` controls navigate to validated same-origin
+URLs and other controls delegate to native elements. Novel Compass similarity
+and catalog metadata may enhance a row only after the live Novel Updates
+identity is resolved.
+
+### 18.5 Native-theme safety
+
+Native-theme mode mounts shell chrome in the existing Shadow DOM and injects a
+separate stylesheet whose every selector is prefixed with an extension mode
+attribute. It may hide known Novel Updates header/sidebar/ad containers and
+offset the native main content, but it must not:
+
+- apply unscoped element or universal selectors;
+- move native forms into Shadow DOM;
+- clone `innerHTML`;
+- remove hidden inputs, nonces, handlers, or validation messages;
+- intercept submissions that can safely remain native;
+- claim that an account mutation succeeded before the host page confirms it.
+
+Original View removes all mode attributes and injected layout offsets. A render
+or parse failure restores the untouched original page.
+
+### 18.6 Delivery waves
+
+1. Route registry, explicit exclusions, global manifest match, and fail-open
+   tests.
+2. Shared shell, responsive sidebar, account-state adapter, and original-view
+   restoration.
+3. Series Ranking purpose-built adapter and view.
+4. Home, search, listing, entity, and recommendation-list templates.
+5. Reading-list, following, and public profile templates.
+6. Native-theme form/table coverage for remaining safe routes.
+7. Desktop, mobile, logged-in, logged-out, keyboard, history, and no-error live
+   Chrome validation.
+
+Milestone 2 is complete only when every known human-facing route maps to an
+audited strategy, unknown safe pages remain usable, protected flows remain
+native, and browser QA confirms that navigation and account-dependent behavior
+survive both Novel Compass and Original View modes.
