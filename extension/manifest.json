@@ -17,7 +17,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content/style.css", "data/*", "data/**/*"],
+      "resources": ["content/style.css", "content/native-theme.css", "data/*", "data/**/*"],
       "matches": ["https://www.novelupdates.com/*"]
     }
   ]

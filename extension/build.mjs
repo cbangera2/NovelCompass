@@ -15,6 +15,11 @@ const { build } = await import(path.join(webRoot, 'node_modules/vite/dist/node/i
 await rm(outputRoot, { recursive: true, force: true });
 await mkdir(outputRoot, { recursive: true });
 await cp(path.join(extensionRoot, 'manifest.json'), path.join(outputRoot, 'manifest.json'));
+await mkdir(path.join(outputRoot, 'content'), { recursive: true });
+await cp(
+  path.join(extensionRoot, 'src/content/native-theme.css'),
+  path.join(outputRoot, 'content/native-theme.css'),
+);
 
 const sharedConfig = {
   configFile: false,

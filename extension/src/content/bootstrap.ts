@@ -14,11 +14,36 @@ import { ExtensionFinderApp } from '../ui/ExtensionFinderApp';
 import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
 import { ensureReplacementHost } from './replacement-host';
 import { resolveNovelUpdatesNavigation } from './navigation';
+import { installNativeTheme } from './native-theme';
 
 const classification = classifyNovelUpdatesDocument(window.location.href, document);
 
 if (classification.kind === 'supported') {
   void bootstrapReplacement();
+} else if (
+  classification.kind === 'blocked' &&
+  classification.reason === 'replacement-not-implemented' &&
+  classification.route?.policy === 'shared-shell-native'
+) {
+  void bootstrapNativeTheme();
+}
+
+async function bootstrapNativeTheme(): Promise<void> {
+  let controller: ReturnType<typeof installNativeTheme> | undefined;
+  try {
+    const preferences = await new ExtensionStorageRepository(
+      chromeLocalStorageArea(),
+    ).loadPreferences();
+    if (!preferences.value.extensionEnabled) return;
+    const response = await fetch(chrome.runtime.getURL('content/native-theme.css'));
+    if (!response.ok) throw new Error(`Native theme styles failed to load (${response.status}).`);
+    controller = installNativeTheme(document, await response.text());
+    controller.activate();
+  } catch (error) {
+    controller?.fail(error);
+    document.documentElement.removeAttribute('data-novel-compass-extension');
+    console.error('Novel Compass could not initialize its native theme.', error);
+  }
 }
 
 async function bootstrapReplacement(): Promise<void> {

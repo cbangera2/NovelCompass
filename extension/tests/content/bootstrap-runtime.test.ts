@@ -32,6 +32,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.documentElement.classList.remove(ACTIVE_CLASS);
+  document.documentElement.classList.remove('novel-compass-native-theme');
   document.documentElement.removeAttribute('data-novel-compass-extension');
   document.body.replaceChildren();
   document.head.replaceChildren();
@@ -115,6 +116,35 @@ describe('content bootstrap runtime', () => {
     expect(document.getElementById(HOST_ID)).toBeNull();
     expect(document.documentElement.classList.contains(ACTIVE_CLASS)).toBe(false);
   });
+
+  it('themes a registered native route without replacing its form DOM', async () => {
+    loadPage(
+      `<!doctype html><html><head><title>Account</title></head><body>
+        <header class="l-header">Novel Updates</header>
+        <main id="account-content"><form action="/account/" method="post">
+          <input name="_wpnonce" value="preserved"><button type="submit">Save</button>
+        </form></main>
+      </body></html>`,
+      'https://www.novelupdates.com/account/',
+    );
+    const originalMain = document.getElementById('account-content');
+    const originalForm = document.querySelector('form');
+
+    await import('../../src/content/bootstrap');
+    await waitFor(() => document.documentElement.classList.contains('novel-compass-native-theme'));
+
+    expect(document.getElementById('account-content')).toBe(originalMain);
+    expect(document.querySelector('form')).toBe(originalForm);
+    expect(document.querySelector<HTMLInputElement>('input[name="_wpnonce"]')?.value).toBe(
+      'preserved',
+    );
+    const host = document.getElementById('novel-compass-native-theme-root');
+    const toggle = host?.shadowRoot?.querySelector<HTMLButtonElement>('button');
+    toggle?.click();
+    expect(document.documentElement.classList.contains('novel-compass-native-theme')).toBe(false);
+    expect(document.getElementById('account-content')).toBe(originalMain);
+    expect(document.querySelector('form')).toBe(originalForm);
+  });
 });
 
 function installChromeApi(storedPreferences?: unknown): void {
@@ -157,6 +187,12 @@ function loadPage(html: string, url: string): void {
 async function fixtureResponse(url: string): Promise<Response> {
   if (url === `${EXTENSION_ORIGIN}content/style.css`) {
     return new Response(':host { display: block; }', {
+      status: 200,
+      headers: { 'content-type': 'text/css' },
+    });
+  }
+  if (url === `${EXTENSION_ORIGIN}content/native-theme.css`) {
+    return new Response('html.novel-compass-native-theme { color-scheme: dark; }', {
       status: 200,
       headers: { 'content-type': 'text/css' },
     });

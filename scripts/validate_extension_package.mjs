@@ -15,6 +15,7 @@ const expectedResourceMatches = ['https://www.novelupdates.com/*'];
 await access(path.join(distRoot, 'background/service-worker.js'));
 await access(path.join(distRoot, 'content/bootstrap.js'));
 await access(path.join(distRoot, 'content/style.css'));
+await access(path.join(distRoot, 'content/native-theme.css'));
 await access(path.join(distRoot, 'data/manifest.json'));
 await access(path.join(distRoot, 'data/catalog.json'));
 
@@ -54,7 +55,7 @@ assert(
 );
 assert(
   JSON.stringify(manifest.web_accessible_resources?.[0]?.resources) ===
-    JSON.stringify(['content/style.css', 'data/*', 'data/**/*']),
+    JSON.stringify(['content/style.css', 'content/native-theme.css', 'data/*', 'data/**/*']),
   'unexpected web-accessible resources',
 );
 
@@ -83,6 +84,7 @@ try {
   assert(entries.includes('background/service-worker.js'), 'ZIP must contain the service worker');
   assert(entries.includes('content/bootstrap.js'), 'ZIP must contain the content script');
   assert(entries.includes('content/style.css'), 'ZIP must contain Shadow DOM product styles');
+  assert(entries.includes('content/native-theme.css'), 'ZIP must contain native theme styles');
   assert(entries.includes('data/manifest.json'), 'ZIP must contain the static-data manifest');
   assert(entries.includes('data/catalog.json'), 'ZIP must contain the deterministic catalog');
   for (const entry of entries) {
