@@ -98,6 +98,16 @@ describe('ExtensionShell', () => {
     );
     expect(window.localStorage.getItem('novel-compass:sidebar-collapsed')).toBe('true');
     expect(toggle?.getAttribute('aria-label')).toBe('Expand sidebar');
+    expect(
+      container.querySelector('a[href="https://www.novelupdates.com/series-ranking/"]')?.getAttribute(
+        'aria-label',
+      ),
+    ).toBe('Series ranking');
+    expect(
+      Array.from(container.querySelectorAll('button')).find((button) =>
+        button.textContent?.includes('Original Novel Updates'),
+      )?.getAttribute('aria-label'),
+    ).toBe('Original Novel Updates');
   });
 });
 

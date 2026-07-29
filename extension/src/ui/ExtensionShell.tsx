@@ -135,7 +135,12 @@ export function ExtensionShell({
   const navigation = (
     <>
       <header className="extension-shell-sidebar-header">
-        <a className="extension-shell-brand" href="https://www.novelupdates.com/">
+        <a
+          aria-label="Novel Compass home"
+          className="extension-shell-brand"
+          href="https://www.novelupdates.com/"
+          title="Novel Compass home"
+        >
           <NovelCompassMark />
           <span>
             <strong>Novel Compass</strong>
@@ -153,11 +158,13 @@ export function ExtensionShell({
                 const active = activeRoute === item.route && item.route !== 'other';
                 return (
                   <a
+                    aria-label={item.label}
                     aria-current={active ? 'page' : undefined}
                     className={active ? 'is-active' : undefined}
                     href={item.href}
                     key={item.href}
                     onClick={() => setMobileOpen(false)}
+                    title={item.label}
                   >
                     <Icon aria-hidden="true" size={18} />
                     <span>
@@ -173,7 +180,12 @@ export function ExtensionShell({
       </div>
       <footer className="extension-shell-sidebar-footer">
         <AccountSummary account={account} onInvokeAction={onInvokeAccountAction} />
-        <button type="button" onClick={onShowOriginal}>
+        <button
+          aria-label="Original Novel Updates"
+          onClick={onShowOriginal}
+          title="Original Novel Updates"
+          type="button"
+        >
           <BookOpen aria-hidden="true" size={17} />
           <span>
             <strong>Original Novel Updates</strong>
@@ -268,7 +280,11 @@ function AccountSummary({
     return (
       <div className="extension-shell-account-links">
         {account.profileUrl ? (
-          <a href={account.profileUrl}>
+          <a
+            aria-label={`${account.username} profile`}
+            href={account.profileUrl}
+            title={`${account.username} profile`}
+          >
             <User aria-hidden="true" size={17} />
             <span>
               <strong>{account.username}</strong>
@@ -276,7 +292,7 @@ function AccountSummary({
             </span>
           </a>
         ) : (
-          <div>
+          <div aria-label={`${account.username} Novel Updates account`}>
             <User aria-hidden="true" size={17} />
             <span>
               <strong>{account.username}</strong>
@@ -284,20 +300,38 @@ function AccountSummary({
             </span>
           </div>
         )}
-        {account.accountUrl ? <a href={account.accountUrl}>Account settings</a> : null}
-        {account.followingUrl ? <a href={account.followingUrl}>Following</a> : null}
+        {account.accountUrl ? (
+          <a aria-label="Account settings" href={account.accountUrl} title="Account settings">
+            Account settings
+          </a>
+        ) : null}
+        {account.followingUrl ? (
+          <a aria-label="Following" href={account.followingUrl} title="Following">
+            Following
+          </a>
+        ) : null}
         {account.alertsUrl ? (
-          <a href={account.alertsUrl}>
+          <a aria-label="Alerts" href={account.alertsUrl} title="Alerts">
             Alerts{account.alertCount === undefined ? '' : ` (${account.alertCount})`}
           </a>
         ) : null}
         {account.messagesUrl ? (
-          <a href={account.messagesUrl} rel="noopener noreferrer">
+          <a
+            aria-label="Forum messages"
+            href={account.messagesUrl}
+            rel="noopener noreferrer"
+            title="Forum messages"
+          >
             Forum messages
           </a>
         ) : null}
         {account.logoutActionId && onInvokeAction ? (
-          <button type="button" onClick={() => onInvokeAction(account.logoutActionId!)}>
+          <button
+            aria-label="Log out"
+            onClick={() => onInvokeAction(account.logoutActionId!)}
+            title="Log out"
+            type="button"
+          >
             Log out
           </button>
         ) : null}
@@ -308,7 +342,11 @@ function AccountSummary({
     account.status === 'logged-out' ? account.loginUrl : 'https://www.novelupdates.com/login/';
   return (
     <div className="extension-shell-account-links">
-      <a href={loginUrl || 'https://www.novelupdates.com/login/'}>
+      <a
+        aria-label={account.status === 'unknown' ? 'Novel Updates account' : 'Log in'}
+        href={loginUrl || 'https://www.novelupdates.com/login/'}
+        title={account.status === 'unknown' ? 'Novel Updates account' : 'Log in'}
+      >
         <LogIn aria-hidden="true" size={17} />
         <span>
           <strong>{account.status === 'unknown' ? 'Novel Updates account' : 'Log in'}</strong>
@@ -318,7 +356,9 @@ function AccountSummary({
         </span>
       </a>
       {account.status === 'logged-out' && account.registerUrl ? (
-        <a href={account.registerUrl}>Register</a>
+        <a aria-label="Register" href={account.registerUrl} title="Register">
+          Register
+        </a>
       ) : null}
     </div>
   );
