@@ -12,6 +12,7 @@ export interface ReplacementHost {
   activate(): void;
   deactivate(): void;
   setTheme(theme: 'system' | 'light' | 'dark'): void;
+  setRecoveryControlVisible(visible: boolean): void;
   fail(error?: unknown): void;
   showOriginal(): void;
   showReplacement(): void;
@@ -100,6 +101,9 @@ function createController(
     },
     setTheme: (theme) => {
       host.dataset.theme = theme;
+    },
+    setRecoveryControlVisible: (visible) => {
+      toggle.hidden = !visible;
     },
     fail: (error?: unknown) => {
       console.error('Novel Compass restored the original page after a fatal error.', error);

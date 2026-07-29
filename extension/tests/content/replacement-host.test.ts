@@ -22,6 +22,12 @@ describe('ensureReplacementHost runtime preferences', () => {
     );
 
     controller.setTheme('light');
+    controller.setRecoveryControlVisible(false);
+    expect(
+      controller.host.shadowRoot?.querySelector<HTMLButtonElement>('#novel-compass-view-toggle')
+        ?.hidden,
+    ).toBe(true);
+    controller.setRecoveryControlVisible(true);
     controller.activate();
     expect(controller.host.dataset.theme).toBe('light');
     expect(controller.host.hidden).toBe(false);

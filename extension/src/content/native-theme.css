@@ -339,11 +339,11 @@ html.novel-compass-native-theme.novel-compass-home
   text-align: center;
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library body {
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) body {
   padding: 2rem clamp(1rem, 4vw, 4rem) 5rem calc(236px + clamp(1rem, 4vw, 4rem));
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
   #novel-compass-reading-library-header {
   box-sizing: border-box;
   margin: 0 auto 1.25rem;
@@ -357,13 +357,13 @@ html.novel-compass-native-theme.novel-compass-reading-library
   box-shadow: 0 22px 60px rgb(0 0 0 / 28%);
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
   #novel-compass-reading-library-header
   :where(h1, p) {
   margin: 0;
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library .novel-compass-library-eyebrow {
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) .novel-compass-library-eyebrow {
   color: #a99af4;
   font-size: 0.72rem;
   font-weight: 800;
@@ -371,20 +371,20 @@ html.novel-compass-native-theme.novel-compass-reading-library .novel-compass-lib
   text-transform: uppercase;
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library #novel-compass-reading-library-title {
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) #novel-compass-reading-library-title {
   color: #fff;
   font-size: clamp(1.8rem, 4vw, 2.75rem);
   line-height: 1.08;
   margin-top: 0.35rem;
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library .novel-compass-library-summary {
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) .novel-compass-library-summary {
   color: #b9b6c5;
   margin-top: 0.7rem !important;
   max-width: 49rem;
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
   #novel-compass-reading-library-header
   nav {
   display: flex;
@@ -393,7 +393,7 @@ html.novel-compass-native-theme.novel-compass-reading-library
   margin-top: 1.25rem;
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
   #novel-compass-reading-library-header
   nav
   a {
@@ -404,17 +404,68 @@ html.novel-compass-native-theme.novel-compass-reading-library
   text-decoration: none;
 }
 
-html.novel-compass-native-theme.novel-compass-reading-library
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
   #novel-compass-reading-library-header
   nav
   a:is(:hover, :focus-visible),
-html.novel-compass-native-theme.novel-compass-reading-library
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
   #novel-compass-reading-library-header
   nav
   a[aria-current='page'] {
   background: #6d5bd0;
   border-color: #8d7ce8;
   color: #fff;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(.l-sidebar, .sidebar, #sidebar, .g-cols > .one-third:last-child) {
+  display: none !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(.l-main, .l-submain, .l-content, .g-cols, .g-cols > div, .wpb_wrapper) {
+  box-sizing: border-box;
+  float: none !important;
+  margin-inline: auto !important;
+  max-width: 1180px !important;
+  width: 100% !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(table, form, .panel, .card, .w-box, [class*='follow']) {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+html.novel-compass-native-theme.novel-compass-following body :where(table) {
+  border: 1px solid rgb(255 255 255 / 10%) !important;
+  border-collapse: separate !important;
+  border-radius: 12px;
+  border-spacing: 0 !important;
+  overflow: hidden;
+  width: 100% !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following body :where(th, td) {
+  padding: 0.65rem 0.75rem !important;
+  vertical-align: middle;
+}
+
+html.novel-compass-native-theme.novel-compass-following body :where(tbody tr:hover) {
+  background: #19172a !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(.pagination, .page_navi, .wp-pagenavi) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  margin-top: 1rem;
 }
 
 html.novel-compass-native-theme.novel-compass-reading-library
@@ -476,7 +527,7 @@ html.novel-compass-native-theme.novel-compass-reading-library
     padding: 4.5rem 0.75rem 3rem;
   }
 
-  html.novel-compass-native-theme.novel-compass-reading-library body {
+  html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) body {
     padding: calc(3.75rem + 1rem) 0.7rem 4rem;
   }
 

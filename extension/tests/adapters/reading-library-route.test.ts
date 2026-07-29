@@ -14,4 +14,17 @@ describe('reading-list route family', () => {
       },
     });
   });
+
+  it('keeps Following native so authenticated controls remain live', () => {
+    expect(
+      classifyNovelUpdatesPage('https://www.novelupdates.com/following/'),
+    ).toMatchObject({
+      kind: 'blocked',
+      reason: 'replacement-not-implemented',
+      route: {
+        family: 'reading-library',
+        policy: 'shared-shell-native',
+      },
+    });
+  });
 });

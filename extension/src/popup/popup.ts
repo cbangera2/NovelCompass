@@ -11,10 +11,12 @@ import {
 const repository = new ExtensionStorageRepository(chromeLocalStorageArea());
 
 const enabledInput = requiredInput('extension-enabled');
+const showOriginalButtonInput = requiredInput('show-original-button');
 const statusPill = requiredElement('status-pill');
 const saveStatus = requiredElement('save-status');
 const dataPackBadge = requiredElement('data-pack-badge');
 const dataPackDetail = requiredElement('data-pack-detail');
+const dataPackFallback = requiredElement('data-pack-fallback');
 const dataPackEnable = requiredButton('data-pack-enable');
 const dataPackRemove = requiredButton('data-pack-remove');
 const controls = Array.from(document.querySelectorAll('input, button, a[data-external]'));
@@ -27,6 +29,7 @@ async function initialize(): Promise<void> {
     const result = await repository.loadPreferences();
     const preferences = result.value;
     enabledInput.checked = preferences.extensionEnabled;
+    showOriginalButtonInput.checked = preferences.showOriginalButton;
     checkedRadio('theme', preferences.theme).checked = true;
 
     const pageModes = Object.values(preferences.pageModes);
@@ -53,6 +56,11 @@ function bindEvents(): void {
     void save(
       () => repository.setEnabled(enabledInput.checked),
       () => renderEnabled(enabledInput.checked),
+    );
+  });
+  showOriginalButtonInput.addEventListener('change', () => {
+    void save(() =>
+      repository.updatePreferences({ showOriginalButton: showOriginalButtonInput.checked }),
     );
   });
 
@@ -110,6 +118,7 @@ function renderDataPackStatus(status: DataPackStatus): void {
   const version = status.datasetVersion ? ` · ${status.datasetVersion}` : '';
   const size = status.bytes ? ` · ${formatBytes(status.bytes)}` : '';
   dataPackBadge.dataset.state = status.state;
+  dataPackFallback.hidden = status.state !== 'error' && status.state !== 'update-required';
   dataPackRemove.hidden = status.state !== 'ready';
   dataPackRemove.disabled = false;
   dataPackEnable.disabled = false;

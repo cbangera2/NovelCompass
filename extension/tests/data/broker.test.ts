@@ -81,6 +81,26 @@ function setup(options: { corrupt?: boolean; offlineAfterWarm?: boolean } = {}) 
 }
 
 describe('ExtensionDataBroker', () => {
+  it('explains when the optional Pages dataset has not been published', async () => {
+    const fixture = setup();
+    fixture.fetcher.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith('chrome-extension://')) return jsonResponse('{}', 404);
+      return jsonResponse('{}', 404);
+    });
+
+    await expect(fixture.broker.prepare()).resolves.toMatchObject({
+      ok: false,
+      code: 'unavailable',
+      message: 'NovelCompass enhanced data has not been published yet (HTTP 404).',
+      retryable: true,
+    });
+    await expect(fixture.broker.getStatus()).resolves.toMatchObject({
+      state: 'error',
+      message: 'NovelCompass enhanced data has not been published yet (HTTP 404).',
+    });
+  });
+
   it('prepares only the small manifest boundary before feature data is requested', async () => {
     const fixture = setup();
     await expect(fixture.broker.prepare()).resolves.toMatchObject({

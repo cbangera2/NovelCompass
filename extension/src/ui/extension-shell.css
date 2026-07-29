@@ -277,6 +277,32 @@
   ) {
   justify-content: center;
   padding-inline: 0;
+  position: relative;
+}
+
+.extension-shell-sidebar.is-collapsed
+  :is(a, button, [aria-label]):is(:hover, :focus-visible)::after {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  box-shadow: 0 0.45rem 1.3rem rgb(0 0 0 / 28%);
+  color: var(--text);
+  content: attr(aria-label);
+  font-size: 0.72rem;
+  font-weight: 600;
+  left: calc(100% + 0.65rem);
+  line-height: 1.2;
+  padding: 0.42rem 0.58rem;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  z-index: 80;
+}
+
+.extension-shell-sidebar.is-collapsed :is(a, button, [aria-label]) {
+  position: relative;
 }
 
 .extension-shell-sidebar.is-collapsed .extension-shell-account-links > div {
@@ -321,6 +347,7 @@
 
 .extension-shell-topbar form:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .extension-shell-topbar input {
@@ -330,6 +357,10 @@
   min-width: 0;
   outline: 0;
   width: 100%;
+}
+
+.extension-shell-topbar input:focus-visible {
+  outline: 0;
 }
 
 .extension-shell-account-compact {

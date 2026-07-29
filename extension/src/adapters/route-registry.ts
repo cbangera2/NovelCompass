@@ -51,7 +51,7 @@ const ROUTES: readonly RouteDefinition[] = [
   ),
   replacement('public-profile', 1, /^\/user(?:\/\d+)?(?:\/[^/]+)?\/?$/, true),
   replacement('reading-library', 1, /^\/reading-list\/?$/, true),
-  replacement('reading-library', 1, /^\/following\/?$/),
+  native('reading-library', 1, /^\/following\/?$/),
   native('account-form', 1, /^\/(?:account|your-profile|release-filtering|series-filtering)\/?$/),
   native('account-form', 1, /^\/userlist(?:\/\d+)?\/?$/),
   native(

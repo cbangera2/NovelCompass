@@ -27,6 +27,7 @@ import { ExtensionShell, type ExtensionRoute } from '../ui/ExtensionShell';
 import { ensureReplacementHost } from './replacement-host';
 import { resolveNovelUpdatesNavigation } from './navigation';
 import { installNativeTheme } from './native-theme';
+import { installFollowingTheme } from './reading-library-theme';
 
 const classification = classifyNovelUpdatesDocument(window.location.href, document);
 
@@ -49,12 +50,18 @@ async function bootstrapNativeTheme(): Promise<void> {
     if (!preferences.value.extensionEnabled) return;
     const response = await fetch(chrome.runtime.getURL('content/native-theme.css'));
     if (!response.ok) throw new Error(`Native theme styles failed to load (${response.status}).`);
+    if (window.location.pathname.replace(/\/+$/, '') === '/following') {
+      installFollowingTheme(document);
+    }
     controller = installNativeTheme(document, await response.text());
     controller.setTheme(preferences.value.theme);
+    controller.setRecoveryControlVisible(preferences.value.showOriginalButton);
     controller.activate();
     observePreferenceChanges({
       onEnabledChange: (enabled) => (enabled ? controller?.activate() : controller?.deactivate()),
       onThemeChange: (theme) => controller?.setTheme(theme),
+      onShowOriginalButtonChange: (visible) =>
+        controller?.setRecoveryControlVisible(visible),
     });
   } catch (error) {
     controller?.fail(error);
@@ -79,6 +86,7 @@ async function bootstrapReplacement(): Promise<void> {
 
     replacementHost = ensureReplacementHost(document);
     replacementHost.setTheme(preferences.value.theme);
+    replacementHost.setRecoveryControlVisible(preferences.value.showOriginalButton);
     await installProductStyles(replacementHost.productRoot);
 
     let renderFailed = false;
@@ -121,6 +129,7 @@ async function bootstrapReplacement(): Promise<void> {
           if (result.kind === 'navigate') window.location.assign(result.url);
         },
         onShowOriginal: replacementHost.showOriginal,
+        showOriginalButton: preferences.value.showOriginalButton,
       },
       routeApp,
     );
@@ -139,6 +148,8 @@ async function bootstrapReplacement(): Promise<void> {
       onEnabledChange: (enabled) =>
         enabled ? replacementHost?.showReplacement() : replacementHost?.deactivate(),
       onThemeChange: (theme) => replacementHost?.setTheme(theme),
+      onShowOriginalButtonChange: (visible) =>
+        replacementHost?.setRecoveryControlVisible(visible),
     });
     document.documentElement.dataset.novelCompassExtension = 'active';
   } catch (error) {
@@ -151,6 +162,7 @@ async function bootstrapReplacement(): Promise<void> {
 interface PreferenceChangeHandlers {
   onEnabledChange(enabled: boolean): void;
   onThemeChange(theme: 'system' | 'light' | 'dark'): void;
+  onShowOriginalButtonChange?(visible: boolean): void;
 }
 
 function observePreferenceChanges(handlers: PreferenceChangeHandlers): void {
@@ -161,16 +173,25 @@ function observePreferenceChanges(handlers: PreferenceChangeHandlers): void {
     if (!isRuntimePreferences(next)) return;
     handlers.onThemeChange(next.theme);
     handlers.onEnabledChange(next.extensionEnabled);
+    if (next.showOriginalButton !== undefined) {
+      handlers.onShowOriginalButtonChange?.(next.showOriginalButton);
+    }
   });
 }
 
 function isRuntimePreferences(
   value: unknown,
-): value is { extensionEnabled: boolean; theme: 'system' | 'light' | 'dark' } {
+): value is {
+  extensionEnabled: boolean;
+  showOriginalButton?: boolean;
+  theme: 'system' | 'light' | 'dark';
+} {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
   return (
     typeof candidate.extensionEnabled === 'boolean' &&
+    (candidate.showOriginalButton === undefined ||
+      typeof candidate.showOriginalButton === 'boolean') &&
     (candidate.theme === 'system' || candidate.theme === 'light' || candidate.theme === 'dark')
   );
 }

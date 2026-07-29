@@ -128,4 +128,17 @@ describe('installNativeTheme', () => {
     expect(controller.host.hidden).toBe(false);
     expect(document.documentElement.classList.contains(NATIVE_THEME_CLASS)).toBe(true);
   });
+
+  it('can hide the original-page recovery control without disabling the theme', () => {
+    const controller = installNativeTheme(document, 'html.novel-compass-native-theme{}');
+    const toggle = controller.host.shadowRoot?.querySelector<HTMLButtonElement>('.view-toggle');
+
+    controller.activate();
+    controller.setRecoveryControlVisible(false);
+    expect(toggle?.hidden).toBe(true);
+    expect(document.documentElement.classList.contains(NATIVE_THEME_CLASS)).toBe(true);
+
+    controller.setRecoveryControlVisible(true);
+    expect(toggle?.hidden).toBe(false);
+  });
 });

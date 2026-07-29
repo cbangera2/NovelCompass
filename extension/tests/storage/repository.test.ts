@@ -57,6 +57,7 @@ describe('ExtensionStorageRepository', () => {
       value: {
         schemaVersion: 2,
         extensionEnabled: true,
+        showOriginalButton: true,
         theme: 'system',
         pageModes: { series: 'replacement', seriesFinder: 'replacement' },
         updatedAt: NOW,
@@ -110,6 +111,7 @@ describe('ExtensionStorageRepository', () => {
       value: {
         schemaVersion: 2,
         extensionEnabled: false,
+        showOriginalButton: true,
         theme: 'system',
         pageModes: { series: 'original', seriesFinder: 'replacement' },
         updatedAt: '2026-07-28T01:00:00.000Z',
@@ -128,12 +130,14 @@ describe('ExtensionStorageRepository', () => {
 
     await repository.setEnabled(false);
     await repository.updatePreferences({ theme: 'dark' });
+    await repository.updatePreferences({ showOriginalButton: false });
     await repository.setPageMode('series', 'original');
     const loaded = await repository.loadPreferences();
 
     expect(loaded.status).toBe('ready');
     expect(loaded.value).toMatchObject({
       extensionEnabled: false,
+      showOriginalButton: false,
       theme: 'dark',
       pageModes: {
         series: 'original',

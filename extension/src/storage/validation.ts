@@ -12,6 +12,7 @@ export function defaultExtensionPreferences(now = new Date().toISOString()): Ext
   return {
     schemaVersion: EXTENSION_PREFERENCES_SCHEMA_VERSION,
     extensionEnabled: true,
+    showOriginalButton: true,
     theme: 'system',
     pageModes: {
       series: 'replacement',
@@ -26,6 +27,7 @@ export function parsePreferences(value: unknown): ExtensionPreferences | undefin
     return undefined;
   if (
     typeof value.extensionEnabled !== 'boolean' ||
+    typeof value.showOriginalButton !== 'boolean' ||
     !isTheme(value.theme) ||
     !isRecord(value.pageModes) ||
     !isPageMode(value.pageModes.series) ||
@@ -46,7 +48,7 @@ export function migratePreferences(value: unknown): ExtensionPreferences | undef
   if (current) return current;
   if (
     !isRecord(value) ||
-    value.schemaVersion !== 1 ||
+    (value.schemaVersion !== 1 && value.schemaVersion !== 2) ||
     typeof value.extensionEnabled !== 'boolean' ||
     !isRecord(value.pageModes) ||
     !isPageMode(value.pageModes.series) ||
@@ -57,7 +59,8 @@ export function migratePreferences(value: unknown): ExtensionPreferences | undef
   return {
     schemaVersion: EXTENSION_PREFERENCES_SCHEMA_VERSION,
     extensionEnabled: value.extensionEnabled,
-    theme: 'system',
+    showOriginalButton: true,
+    theme: isTheme(value.theme) ? value.theme : 'system',
     pageModes: {
       series: value.pageModes.series,
       seriesFinder: value.pageModes.seriesFinder,

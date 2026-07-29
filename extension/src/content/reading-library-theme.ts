@@ -1,4 +1,5 @@
 const READING_LIBRARY_CLASS = 'novel-compass-reading-library';
+const FOLLOWING_CLASS = 'novel-compass-following';
 export const READING_LIBRARY_HEADER_ID = 'novel-compass-reading-library-header';
 
 /**
@@ -10,9 +11,40 @@ export const READING_LIBRARY_HEADER_ID = 'novel-compass-reading-library-header';
  * tokens that must stay owned by Novel Updates.
  */
 export function installReadingLibraryTheme(document: Document): void {
+  installLibraryFrame(document, {
+    activePath: '/reading-list/',
+    pageClass: READING_LIBRARY_CLASS,
+    summary:
+      'Your live Novel Updates reading list. Filters, chapter links, list changes, and progress controls still use Novel Updates directly.',
+    title: 'My Library',
+  });
+}
+
+/**
+ * Frames Novel Updates' authenticated Following page without copying or
+ * replacing its follow and unfollow controls.
+ */
+export function installFollowingTheme(document: Document): void {
+  installLibraryFrame(document, {
+    activePath: '/following/',
+    pageClass: FOLLOWING_CLASS,
+    summary:
+      'Lists and people you follow on Novel Updates. Follow controls remain connected directly to your Novel Updates account.',
+    title: 'Following',
+  });
+}
+
+interface LibraryFrameOptions {
+  activePath: '/following/' | '/reading-list/';
+  pageClass: string;
+  summary: string;
+  title: string;
+}
+
+function installLibraryFrame(document: Document, options: LibraryFrameOptions): void {
   if (!document.body || document.getElementById(READING_LIBRARY_HEADER_ID)) return;
 
-  document.documentElement.classList.add(READING_LIBRARY_CLASS);
+  document.documentElement.classList.add(options.pageClass);
 
   const header = document.createElement('section');
   header.id = READING_LIBRARY_HEADER_ID;
@@ -24,12 +56,11 @@ export function installReadingLibraryTheme(document: Document): void {
 
   const title = document.createElement('h1');
   title.id = 'novel-compass-reading-library-title';
-  title.textContent = 'My Library';
+  title.textContent = options.title;
 
   const summary = document.createElement('p');
   summary.className = 'novel-compass-library-summary';
-  summary.textContent =
-    'Your live Novel Updates reading list. Filters, chapter links, list changes, and progress controls still use Novel Updates directly.';
+  summary.textContent = options.summary;
 
   const navigation = document.createElement('nav');
   navigation.setAttribute('aria-label', 'Library navigation');
@@ -44,7 +75,7 @@ export function installReadingLibraryTheme(document: Document): void {
     const link = document.createElement('a');
     link.href = href;
     link.textContent = label;
-    if (href === '/reading-list/') link.setAttribute('aria-current', 'page');
+    if (href === options.activePath) link.setAttribute('aria-current', 'page');
     navigation.append(link);
   }
 

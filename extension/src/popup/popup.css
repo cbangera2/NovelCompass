@@ -160,7 +160,8 @@ button {
 
 .data-pack-heading p,
 .data-pack-detail,
-.data-pack-note {
+.data-pack-note,
+.data-pack-fallback {
   color: #aaa9b6;
   font-size: 10px;
   line-height: 1.45;
@@ -235,6 +236,26 @@ button {
 .data-pack-note {
   display: block;
   margin-top: 9px;
+}
+
+.data-pack-fallback {
+  margin: 9px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid rgb(255 255 255 / 9%);
+}
+
+.data-pack-fallback[hidden] {
+  display: none;
+}
+
+.data-pack-fallback a {
+  color: #b8a8ff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.data-pack-fallback a:hover {
+  text-decoration: underline;
 }
 
 h2 {

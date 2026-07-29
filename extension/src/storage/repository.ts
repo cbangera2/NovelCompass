@@ -53,7 +53,9 @@ export class ExtensionStorageRepository {
   }
 
   async updatePreferences(
-    update: Partial<Pick<ExtensionPreferences, 'extensionEnabled' | 'theme'>> & {
+    update: Partial<
+      Pick<ExtensionPreferences, 'extensionEnabled' | 'showOriginalButton' | 'theme'>
+    > & {
       pageModes?: Partial<ExtensionPreferences['pageModes']>;
     },
   ): Promise<ExtensionPreferences> {
@@ -63,6 +65,9 @@ export class ExtensionStorageRepository {
       ...(update.extensionEnabled === undefined
         ? {}
         : { extensionEnabled: update.extensionEnabled }),
+      ...(update.showOriginalButton === undefined
+        ? {}
+        : { showOriginalButton: update.showOriginalButton }),
       ...(update.theme === undefined ? {} : { theme: update.theme }),
       pageModes: { ...current.pageModes, ...update.pageModes },
       updatedAt: this.now(),

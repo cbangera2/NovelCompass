@@ -51,4 +51,17 @@ describe('ExtensionReadingLibraryApp', () => {
     container.querySelector<HTMLButtonElement>('.extension-library-hero button')?.click();
     expect(onShowOriginal).toHaveBeenCalledOnce();
   });
+
+  it('marks the result list for a responsive dense card grid', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ExtensionReadingLibraryApp page={page} onShowOriginal={() => undefined} />,
+      );
+    });
+
+    const list = container.querySelector('.extension-library-results > ol');
+    expect(list).not.toBeNull();
+    expect(list?.children).toHaveLength(2);
+  });
 });

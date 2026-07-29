@@ -2,7 +2,10 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { installReadingLibraryTheme } from '../../src/content/reading-library-theme';
+import {
+  installFollowingTheme,
+  installReadingLibraryTheme,
+} from '../../src/content/reading-library-theme';
 
 afterEach(() => {
   document.documentElement.removeAttribute('class');
@@ -47,5 +50,29 @@ describe('installReadingLibraryTheme', () => {
     installReadingLibraryTheme(document);
 
     expect(document.querySelectorAll('#novel-compass-reading-library-header')).toHaveLength(1);
+  });
+
+  it('frames Following while preserving authenticated controls', () => {
+    document.body.innerHTML = `
+      <main class="l-main">
+        <form id="following-actions" action="/following/" method="post">
+          <input name="_wpnonce" value="following-fixture">
+          <button name="unfollow" value="42" type="submit">Unfollow</button>
+        </form>
+      </main>
+    `;
+    const form = document.getElementById('following-actions');
+    const button = document.querySelector<HTMLButtonElement>('button[name="unfollow"]');
+
+    installFollowingTheme(document);
+
+    expect(document.documentElement.classList.contains('novel-compass-following')).toBe(true);
+    expect(document.getElementById('following-actions')).toBe(form);
+    expect(document.querySelector('button[name="unfollow"]')).toBe(button);
+    expect(document.querySelector<HTMLInputElement>('input[name="_wpnonce"]')?.value)
+      .toBe('following-fixture');
+    expect(document.querySelector('#novel-compass-reading-library-title')?.textContent)
+      .toBe('Following');
+    expect(document.querySelector('[aria-current="page"]')?.textContent).toBe('Following');
   });
 });

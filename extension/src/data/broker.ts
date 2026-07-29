@@ -187,6 +187,13 @@ export class ExtensionDataBroker {
       const pointerResponse = await this.dependencies.fetch(this.dependencies.latestUrl, {
         cache: 'no-store',
       });
+      if (!pointerResponse.ok) {
+        throw new Error(
+          pointerResponse.status === 404
+            ? 'NovelCompass enhanced data has not been published yet (HTTP 404).'
+            : `NovelCompass enhanced data returned HTTP ${pointerResponse.status}.`,
+        );
+      }
       const pointer = await readValidatedJson<LatestPointer>(pointerResponse, MAX_POINTER_BYTES);
       const manifestUrl = this.trustedUrl(pointer.manifest_url, this.dependencies.latestUrl);
       if (
@@ -197,6 +204,9 @@ export class ExtensionDataBroker {
         return prior.manifest;
       }
       const manifestResponse = await this.dependencies.fetch(manifestUrl, { cache: 'no-store' });
+      if (!manifestResponse.ok) {
+        throw new Error(`NovelCompass data manifest returned HTTP ${manifestResponse.status}.`);
+      }
       const bytes = await readValidatedBytes(manifestResponse, MAX_MANIFEST_BYTES);
       if (pointer.manifest_sha256) await assertDigest(bytes, pointer.manifest_sha256);
       const manifest = JSON.parse(new TextDecoder().decode(bytes)) as RemoteManifest;

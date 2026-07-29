@@ -52,6 +52,13 @@
             <label><input type="radio" name="page-mode" value="original" />Original</label>
           </div>
         </fieldset>
+        <label class="setting-row setting-row--compact" for="show-original-button">
+          <span>
+            <strong>Original-page button</strong>
+            <small>Show the recovery button on restyled pages</small>
+          </span>
+          <input class="switch" id="show-original-button" type="checkbox" role="switch" />
+        </label>
       </section>
 
       <section class="settings-group data-pack" aria-labelledby="data-pack-title">
@@ -75,6 +82,16 @@
           Downloads JSON only from NovelCompass after you approve access. Restyling and live
           Novel Updates pages work without it.
         </small>
+        <p class="data-pack-fallback" id="data-pack-fallback" hidden>
+          Enhanced data is optional. You can still
+          <a href="https://cbangera2.github.io/NovelCompass/" data-external
+            >open NovelCompass <span aria-hidden="true">↗</span></a
+          >
+          or
+          <a href="https://github.com/cbangera2/NovelCompass" data-external
+            >check the project on GitHub <span aria-hidden="true">↗</span></a
+          >.
+        </p>
       </section>
 
       <p class="save-status" id="save-status" aria-live="polite"></p>
@@ -86,6 +103,9 @@
         >
         <a href="https://www.novelupdates.com/series-ranking/" data-external
           >Rankings <span>↗</span></a
+        >
+        <a href="https://cbangera2.github.io/NovelCompass/" data-external
+          >NovelCompass app <span>↗</span></a
         >
       </nav>
 

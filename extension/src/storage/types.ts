@@ -10,6 +10,7 @@ export type ExtensionTheme = 'system' | 'light' | 'dark';
 export interface ExtensionPreferences {
   schemaVersion: 2;
   extensionEnabled: boolean;
+  showOriginalButton: boolean;
   theme: ExtensionTheme;
   pageModes: {
     series: ExtensionPageMode;

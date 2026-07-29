@@ -17,6 +17,14 @@ describe('extension action popup', () => {
     });
   });
 
+  it('starts page restyling as soon as the native DOM is available', async () => {
+    const manifest = JSON.parse(
+      await readFile(new URL('manifest.json', extensionRoot), 'utf8'),
+    ) as { content_scripts?: Array<{ run_at?: string }> };
+
+    expect(manifest.content_scripts?.[0]?.run_at).toBe('document_end');
+  });
+
   it('exposes accessible controls for every popup preference', async () => {
     const html = await readFile(new URL('src/popup/index.html', extensionRoot), 'utf8');
 
@@ -27,10 +35,14 @@ describe('extension action popup', () => {
     expect(html).toContain('name="theme" value="dark"');
     expect(html).toContain('name="page-mode" value="replacement"');
     expect(html).toContain('name="page-mode" value="original"');
+    expect(html).toContain('id="show-original-button"');
     expect(html).toContain('id="data-pack-enable"');
     expect(html).toContain('id="data-pack-remove"');
     expect(html).toContain('Optional enhanced search and similar-novel recommendations.');
     expect(html).toContain('Restyling and live');
+    expect(html).toContain('id="data-pack-fallback"');
+    expect(html).toContain('href="https://cbangera2.github.io/NovelCompass/"');
+    expect(html).toContain('href="https://github.com/cbangera2/NovelCompass"');
     expect(html).toContain('aria-live="polite"');
   });
 

@@ -10,6 +10,7 @@ export interface NativeThemeController {
   activate(): void;
   deactivate(): void;
   setTheme(theme: 'system' | 'light' | 'dark'): void;
+  setRecoveryControlVisible(visible: boolean): void;
   showOriginal(): void;
   showThemed(): void;
   fail(error?: unknown): void;
@@ -188,6 +189,9 @@ export function installNativeTheme(document: Document, css: string): NativeTheme
     setTheme: (theme) => {
       host.dataset.theme = theme;
       document.documentElement.dataset.novelCompassTheme = theme;
+    },
+    setRecoveryControlVisible: (visible) => {
+      button.hidden = !visible;
     },
     showOriginal: () => setThemed(false),
     showThemed: () => setThemed(true),

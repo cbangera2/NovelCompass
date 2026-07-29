@@ -40,6 +40,7 @@ export interface ExtensionShellProps {
   children?: ReactNode;
   onInvokeAccountAction?: (actionId: string) => void;
   onShowOriginal: () => void;
+  showOriginalButton?: boolean;
 }
 
 const NAV_GROUPS = [
@@ -97,6 +98,7 @@ export function ExtensionShell({
   children,
   onInvokeAccountAction,
   onShowOriginal,
+  showOriginalButton = true,
 }: ExtensionShellProps): JSX.Element {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -187,18 +189,20 @@ export function ExtensionShell({
       </div>
       <footer className="extension-shell-sidebar-footer">
         <AccountSummary account={account} onInvokeAction={onInvokeAccountAction} />
-        <button
-          aria-label="Original Novel Updates"
-          onClick={onShowOriginal}
-          title="Original Novel Updates"
-          type="button"
-        >
-          <BookOpen aria-hidden="true" size={17} />
-          <span>
-            <strong>Original Novel Updates</strong>
-            <small>Temporarily restore this page</small>
-          </span>
-        </button>
+        {showOriginalButton ? (
+          <button
+            aria-label="Original Novel Updates"
+            onClick={onShowOriginal}
+            title="Original Novel Updates"
+            type="button"
+          >
+            <BookOpen aria-hidden="true" size={17} />
+            <span>
+              <strong>Original Novel Updates</strong>
+              <small>Temporarily restore this page</small>
+            </span>
+          </button>
+        ) : null}
       </footer>
     </>
   );

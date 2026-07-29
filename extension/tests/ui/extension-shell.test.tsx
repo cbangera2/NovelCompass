@@ -55,6 +55,13 @@ describe('ExtensionShell', () => {
     expect(onShowOriginal).toHaveBeenCalledOnce();
   });
 
+  it('can hide the original-view control without removing navigation', () => {
+    renderShell({ showOriginalButton: false });
+
+    expect(container.querySelector('[aria-label="Original Novel Updates"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Series finder"]')).not.toBeNull();
+  });
+
   it('renders the minimal account contract without inventing logged-in state', () => {
     renderShell({
       account: {
@@ -108,6 +115,9 @@ describe('ExtensionShell', () => {
     );
     expect(window.localStorage.getItem('novel-compass:sidebar-collapsed')).toBe('true');
     expect(toggle?.getAttribute('aria-label')).toBe('Expand sidebar');
+    expect(
+      container.querySelector('.extension-shell-sidebar.is-collapsed [aria-label="Series ranking"]'),
+    ).not.toBeNull();
     expect(
       container.querySelector('a[href="https://www.novelupdates.com/series-ranking/"]')?.getAttribute(
         'aria-label',

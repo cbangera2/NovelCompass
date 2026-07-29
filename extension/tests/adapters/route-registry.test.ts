@@ -13,6 +13,7 @@ describe('matchNovelUpdatesRoute', () => {
     ['/viewlist/123/', 'recommendation-lists', 'bespoke-replacement', true],
     ['/user/42/reader/', 'public-profile', 'bespoke-replacement', true],
     ['/reading-list/', 'reading-library', 'bespoke-replacement', true],
+    ['/following/', 'reading-library', 'shared-shell-native', false],
     ['/account/', 'account-form', 'shared-shell-native', false],
     ['/userlist/123/', 'account-form', 'shared-shell-native', false],
     ['/add-release/', 'contributor-form', 'shared-shell-native', false],
