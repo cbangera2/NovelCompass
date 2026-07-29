@@ -54,7 +54,15 @@ html.novel-compass-native-theme body
     .l-submain,
     .wpb_wrapper,
     .panel,
-    .card
+    .card,
+    .breadcrumb_nu,
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^="profile_content"],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu,
+    .search_main_box_nu .search_body_nu
   ) {
   background-color: #111520 !important;
   background-image: none !important;
@@ -63,9 +71,34 @@ html.novel-compass-native-theme body
 }
 
 html.novel-compass-native-theme body
-  :where(.w-box, .w-blog-post, .w-form, .l-submain, .panel, .card) {
+  :where(
+    .w-box,
+    .w-blog-post,
+    .w-form,
+    .l-submain,
+    .panel,
+    .card,
+    .breadcrumb_nu,
+    .p_b_body,
+    .wi-fic_profile_content,
+    .lid_box_sub,
+    .search_main_box_nu
+  ) {
   border-radius: 12px;
   box-shadow: 0 16px 45px rgb(0 0 0 / 20%);
+}
+
+html.novel-compass-native-theme body
+  :where(
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^="profile_content"],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu
+  )
+  :where(div, span, p, dt, dd, label) {
+  color: #d8d6e2;
 }
 
 html.novel-compass-native-theme body :where(th, td) {
