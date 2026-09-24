@@ -59,7 +59,7 @@ jobs:
           python build_static_export_parallel.py \
             --db "${RUNNER_TEMP}/fixture.sqlite" \
             --output web/public/data \
-            --candidate-limit 10
+            --compact-candidate-limit 10
           python build_static_export_parallel.py \
             --output web/public/data \
             --verify-only

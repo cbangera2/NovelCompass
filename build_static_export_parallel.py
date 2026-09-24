@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from src.db.schema import DEFAULT_DB_PATH, get_connection
-from src.engine.candidate_gen import CandidateGenerator
 from src.nlp.taxonomy import HIGH_PRIORITY_TAGS
 
 
@@ -127,105 +126,6 @@ def _dataset_version(conn: Any) -> str:
     material = f"{SCHEMA_VERSION}:{ALGORITHM_VERSION}:{row[0]}:{row[1]}"
     digest = hashlib.sha256(material.encode()).hexdigest()[:12]
     return f"{datetime.now(timezone.utc).date().isoformat()}-{digest}"
-
-
-def _candidate_evidence(
-    conn: Any,
-    seed_id: int,
-    candidate_ids: list[int],
-    tag_indices: dict[int, int],
-    list_titles: dict[int, str | None],
-) -> dict[int, dict[str, Any]]:
-    evidence = {candidate_id: {"shared_tag_ids": [], "direct_votes": 0, "list_count": 0, "list_ids": [], "lists": []}
-                for candidate_id in candidate_ids}
-    if not candidate_ids:
-        return evidence
-    marks = ",".join("?" for _ in candidate_ids)
-    for candidate_id, tag_id in conn.execute(
-        f"""SELECT nt2.novel_id, nt1.tag_id
-            FROM novel_tags nt1 JOIN novel_tags nt2 ON nt1.tag_id = nt2.tag_id
-            WHERE nt1.novel_id = ? AND nt2.novel_id IN ({marks})""",
-        (seed_id, *candidate_ids),
-    ):
-        evidence[candidate_id]["shared_tag_ids"].append(tag_indices[tag_id])
-    for source, target, votes in conn.execute(
-        f"""SELECT source_novel_id, target_novel_id, votes FROM direct_recs
-            WHERE (source_novel_id = ? AND target_novel_id IN ({marks}))
-               OR (target_novel_id = ? AND source_novel_id IN ({marks}))""",
-        (seed_id, *candidate_ids, seed_id, *candidate_ids),
-    ):
-        candidate_id = target if source == seed_id else source
-        evidence[candidate_id]["direct_votes"] = max(evidence[candidate_id]["direct_votes"], votes or 1)
-    for candidate_id, list_id in conn.execute(
-        f"""SELECT other.novel_id, seed.list_id
-            FROM rec_list_items seed JOIN rec_list_items other ON seed.list_id = other.list_id
-            WHERE seed.novel_id = ? AND other.novel_id IN ({marks})""",
-        (seed_id, *candidate_ids),
-    ):
-        evidence[candidate_id]["list_ids"].append(list_id)
-    for item in evidence.values():
-        item["shared_tag_ids"].sort()
-        item["list_ids"] = sorted(set(item["list_ids"]))
-        item["list_count"] = len(item["list_ids"])
-        if item["list_ids"]:
-            item["lists"] = [
-                {
-                    "id": list_id,
-                    "title": (
-                        None
-                        if not list_titles.get(list_id) or re.fullmatch(
-                            rf"Novel Updates List\s+{list_id}",
-                            list_titles[list_id],
-                            re.I,
-                        )
-                        else list_titles[list_id]
-                    ),
-                }
-                for list_id in item["list_ids"]
-            ]
-    return evidence
-
-
-def _export_pool(
-    conn: Any,
-    generator: CandidateGenerator,
-    seed_id: int,
-    limit: int,
-    tag_indices: dict[int, int],
-    list_titles: dict[int, str | None],
-) -> dict[str, Any]:
-    raw_channels = generator.get_candidate_channels(seed_id, limit_per_channel=limit, conn=conn)
-    ranks: dict[int, dict[str, int]] = {}
-    for channel in CHANNELS:
-        for rank, (candidate_id, _score) in enumerate(raw_channels.get(channel, []), 1):
-            if candidate_id != seed_id:
-                ranks.setdefault(candidate_id, {})[channel] = rank
-    selected = sorted(
-        ranks,
-        key=lambda candidate_id: (
-            -len(ranks[candidate_id]),
-            min(ranks[candidate_id].values()),
-            candidate_id,
-        ),
-    )[:limit]
-    evidence = _candidate_evidence(conn, seed_id, selected, tag_indices, list_titles)
-    candidates = []
-    for candidate_id in selected:
-        item = evidence[candidate_id]
-        candidates.append({
-            "id": candidate_id,
-            "r": [ranks[candidate_id].get(channel) for channel in CHANNELS],
-            **item,
-        })
-    result: dict[str, Any] = {
-        "seed": seed_id,
-        "algorithm_version": ALGORITHM_VERSION,
-        "channels": list(CHANNELS),
-        "candidates": candidates,
-    }
-    if not candidates:
-        result["reason"] = "insufficient_evidence"
-    return result
 
 
 class CompactCandidateIndex:
@@ -420,9 +320,7 @@ def export_static_dataset(
     output: Path,
     max_novels: int | None = None,
     db_path: str = DEFAULT_DB_PATH,
-    candidate_limit: int = 200,
     catalog_limit: int | None = None,
-    reuse_recommendations: bool = False,
     compact_candidate_limit: int = 50,
     workers: int | None = None,
 ) -> dict[str, Any]:
@@ -624,7 +522,6 @@ def export_static_dataset(
             recommendable += bool(pool)
 
         (output / "recommendation-index").mkdir(parents=True, exist_ok=True)
-        (output / "recs").mkdir(parents=True, exist_ok=True)
 
         bucket_log = ProgressLogger("bucket-writes", 256)
         write_args = [
@@ -778,10 +675,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("web/public/data"))
     parser.add_argument("--db", default=DEFAULT_DB_PATH)
     parser.add_argument("--max-novels", type=int)
-    parser.add_argument("--candidate-limit", type=int, default=200)
     parser.add_argument("--compact-candidate-limit", type=int, default=50)
     parser.add_argument("--bootstrap-limit", "--catalog-limit", dest="catalog_limit", type=int)
-    parser.add_argument("--reuse-recommendations", action="store_true")
     parser.add_argument("--workers", type=int, default=None,
                         help="Parallel worker processes (default: cpu_count-1)")
     parser.add_argument("--verify-only", action="store_true")
@@ -790,8 +685,8 @@ def main() -> None:
         verify_export(args.output)
     else:
         manifest = export_static_dataset(
-            args.output, args.max_novels, args.db, args.candidate_limit,
-            args.catalog_limit, args.reuse_recommendations,
+            args.output, args.max_novels, args.db,
+            args.catalog_limit,
             args.compact_candidate_limit, args.workers,
         )
         print(json.dumps(manifest, indent=2))
