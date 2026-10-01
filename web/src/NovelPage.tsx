@@ -11,7 +11,7 @@ import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { LocalNovelFeedback, LocalUserProfile } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { NovelDetail, NovelInsights, Recommendation } from './types';
-import { getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
+import { formatStatusLabel, getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import './novel-page.css';
 import { useDataModePreference } from './dataModePreference';
@@ -162,7 +162,7 @@ export default function NovelPage(): JSX.Element {
               </>
             );
           })()}
-          {detail.status_trans && <span>{detail.status_trans === 'Yes' ? 'Completed' : detail.status_trans === 'No' ? 'Ongoing' : detail.status_trans}</span>}
+          {detail.status_trans && <span>{formatStatusLabel(detail.status_trans)}</span>}
         </div>
         <h1>{title}</h1>
         <p className="novel-byline">
@@ -185,7 +185,7 @@ export default function NovelPage(): JSX.Element {
         <dl className="novel-facts" aria-label="Publication details">
           {detail.language && <div><dt>Language</dt><dd><a href={browseFacetUrl('language', detail.language)}>{detail.language}</a></dd></div>}
           {detail.year && <div><dt>Year</dt><dd>{detail.year}</dd></div>}
-          {detail.status_trans && <div><dt>Status</dt><dd>{detail.status_trans === 'Yes' ? 'Completed' : detail.status_trans === 'No' ? 'Ongoing' : detail.status_trans}</dd></div>}
+          {detail.status_trans && <div><dt>Status</dt><dd>{formatStatusLabel(detail.status_trans)}</dd></div>}
           <div><dt>Translated</dt><dd>{detail.chapters_trans.toLocaleString()} chapters</dd></div>
         </dl>
         <div className="novel-actions">
