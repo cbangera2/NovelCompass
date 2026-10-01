@@ -1,0 +1,18 @@
+name = "novelcompass-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Serve the Vite frontend build as static assets; /api/* routes are handled
+# by the Worker. Build the frontend first (web/dist) before deploying.
+[assets]
+directory = "../web/dist"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "novelcompass"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+# Optional: pin the dataset version string instead of hashing table counts.
+# NOVEL_DATASET_VERSION = "db-abc123"
