@@ -145,7 +145,10 @@ export class StaticDataSource implements RecommendationDataSource {
   private genres: string[] = [];
   private tags: string[] = [];
 
-  constructor(private readonly baseUrl = `${import.meta.env.BASE_URL}data`) {}
+  constructor(
+    private readonly baseUrl =
+      import.meta.env.VITE_DATA_URL || 'https://raw.githubusercontent.com/cbangera2/novelcompass-data/main'
+  ) {}
 
   async getManifest(): Promise<DatasetManifest> {
     if (!this.manifestPromise) {
