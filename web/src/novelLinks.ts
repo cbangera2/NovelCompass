@@ -43,4 +43,8 @@ export function novelPageUrl(id: number, from?: number, mediaType?: string): str
   return itemPageUrl(id, from, mediaType);
 }
 
-
+/** NovelUpdates' generic "no image" placeholder counts as no cover. */
+export function hasUsableCover(coverUrl?: string | null): boolean {
+  if (!coverUrl) return false;
+  return !coverUrl.toLowerCase().includes('noimagefound');
+}

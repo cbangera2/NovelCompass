@@ -11,7 +11,7 @@ import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { LocalNovelFeedback, LocalUserProfile } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { NovelDetail, NovelInsights, Recommendation } from './types';
-import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import './novel-page.css';
 import { useDataModePreference } from './dataModePreference';
@@ -145,7 +145,7 @@ export default function NovelPage(): JSX.Element {
 
     <section className="novel-hero">
       <div className="novel-cover-shell">
-        {detail.cover_url ? <img src={detail.cover_url} alt={`Cover of ${title}`} /> : <BookOpen aria-label="No cover available" />}
+        {hasUsableCover(detail.cover_url) ? <img src={detail.cover_url} alt={`Cover of ${title}`} /> : <BookOpen aria-label="No cover available" />}
       </div>
       <div className="novel-hero-copy">
         <div className="novel-eyebrow">
@@ -162,7 +162,7 @@ export default function NovelPage(): JSX.Element {
               </>
             );
           })()}
-          {detail.status_trans && <span>{detail.status_trans}</span>}
+          {detail.status_trans && <span>{detail.status_trans === 'Yes' ? 'Completed' : detail.status_trans === 'No' ? 'Ongoing' : detail.status_trans}</span>}
         </div>
         <h1>{title}</h1>
         <p className="novel-byline">
@@ -172,7 +172,7 @@ export default function NovelPage(): JSX.Element {
         </p>
         <div className="novel-stats">
           <div><strong>{detail.rating.toFixed(1)}</strong><span>rating</span><small>{detail.rating_votes.toLocaleString()} votes</small></div>
-          <div><strong>{detail.reading_list_count.toLocaleString()}</strong><span>readers</span><small>on reading lists</small></div>
+          <div><strong>{Math.max(0, detail.reading_list_count).toLocaleString()}</strong><span>readers</span><small>on reading lists</small></div>
           <div><strong>{detail.chapters_trans.toLocaleString()}</strong><span>chapters</span><small>{detail.chapters_orig ? `${detail.chapters_orig.toLocaleString()} original` : 'translated'}</small></div>
         </div>
         {insights && <div className="novel-rank-strip" aria-label="Catalog ranks">
@@ -185,7 +185,7 @@ export default function NovelPage(): JSX.Element {
         <dl className="novel-facts" aria-label="Publication details">
           {detail.language && <div><dt>Language</dt><dd><a href={browseFacetUrl('language', detail.language)}>{detail.language}</a></dd></div>}
           {detail.year && <div><dt>Year</dt><dd>{detail.year}</dd></div>}
-          {detail.status_trans && <div><dt>Status</dt><dd>{detail.status_trans}</dd></div>}
+          {detail.status_trans && <div><dt>Status</dt><dd>{detail.status_trans === 'Yes' ? 'Completed' : detail.status_trans === 'No' ? 'Ongoing' : detail.status_trans}</dd></div>}
           <div><dt>Translated</dt><dd>{detail.chapters_trans.toLocaleString()} chapters</dd></div>
         </dl>
         <div className="novel-actions">
@@ -255,7 +255,7 @@ export default function NovelPage(): JSX.Element {
           <p className="related-definition">Ranked from the current recommendation candidate pool. Percent match is normalized within this seed’s result set; signal ranks show which evidence channels surfaced each title.</p>
           <div className="novel-related-grid">{related.slice(0, 10).map((item) =>
             <a className="related-novel" key={item.target_id} href={novelPageUrl(item.target_id, novelId)}>
-              {item.cover_url ? <img src={item.cover_url} alt="" loading="lazy" /> : <BookMarked />}
+              {hasUsableCover(item.cover_url) ? <img src={item.cover_url} alt="" loading="lazy" /> : <BookMarked />}
               <span><strong>{item.title}</strong><small>{item.author || item.language}</small>
                 <span className="related-match"><b>{item.match_score_percent.toFixed(0)}% match</b>{topSignals(item).map((signal) => <em key={signal}>{signal}</em>)}</span>
                 <small className="related-reason">{item.evidence_bullets[0] || `${item.shared_tags.length} shared tags`}</small>

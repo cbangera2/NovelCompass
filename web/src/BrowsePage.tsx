@@ -9,7 +9,7 @@ import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
@@ -451,7 +451,7 @@ function BrowseCard({ novel }: { novel: BrowseNovel }) {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); }
   }}>
     <a className="browse-cover" href={novelPageUrl(novel.id, undefined, novel.media_type)}>
-      {novel.cover_url ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
+      {hasUsableCover(novel.cover_url) ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
     </a>
     <div>
       <a className="browse-title" href={novelPageUrl(novel.id, undefined, novel.media_type)}>{title}</a>
@@ -464,7 +464,7 @@ function BrowseCard({ novel }: { novel: BrowseNovel }) {
           {badge.formatLabel}
         </span>
         <Badge tone="amber"><Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'} <small>({novel.rating_votes.toLocaleString()})</small></Badge>
-        <Badge><Users size={14} /> {novel.reading_list_count.toLocaleString()}</Badge>
+        <Badge><Users size={14} /> {Math.max(0, novel.reading_list_count).toLocaleString()}</Badge>
       </div>
       <div className="browse-chips">{novel.genres?.slice(0, 3).map((item) => <a key={item} href={browseFacetUrl('genre', item)}>{item}</a>)}</div>
       <footer className="browse-card-actions">
