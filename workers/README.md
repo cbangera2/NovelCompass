@@ -33,7 +33,7 @@ vectors are precomputed (see below).
 2. Run migrations: `pnpm db:migrate`
 3. Build the frontend: `cd ../web && pnpm build`
 4. Import data: export the serving tables from SQLite and import:
-   `wrangler d1 import novelcompass --file data.sql`
+   `wrangler d1 execute novelcompass --remote --file data.sql`
    (or use `wrangler d1 execute` with batched inserts)
 5. Deploy: `pnpm deploy`
 

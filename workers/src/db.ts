@@ -33,9 +33,24 @@ export function parseAssociatedNames(value?: string | null): string[] {
 export function normalizeSearchQuery(query: string): string {
   return (query ?? "")
     .toLowerCase()
-    .replace(/[^\w\s]/gu, " ")
+    .replace(/[^\p{L}\p{N}_\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Build a LIKE pattern from user input that fits D1's 50-byte pattern limit.
+ * Truncates the needle (by bytes, to keep multi-byte chars intact) so the
+ * full `%...%` pattern stays at or under 50 bytes.
+ */
+export function likePattern(raw: string, maxNeedleBytes = 44): string {
+  const enc = new TextEncoder();
+  const bytes = enc.encode(raw ?? "");
+  const needle =
+    bytes.length > maxNeedleBytes
+      ? new TextDecoder().decode(bytes.slice(0, maxNeedleBytes))
+      : String(raw ?? "");
+  return `%${needle}%`;
 }
 
 export function searchTokenClause(
@@ -46,7 +61,7 @@ export function searchTokenClause(
   const params: string[] = [];
   const groups = tokens.map((token) => {
     const ors = columnExprs.map((expr) => `${expr} LIKE ?`).join(" OR ");
-    columnExprs.forEach(() => params.push(`%${token}%`));
+    columnExprs.forEach(() => params.push(likePattern(token)));
     return `(${ors})`;
   });
   return { sql: groups.join(" AND "), params };

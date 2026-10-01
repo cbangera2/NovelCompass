@@ -182,21 +182,15 @@ async function recListCandidates(
   seedId: number,
   limit: number,
 ): Promise<Array<[number, number]>> {
-  const listRows = await db
-    .prepare("SELECT list_id AS lid FROM rec_list_items WHERE novel_id = ?")
-    .bind(seedId)
-    .all<{ lid: number }>();
-  const listIds = (listRows.results ?? []).map((r) => r.lid);
-  if (listIds.length === 0) return [];
-  const placeholders = listIds.map(() => "?").join(",");
   const rows = await db
     .prepare(
       `SELECT novel_id AS nid, COUNT(list_id) AS co
        FROM rec_list_items
-       WHERE list_id IN (${placeholders}) AND novel_id != ?
+       WHERE list_id IN (SELECT list_id FROM rec_list_items WHERE novel_id = ?)
+         AND novel_id != ?
        GROUP BY novel_id ORDER BY co DESC LIMIT ?`,
     )
-    .bind(...listIds, seedId, limit)
+    .bind(seedId, seedId, limit)
     .all<{ nid: number; co: number }>();
   return (rows.results ?? []).map((r) => [r.nid, r.co]);
 }
@@ -230,15 +224,24 @@ async function structuralCandidates(
   return scored.slice(0, limit);
 }
 
+export let cachedTagIdf: Map<string, number> | null = null;
+let cachedTagsMap: Map<number, Set<string>> | null = null;
+
+async function getTagTables(db: D1Database) {
+  if (!cachedTagIdf || !cachedTagsMap) {
+    const [idf, tagsMap] = await Promise.all([calculateTagIdf(db), novelTagsMap(db)]);
+    cachedTagIdf = idf;
+    cachedTagsMap = tagsMap;
+  }
+  return { idf: cachedTagIdf, tagsMap: cachedTagsMap };
+}
+
 export async function getCandidateChannels(
   db: D1Database,
   seedId: number,
   limitPerChannel = 150,
 ): Promise<ChannelCandidates> {
-  const [idf, tagsMap] = await Promise.all([
-    calculateTagIdf(db),
-    novelTagsMap(db),
-  ]);
+  const { idf, tagsMap } = await getTagTables(db);
   const [vector, tag, directRec, recList, structural] = await Promise.all([
     vectorCandidates(db, seedId, limitPerChannel),
     tagCandidates(db, seedId, limitPerChannel, idf, tagsMap),
@@ -358,10 +361,64 @@ export async function filterCandidates(
   const source = (prefs.source ?? "").trim().toLowerCase();
   const excludeIds = new Set(prefs.exclude_novel_ids ?? []);
 
+  const traitMap = new Map<number, NovelTraits>();
+  const toLoad = candidateIds.filter((nid) => !excludeIds.has(nid));
+  for (let i = 0; i < toLoad.length; i += 100) {
+    const chunk = toLoad.slice(i, i + 100);
+    const ph = chunk.map(() => "?").join(",");
+    const [tagRows, genreRows, novelRows] = await Promise.all([
+      db.prepare(
+        `SELECT nt.novel_id AS nid, LOWER(t.name) AS name FROM tags t
+         JOIN novel_tags nt ON t.id = nt.tag_id WHERE nt.novel_id IN (${ph})`,
+      ).bind(...chunk).all<{ nid: number; name: string }>(),
+      db.prepare(
+        `SELECT ng.novel_id AS nid, LOWER(g.name) AS name FROM genres g
+         JOIN novel_genres ng ON g.id = ng.genre_id WHERE ng.novel_id IN (${ph})`,
+      ).bind(...chunk).all<{ nid: number; name: string }>(),
+      db.prepare(
+        `SELECT id, status_trans, chapters_trans, language, rating, rating_votes,
+                reading_list_count, year,
+                COALESCE(media_type, 'novel') AS media_type,
+                COALESCE(source, 'novelupdates') AS source
+         FROM novels WHERE id IN (${ph})`,
+      ).bind(...chunk).all<any>(),
+    ]);
+    const tagsById = new Map<number, Set<string>>();
+    for (const r of tagRows.results ?? []) {
+      if (!tagsById.has(r.nid)) tagsById.set(r.nid, new Set());
+      tagsById.get(r.nid)!.add(r.name);
+    }
+    const genresById = new Map<number, Set<string>>();
+    for (const r of genreRows.results ?? []) {
+      if (!genresById.has(r.nid)) genresById.set(r.nid, new Set());
+      genresById.get(r.nid)!.add(r.name);
+    }
+    for (const n of novelRows.results ?? []) {
+      traitMap.set(n.id, {
+        tags: tagsById.get(n.id) ?? new Set(),
+        genres: genresById.get(n.id) ?? new Set(),
+        status_trans: n.status_trans ?? "",
+        chapters_trans: n.chapters_trans ?? 0,
+        language: n.language ?? "",
+        rating: n.rating ?? 0,
+        rating_votes: n.rating_votes ?? 0,
+        reading_list_count: n.reading_list_count ?? 0,
+        year: n.year ?? 0,
+        media_type: n.media_type ?? "novel",
+        source: n.source ?? "novelupdates",
+      });
+    }
+  }
+  const emptyTraits: NovelTraits = {
+    tags: new Set(), genres: new Set(), status_trans: "", chapters_trans: 0,
+    language: "", rating: 0, rating_votes: 0, reading_list_count: 0,
+    year: 0, media_type: "novel", source: "novelupdates",
+  };
+
   const valid: number[] = [];
   for (const nid of candidateIds) {
     if (excludeIds.has(nid)) continue;
-    const traits = await getNovelFilterTraits(db, nid);
+    const traits = traitMap.get(nid) ?? emptyTraits;
     const allTagsGenres = new Set([...traits.tags, ...traits.genres]);
 
     if (targetTypes.size > 0 && !targetTypes.has("all")) {

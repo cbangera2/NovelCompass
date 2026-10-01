@@ -117,8 +117,8 @@ app.post("/api/resolve-slugs", async (c) => {
   if (requested.length === 0) return c.json({ results: [] });
   const db = c.env.DB;
   const results: any[] = [];
-  for (let i = 0; i < requested.length; i += 500) {
-    const chunk = requested.slice(i, i + 500);
+  for (let i = 0; i < requested.length; i += 100) {
+    const chunk = requested.slice(i, i + 100);
     const placeholders = chunk.map(() => "?").join(",");
     const rows = await db
       .prepare(
@@ -143,8 +143,8 @@ app.post("/api/resolve-ids", async (c) => {
   if (requested.length === 0) return c.json({ results: [] });
   const db = c.env.DB;
   const results: any[] = [];
-  for (let i = 0; i < requested.length; i += 500) {
-    const chunk = requested.slice(i, i + 500);
+  for (let i = 0; i < requested.length; i += 100) {
+    const chunk = requested.slice(i, i + 100);
     const placeholders = chunk.map(() => "?").join(",");
     const rows = await db
       .prepare(`SELECT ${SEARCH_RESULT_COLUMNS} FROM novels WHERE id IN (${placeholders})`)
@@ -282,7 +282,7 @@ function browseWhere(f: BrowseFilters): { joins: string[]; where: string[]; para
     params.push(...excludedIds.map(Number));
   }
   if (f.query.trim()) {
-    const needle = `%${f.query.trim()}%`;
+    const needle = `%${f.query.trim().slice(0, 48)}%`;
     where.push("(n.title LIKE ? OR n.author LIKE ? OR n.associated_names LIKE ?)");
     params.push(needle, needle, needle);
   }
@@ -695,7 +695,7 @@ async function runRecommend(db: D1Database, body: any) {
          WHERE title LIKE ? OR slug LIKE ?
          ORDER BY reading_list_count DESC LIMIT 1`,
       )
-      .bind(`%${query}%`, `%${query}%`)
+      .bind(`%${query.slice(0, 48)}%`, `%${query.slice(0, 48)}%`)
       .first();
   }
   if (!seedRow) return { error: `Novel matching '${query}' not found.`, status: 404 };
@@ -721,16 +721,20 @@ async function runRecommend(db: D1Database, body: any) {
   const hiddenGem = body.hidden_gem_mode ?? false;
   const gamma = Math.max(0, Math.min(1, Number(body.hidden_gem_strength ?? 0.3)));
   const finalScores = new Map<number, number>();
-  for (const [nid, score] of rrfScores) {
-    if (hiddenGem) {
-      const r = await db
-        .prepare("SELECT reading_list_count FROM novels WHERE id = ?")
-        .bind(nid)
-        .first<{ reading_list_count: number }>();
-      finalScores.set(nid, applyHiddenGemBoost(score, r?.reading_list_count ?? 0, 10000, gamma));
-    } else {
-      finalScores.set(nid, score);
+  let rlCounts = new Map<number, number>();
+  if (hiddenGem && rrfScores.size > 0) {
+    const nids = [...rrfScores.keys()];
+    for (let i = 0; i < nids.length; i += 100) {
+      const chunk = nids.slice(i, i + 100);
+      const rows = await db
+        .prepare(`SELECT id, reading_list_count FROM novels WHERE id IN (${chunk.map(() => "?").join(",")})`)
+        .bind(...chunk)
+        .all<{ id: number; reading_list_count: number }>();
+      for (const r of rows.results ?? []) rlCounts.set(r.id, r.reading_list_count ?? 0);
     }
+  }
+  for (const [nid, score] of rrfScores) {
+    finalScores.set(nid, hiddenGem ? applyHiddenGemBoost(score, rlCounts.get(nid) ?? 0, 10000, gamma) : score);
   }
 
   const sorted = [...finalScores.entries()]
@@ -845,7 +849,7 @@ app.post("/api/recommend/for-you", async (c) => {
 
   const ranked = [...scores.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, Math.max(limit * 3, limit));
+    .slice(0, limit);
 
   const hiddenGem = body.hidden_gem_mode ?? false;
   const gamma = Math.max(0, Math.min(1, Number(body.hidden_gem_strength ?? 0.3)));
