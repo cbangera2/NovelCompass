@@ -92,3 +92,46 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
 
+
+.genre-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.genre-tile {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.genre-tile:hover {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+}
+
+.genre-tile.active {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+  color: var(--accent-bright);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.genre-tile-name {
+  font-weight: 600;
+}
+
+.genre-tile-count {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

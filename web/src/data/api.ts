@@ -73,6 +73,15 @@ export class ApiDataSource implements RecommendationDataSource {
     return this.optionsPromise;
   }
 
+  async getGenreCounts(): Promise<Array<{ genre: string; count: number }>> {
+    try {
+      const result = await apiFetch<{ genres: Array<{ genre: string; count: number }> }>('/api/genre-counts');
+      return result.genres || [];
+    } catch {
+      return [];
+    }
+  }
+
   async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {
     const result = new Map<string, NovelSearchResult>();
     const exact = await apiFetch<{ results: NovelSearchResult[] }>('/api/resolve-slugs', {
