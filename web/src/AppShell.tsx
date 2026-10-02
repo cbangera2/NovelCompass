@@ -359,12 +359,12 @@ function GlobalNovelSearch({
 
   useEffect(() => {
     const onShortcut = (event: KeyboardEvent) => {
+      const isCmdK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
       const target = event.target as HTMLElement | null;
-      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
-      if (
-        event.key === '/' ||
-        ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k')
-      ) {
+      const inField = target?.matches('input, textarea, select, [contenteditable="true"]');
+      // `/` only fires outside text fields so it never hijacks typing;
+      // ⌘K/Ctrl+K works from anywhere, matching the command-palette convention.
+      if ((event.key === '/' && !inField) || isCmdK) {
         event.preventDefault();
         setOpen(true);
         window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -444,7 +444,12 @@ function GlobalNovelSearch({
             <X size={15} />
           </button>
         )}
-        {!mobile && <kbd>/</kbd>}
+        {!mobile && (
+          <>
+            <kbd>/</kbd>
+            <kbd>⌘K</kbd>
+          </>
+        )}
       </label>
       {open && hasPanelContent && (
         <div className="shell-search-results">

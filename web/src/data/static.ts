@@ -357,6 +357,20 @@ export class StaticDataSource implements RecommendationDataSource {
     };
   }
 
+  async getGenreCounts(): Promise<Array<{ genre: string; count: number }>> {
+    await this.loadCatalog();
+    const counts = new Map<string, number>();
+    for (const card of this.cards.values()) {
+      for (const genreId of card.genre_ids || []) {
+        const name = this.genres[genreId];
+        if (name) counts.set(name, (counts.get(name) || 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([genre, count]) => ({ genre, count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
   async resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>> {
     await this.loadCatalog();
     const requested = new Set(items.map((item) => item.slug.toLowerCase()));
@@ -620,6 +634,7 @@ export class StaticDataSource implements RecommendationDataSource {
     const includeGenres = (request.include_genres || '').split(',').map(normalize).filter(Boolean);
     const excludeGenres = (request.exclude_genres || '').split(',').map(normalize).filter(Boolean);
     const includeTags = (request.include_tags || '').split(',').map(normalize).filter(Boolean);
+    const matchAnyTag = request.tag_match === 'any';
     const excludeTags = (request.exclude_tags || '').split(',').map(normalize).filter(Boolean);
     const excludedIds = new Set((request.exclude_ids || '').split(',').map(Number).filter(Number.isFinite));
     let facets: FacetsFile | undefined;
@@ -655,7 +670,9 @@ export class StaticDataSource implements RecommendationDataSource {
       if ((tag || includeTags.length || excludeTags.length) && tagSupported) {
         const tagNames = (facets?.novels?.[String(card.id)]?.t || []).map((id) => this.tags[id]).filter(Boolean).map(normalize);
         if (tag && !tagNames.includes(tag)) return false;
-        if (includeTags.some((item) => !tagNames.includes(item))) return false;
+        if (matchAnyTag
+          ? (includeTags.length && !includeTags.some((item) => tagNames.includes(item)))
+          : includeTags.some((item) => !tagNames.includes(item))) return false;
         if (excludeTags.some((item) => tagNames.includes(item))) return false;
       }
       return true;
