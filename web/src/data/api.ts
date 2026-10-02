@@ -77,7 +77,8 @@ export class ApiDataSource implements RecommendationDataSource {
     try {
       const result = await apiFetch<{ genres: Array<{ genre: string; count: number }> }>('/api/genre-counts');
       return result.genres || [];
-    } catch {
+    } catch (error) {
+      console.warn('genre counts unavailable:', error);
       return [];
     }
   }

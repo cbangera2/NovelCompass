@@ -668,9 +668,9 @@ app.get("/api/novels/:id/insights", async (c) => {
 app.get("/api/genre-counts", async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
-    `SELECT g.name AS genre, COUNT(*) AS count FROM genres g
+    `SELECT g.name AS genre, COUNT(DISTINCT ng.novel_id) AS count FROM genres g
      JOIN novel_genres ng ON ng.genre_id = g.id
-     GROUP BY g.id ORDER BY COUNT(*) DESC`,
+     GROUP BY g.id ORDER BY count DESC`,
   ).all<{ genre: string; count: number }>();
   return c.json({ genres: rows.results ?? [] });
 });

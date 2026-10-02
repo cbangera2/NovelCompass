@@ -91,7 +91,9 @@ export default function BrowsePage(): JSX.Element {
       if (cancelled) return;
       setSource(next);
       setOptions(nextOptions);
-      next.getGenreCounts().then(setGenreCounts).catch(() => setGenreCounts([]));
+      next.getGenreCounts()
+        .then((counts) => { if (!cancelled) setGenreCounts(counts); })
+        .catch(() => { if (!cancelled) setGenreCounts([]); });
     }).catch((reason) => !cancelled && setError(reason.message || `Could not load the ${dataMode} data source.`));
     return () => { cancelled = true; };
   }, [dataMode]);
