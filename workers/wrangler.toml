@@ -1,4 +1,4 @@
-name = "novelcompass-api"
+name = "novelcompass"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
@@ -11,7 +11,9 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "novelcompass"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+# D1 database ids are not secrets; local dev overrides this binding with
+# `--local` (see README), so committing the id is safe.
+database_id = "758bff42-5274-43ed-a043-6c5f5ea84a51"
 
 [vars]
 # Optional: pin the dataset version string instead of hashing table counts.
