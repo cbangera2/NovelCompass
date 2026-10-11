@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Series Ranking - Novel Updates</title>
+    <link
+      rel="canonical"
+      href="https://www.novelupdates.com/series-ranking/?rank=popmonth&amp;pg=2"
+    />
+  </head>
+  <body>
+    <main>
+      <h1 data-ranking-heading>Series Ranking</h1>
+      <form action="/series-ranking/" method="get">
+        <label for="ranking-type">Ranking Type</label>
+        <select id="ranking-type" name="rank">
+          <option value="popular">Popular (All)</option>
+          <option value="popmonth" selected>Popular (Month)</option>
+          <option value="week">Activity (Week)</option>
+        </select>
+        <fieldset data-ranking-language>
+          <legend>Language</legend>
+          <label><input name="rl[]" type="checkbox" value="1" checked /> Chinese</label>
+          <label><input name="rl[]" type="checkbox" value="3" /> Korean</label>
+        </fieldset>
+        <label for="minimum-chapters">Chapters (Minimum # of Chapters)</label>
+        <input id="minimum-chapters" name="mchap" type="number" value="25" />
+        <label for="story-status">Story Status</label>
+        <select id="story-status" name="status">
+          <option value="">Any</option>
+          <option value="1" selected>Completed</option>
+        </select>
+        <fieldset>
+          <legend>Genre</legend>
+          <label><input name="gi" type="checkbox" value="8" checked /> Fantasy</label>
+          <label
+            ><input class="exclude" name="ge" type="checkbox" value="15" checked /> Harem</label
+          >
+        </fieldset>
+      </form>
+
+      <article class="search_main_box_nu" data-rank="21">
+        <img src="https://cdn.novelupdates.com/images/synthetic-one.jpg" alt="" />
+        <span data-language>Korean</span>
+        <span>(4.2)</span>
+        <h2 class="search_title">
+          <a id="sid1001" href="/series/synthetic-moon/">Synthetic Moon</a>
+        </h2>
+        <div class="search_stats">
+          174 Chapters Every 0.9 Day(s) 1,499 Readers 9 Reviews 07-27-2026
+        </div>
+        <p class="search_body_nu">A sanitized fixture description.</p>
+        <a href="/genre/fantasy/">Fantasy</a>
+      </article>
+      <article class="search_main_box_nu" data-rank="22">
+        <h2 class="search_title">
+          <a id="sid1002" href="https://www.novelupdates.com/series/synthetic-sword/"
+            >Synthetic Sword</a
+          >
+        </h2>
+        <span>Japanese (3.9)</span>
+        <span>88 Chapters</span><span>320 Readers</span><span>2 Reviews</span>
+      </article>
+
+      <nav class="digg_pagination" aria-label="Ranking pages">
+        <a class="prev" rel="prev" href="?rank=popmonth&amp;pg=1">Previous</a>
+        <a href="?rank=popmonth&amp;pg=1">1</a>
+        <span class="current">2</span>
+        <a href="?rank=popmonth&amp;pg=3">3</a>
+        <a class="next" rel="next" href="?rank=popmonth&amp;pg=3">Next</a>
+      </nav>
+    </main>
+  </body>
+</html>

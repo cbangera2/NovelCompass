@@ -1,0 +1,12 @@
+{
+  "101": {
+    "associated_names": ["Regressed Mercenary"],
+    "synopsis": "A deterministic fixture synopsis.",
+    "genre_ids": [0, 1],
+    "tag_ids": [0, 1],
+    "original_chapters": 150,
+    "direct_recommendation_count": 1,
+    "related_series_count": 0,
+    "recommendation_list_count": 1
+  }
+}

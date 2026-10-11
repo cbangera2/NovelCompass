@@ -1,0 +1,543 @@
+html.novel-compass-native-theme {
+  color-scheme: dark;
+  background: #090b12;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light'] {
+  color-scheme: light;
+  background: #f7f7fb;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light'] body {
+  background: #f7f7fb !important;
+  color: #292338 !important;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light'] body :where(a) {
+  color: #5945bc;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light']
+  body
+  :where(input, select, textarea) {
+  background: #fff !important;
+  border-color: #d6d0e2 !important;
+  color: #292338 !important;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light']
+  body
+  :where(
+    table,
+    .w-box,
+    .w-blog-post,
+    .w-form,
+    .g-cols,
+    .g-cols > div,
+    .l-main,
+    .l-submain,
+    .wpb_wrapper,
+    .panel,
+    .card,
+    .breadcrumb_nu,
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^='profile_content'],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu
+  ) {
+  background-color: #fff !important;
+  border-color: #ded9e8 !important;
+  color: #292338 !important;
+}
+
+html.novel-compass-native-theme[data-novel-compass-theme='light']
+  body
+  :where(
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^='profile_content'],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu
+  )
+  :where(div, span, p, dt, dd, label) {
+  color: #554e62;
+}
+
+@media (prefers-color-scheme: light) {
+  html.novel-compass-native-theme[data-novel-compass-theme='system'] {
+    color-scheme: light;
+    background: #f7f7fb;
+  }
+
+  html.novel-compass-native-theme[data-novel-compass-theme='system'] body {
+    background: #f7f7fb !important;
+    color: #292338 !important;
+  }
+
+  html.novel-compass-native-theme[data-novel-compass-theme='system'] body :where(a) {
+    color: #5945bc;
+  }
+
+  html.novel-compass-native-theme[data-novel-compass-theme='system']
+    body
+    :where(input, select, textarea) {
+    background: #fff !important;
+    border-color: #d6d0e2 !important;
+    color: #292338 !important;
+  }
+}
+
+html.novel-compass-native-theme body {
+  background: #090b12 !important;
+  color: #e7e5ee !important;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif !important;
+  line-height: 1.55;
+  padding-left: 236px;
+}
+
+html.novel-compass-native-theme body :where(a) {
+  color: #b8a8ff;
+}
+
+html.novel-compass-native-theme body :where(input, select, textarea, button) {
+  border: 1px solid rgb(255 255 255 / 18%) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font: inherit;
+}
+
+html.novel-compass-native-theme body :where(input, select, textarea) {
+  background: #111520 !important;
+  color: #f5f3ff !important;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.65rem;
+}
+
+html.novel-compass-native-theme body :where(button, input[type='button'], input[type='submit']) {
+  background: #6d5bd0 !important;
+  color: #fff !important;
+  cursor: pointer;
+  padding: 0.48rem 0.8rem;
+}
+
+html.novel-compass-native-theme body :where(input, select, textarea, button):focus-visible {
+  border-color: #a99af4 !important;
+  outline: 3px solid rgb(169 154 244 / 28%) !important;
+  outline-offset: 1px;
+}
+
+html.novel-compass-native-theme
+  body
+  :where(
+    table,
+    .w-box,
+    .w-blog-post,
+    .w-form,
+    .g-cols,
+    .g-cols > div,
+    .l-main,
+    .l-submain,
+    .wpb_wrapper,
+    .panel,
+    .card,
+    .breadcrumb_nu,
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^='profile_content'],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu,
+    .search_main_box_nu .search_body_nu
+  ) {
+  background-color: #111520 !important;
+  background-image: none !important;
+  border-color: rgb(255 255 255 / 10%) !important;
+  color: #e7e5ee !important;
+}
+
+html.novel-compass-native-theme
+  body
+  :where(
+    .w-box,
+    .w-blog-post,
+    .w-form,
+    .l-submain,
+    .panel,
+    .card,
+    .breadcrumb_nu,
+    .p_b_body,
+    .wi-fic_profile_content,
+    .lid_box_sub,
+    .search_main_box_nu
+  ) {
+  border-radius: 12px;
+  box-shadow: 0 16px 45px rgb(0 0 0 / 20%);
+}
+
+html.novel-compass-native-theme
+  body
+  :where(
+    .p_b_body,
+    .wi-fic_profile_content,
+    [id^='profile_content'],
+    .lid_box_sub,
+    .search_main_box_nu,
+    .search_body_nu
+  )
+  :where(div, span, p, dt, dd, label) {
+  color: #d8d6e2;
+}
+
+html.novel-compass-native-theme body :where(th, td) {
+  background-color: transparent !important;
+  border-color: rgb(255 255 255 / 9%) !important;
+  color: inherit !important;
+}
+
+html.novel-compass-native-theme
+  body
+  :where(.l-header, .l-footer, .ad_336, .ad_728, [id^='div-gpt-ad'], .adsbygoogle) {
+  display: none !important;
+}
+
+html.novel-compass-native-theme body > :not(#novel-compass-native-theme-root) {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+html.novel-compass-native-theme.novel-compass-home body {
+  padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 4rem calc(236px + clamp(1rem, 3vw, 2.5rem));
+}
+
+html.novel-compass-native-theme.novel-compass-home
+  body
+  :where(.l-sidebar, .sidebar, .g-cols > .one-third:last-child, .g-cols > .one-quarter:last-child) {
+  display: none !important;
+}
+
+html.novel-compass-native-theme.novel-compass-home
+  body
+  :where(.l-main, .l-submain, .l-content, .g-cols, .g-cols > div, .wpb_wrapper) {
+  float: none !important;
+  margin: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+html.novel-compass-native-theme.novel-compass-home
+  body
+  :where(table, thead, tbody, tr, th, td, [class*='lnd_']) {
+  background-color: transparent !important;
+  background-image: none !important;
+  color: #e7e5ee !important;
+}
+
+html.novel-compass-native-theme.novel-compass-home
+  body
+  :where([style*='background-color'], [style*='background:']) {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(table) {
+  background: #111520 !important;
+  border: 1px solid rgb(255 255 255 / 10%) !important;
+  border-collapse: separate !important;
+  border-radius: 12px;
+  border-spacing: 0 !important;
+  box-shadow: 0 18px 45px rgb(0 0 0 / 18%);
+  overflow: hidden;
+  table-layout: fixed;
+  width: 100% !important;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(thead, thead tr, th) {
+  background: #171c29 !important;
+  color: #aaa9b7 !important;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(th, td) {
+  border: 0 !important;
+  border-bottom: 1px solid rgb(255 255 255 / 7%) !important;
+  padding: 0.55rem 0.75rem !important;
+  vertical-align: middle;
+}
+
+html.novel-compass-native-theme.novel-compass-home body #myTable :where(th, td):first-child {
+  width: 48%;
+}
+
+html.novel-compass-native-theme.novel-compass-home body #myTable :where(th, td):nth-child(2) {
+  width: 20%;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(tbody tr) {
+  background: #111520 !important;
+  transition: background-color 120ms ease;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(tbody tr:hover) {
+  background: #19172a !important;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(tbody tr:last-child td) {
+  border-bottom: 0 !important;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(td a) {
+  color: #c4b5fd !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+html.novel-compass-native-theme.novel-compass-home body :where(td a:hover) {
+  color: #fff !important;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+html.novel-compass-native-theme.novel-compass-home
+  body
+  :where(input[type='checkbox'], input[type='radio']) {
+  accent-color: #8b7ae6;
+  background: #171c29 !important;
+  min-height: 1rem;
+  padding: 0;
+}
+
+html.novel-compass-native-theme.novel-compass-home
+  body
+  :where(.pagination, .page_navi, .wp-pagenavi) {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+html.novel-compass-native-theme.novel-compass-home
+  body
+  :where(.pagination, .page_navi, .wp-pagenavi)
+  :where(a, span) {
+  background: #171c29 !important;
+  border: 1px solid rgb(255 255 255 / 11%) !important;
+  border-radius: 8px;
+  color: #c8c3d3 !important;
+  min-width: 2.1rem;
+  padding: 0.45rem 0.65rem;
+  text-align: center;
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) body {
+  padding: 2rem clamp(1rem, 4vw, 4rem) 5rem calc(236px + clamp(1rem, 4vw, 4rem));
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
+  #novel-compass-reading-library-header {
+  box-sizing: border-box;
+  margin: 0 auto 1.25rem;
+  max-width: 1180px;
+  padding: clamp(1.35rem, 3vw, 2.25rem);
+  background:
+    radial-gradient(circle at 88% 15%, rgb(109 91 208 / 28%), transparent 34%),
+    linear-gradient(135deg, #171424, #10141d);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 18px;
+  box-shadow: 0 22px 60px rgb(0 0 0 / 28%);
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
+  #novel-compass-reading-library-header
+  :where(h1, p) {
+  margin: 0;
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) .novel-compass-library-eyebrow {
+  color: #a99af4;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) #novel-compass-reading-library-title {
+  color: #fff;
+  font-size: clamp(1.8rem, 4vw, 2.75rem);
+  line-height: 1.08;
+  margin-top: 0.35rem;
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) .novel-compass-library-summary {
+  color: #b9b6c5;
+  margin-top: 0.7rem !important;
+  max-width: 49rem;
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
+  #novel-compass-reading-library-header
+  nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
+  #novel-compass-reading-library-header
+  nav
+  a {
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 999px;
+  color: #d8d2ff;
+  padding: 0.48rem 0.82rem;
+  text-decoration: none;
+}
+
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
+  #novel-compass-reading-library-header
+  nav
+  a:is(:hover, :focus-visible),
+html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following)
+  #novel-compass-reading-library-header
+  nav
+  a[aria-current='page'] {
+  background: #6d5bd0;
+  border-color: #8d7ce8;
+  color: #fff;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(.l-sidebar, .sidebar, #sidebar, .g-cols > .one-third:last-child) {
+  display: none !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(.l-main, .l-submain, .l-content, .g-cols, .g-cols > div, .wpb_wrapper) {
+  box-sizing: border-box;
+  float: none !important;
+  margin-inline: auto !important;
+  max-width: 1180px !important;
+  width: 100% !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(table, form, .panel, .card, .w-box, [class*='follow']) {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+html.novel-compass-native-theme.novel-compass-following body :where(table) {
+  border: 1px solid rgb(255 255 255 / 10%) !important;
+  border-collapse: separate !important;
+  border-radius: 12px;
+  border-spacing: 0 !important;
+  overflow: hidden;
+  width: 100% !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following body :where(th, td) {
+  padding: 0.65rem 0.75rem !important;
+  vertical-align: middle;
+}
+
+html.novel-compass-native-theme.novel-compass-following body :where(tbody tr:hover) {
+  background: #19172a !important;
+}
+
+html.novel-compass-native-theme.novel-compass-following
+  body
+  :where(.pagination, .page_navi, .wp-pagenavi) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+html.novel-compass-native-theme.novel-compass-reading-library
+  body
+  :where(
+    #myTable_wrapper,
+    .dataTables_wrapper,
+    .rl-container,
+    .rl_content,
+    .reading-list,
+    [class*='reading_list']
+  ) {
+  box-sizing: border-box;
+  background: #111520 !important;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 14px;
+  color: #e7e5ee !important;
+  padding: clamp(0.8rem, 2vw, 1.25rem);
+}
+
+html.novel-compass-native-theme.novel-compass-reading-library
+  body
+  :where(.dataTables_filter, .dataTables_length, .dataTables_info, .dataTables_paginate) {
+  color: #c8c5d2 !important;
+  margin-block: 0.45rem;
+}
+
+html.novel-compass-native-theme.novel-compass-reading-library body #myTable {
+  border-collapse: separate !important;
+  border-spacing: 0 0.45rem !important;
+  width: 100% !important;
+}
+
+html.novel-compass-native-theme.novel-compass-reading-library body #myTable :where(th, td) {
+  background: #151a27 !important;
+  padding: 0.72rem !important;
+  vertical-align: middle;
+}
+
+html.novel-compass-native-theme.novel-compass-reading-library
+  body
+  :where(.paginate_button, .page-numbers) {
+  background: #171c29 !important;
+  border: 1px solid rgb(255 255 255 / 12%) !important;
+  border-radius: 7px !important;
+  color: #d8d2ff !important;
+  display: inline-block;
+  margin: 0.15rem;
+  padding: 0.35rem 0.58rem !important;
+}
+
+@media (max-width: 800px) {
+  html.novel-compass-native-theme body {
+    padding-left: 0;
+    padding-top: 3.75rem;
+  }
+
+  html.novel-compass-native-theme.novel-compass-home body {
+    padding: 4.5rem 0.75rem 3rem;
+  }
+
+  html.novel-compass-native-theme:is(.novel-compass-reading-library, .novel-compass-following) body {
+    padding: calc(3.75rem + 1rem) 0.7rem 4rem;
+  }
+
+  html.novel-compass-native-theme.novel-compass-reading-library
+    body
+    :where(#myTable_wrapper, .dataTables_wrapper) {
+    overflow-x: auto;
+  }
+
+  html.novel-compass-native-theme.novel-compass-reading-library body #myTable {
+    min-width: 42rem;
+  }
+}

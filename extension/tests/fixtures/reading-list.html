@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head><title>Reading List | Novel Updates</title></head>
+  <body>
+    <header><h1 data-reading-list-title>Reading List</h1></header>
+    <nav class="reading-list-tabs">
+      <a class="active" href="/reading-list/?list=0">Reading (12)</a>
+      <a href="/reading-list/?list=1">Completed (4)</a>
+    </nav>
+    <form id="reading-list-actions" method="post">
+      <input type="hidden" name="_wpnonce" value="fixture-redacted">
+      <table><tbody>
+        <tr data-reading-row>
+          <td><input type="checkbox" name="series[]" value="101"></td>
+          <td>
+            <img src="https://cdn.novelupdates.com/images/example.jpg">
+            <a class="series-title" href="/series/example-novel/">Example Novel</a>
+          </td>
+          <td class="list-name">Reading</td>
+          <td class="series-status">Ongoing</td>
+          <td class="reading-progress">Chapter 18</td>
+          <td class="latest-release"><a href="/extnu/9001/">Chapter 24</a></td>
+          <td class="updated">2 hours ago</td>
+        </tr>
+        <tr data-reading-row>
+          <td><input type="checkbox" name="series[]" value="102"></td>
+          <td><a class="series-title" href="/series/finished-story/">Finished Story</a></td>
+          <td class="list-name">Completed</td>
+          <td class="series-status">Completed</td>
+          <td class="reading-progress">Chapter 40</td>
+          <td class="latest-release"><a href="/extnu/9002/">Chapter 40</a></td>
+          <td class="updated">Yesterday</td>
+        </tr>
+      </tbody></table>
+      <button type="submit">Move selected</button>
+    </form>
+    <nav class="pagination">
+      <a href="/reading-list/?list=0&amp;pg=1">1</a>
+      <a class="current" href="/reading-list/?list=0&amp;pg=2">2</a>
+      <a rel="next" href="/reading-list/?list=0&amp;pg=3">Next</a>
+    </nav>
+  </body>
+</html>

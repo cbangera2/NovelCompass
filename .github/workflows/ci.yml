@@ -53,6 +53,11 @@ jobs:
       - name: Run non-mutating quality checks
         run: pnpm --dir web run check
 
+      - name: Test and package Chrome extension
+        run: |
+          pnpm --dir web run test:extension
+          pnpm --dir web run package:extension
+
       - name: Generate fixture static projection
         run: |
           python -m scripts.create_ci_dataset "${RUNNER_TEMP}/fixture.sqlite"

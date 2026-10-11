@@ -82,6 +82,20 @@ export interface DatasetManifest {
   bootstrap_catalog_url?: string;
   facets_url?: string;
   options_url?: string;
+  extension_search_index_url?: string;
+  extension_identity_url?: string;
+  extension_facet_options_url?: string;
+  extension_facet_novels_url?: string;
+  artifacts?: Record<
+    string,
+    {
+      url: string;
+      sha256: string;
+      compressed_bytes?: number;
+      uncompressed_bytes?: number;
+      record_count?: number;
+    }
+  >;
 }
 
 export interface FilterOptions {

@@ -1,0 +1,20 @@
+{
+  "seed": 101,
+  "algorithm_version": 1,
+  "channels": ["tag", "direct_rec", "rec_list", "structural", "vector"],
+  "candidates": [
+    {
+      "id": 102,
+      "r": [1, 1, null, 1, 1],
+      "shared_tag_ids": [1],
+      "direct_votes": 2,
+      "mutual": true,
+      "evidence_bullets": ["Shared mercenary themes"]
+    },
+    {
+      "id": 103,
+      "r": [8, null, 2, null, 5],
+      "shared_tag_ids": []
+    }
+  ]
+}

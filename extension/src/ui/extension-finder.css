@@ -1,0 +1,141 @@
+.novel-compass-finder {
+  --bg: #090b12;
+  --surface: #111520;
+  --surface-raised: #161b28;
+  --surface-soft: #0e121c;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --accent: #9b87f5;
+  --accent-bright: #b8a8ff;
+  --accent-soft: rgba(155, 135, 245, 0.13);
+  --text: #f5f3ff;
+  --muted: #aaa9b6;
+  --dim: #747482;
+  --green: #73d4ae;
+  --red: #ff9caa;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  min-height: 100vh;
+}
+
+:host([data-theme='light']) .novel-compass-finder {
+  --bg: #f7f7fb;
+  --surface: #fff;
+  --surface-raised: #f0eef6;
+  --surface-soft: #f4f2f8;
+  --border: rgb(51 42 69 / 12%);
+  --border-strong: rgb(51 42 69 / 21%);
+  --accent: #6d5bd0;
+  --accent-bright: #5945bc;
+  --accent-soft: rgb(109 91 208 / 12%);
+  --text: #201b2b;
+  --muted: #625c6e;
+  --dim: #817b8c;
+  --green: #26755d;
+  --red: #b33a4d;
+}
+
+@media (prefers-color-scheme: light) {
+  :host([data-theme='system']) .novel-compass-finder {
+    --bg: #f7f7fb;
+    --surface: #fff;
+    --surface-raised: #f0eef6;
+    --surface-soft: #f4f2f8;
+    --border: rgb(51 42 69 / 12%);
+    --border-strong: rgb(51 42 69 / 21%);
+    --accent: #6d5bd0;
+    --accent-bright: #5945bc;
+    --accent-soft: rgb(109 91 208 / 12%);
+    --text: #201b2b;
+    --muted: #625c6e;
+    --dim: #817b8c;
+    --green: #26755d;
+    --red: #b33a4d;
+  }
+}
+
+.novel-compass-finder *,
+.novel-compass-finder *::before,
+.novel-compass-finder *::after {
+  box-sizing: border-box;
+}
+
+.extension-finder-toolbar {
+  align-items: center;
+  background: rgba(9, 11, 18, 0.96);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.8rem clamp(1rem, 4vw, 3rem);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.extension-finder-toolbar > div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.extension-finder-toolbar strong {
+  font-size: 0.95rem;
+}
+
+.extension-finder-toolbar span,
+.extension-finder-boundary {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.extension-finder-toolbar button,
+.extension-finder-error button {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.55rem 0.75rem;
+}
+
+.extension-finder-boundary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  line-height: 1.5;
+  margin: 1rem auto 0;
+  max-width: 1216px;
+  padding: 0.7rem 0.85rem;
+}
+
+.extension-finder-loading,
+.extension-finder-error {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 auto;
+  max-width: 560px;
+  min-height: 50vh;
+  padding: 4rem 1rem;
+  place-content: center;
+  text-align: center;
+}
+
+.extension-finder-error p {
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .extension-finder-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

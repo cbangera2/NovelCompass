@@ -40,6 +40,7 @@
 .browse-number-filter span,.browse-text-filter span{color:var(--muted);font-size:.68rem}
 .browse-number-filter input,.browse-text-filter input{background:var(--surface-soft);border:1px solid var(--border);border-radius:8px;color:var(--text);min-width:0;padding:.55rem;width:100%}
 .browse-library-filter{align-items:center;color:var(--muted);display:flex;font-size:.75rem;gap:.45rem}
+.browse-native-select{display:flex;flex-direction:column;gap:.25rem;min-width:0}.browse-native-select>span{color:var(--dim);font-size:.61rem;font-weight:750;letter-spacing:.08em;line-height:1;text-transform:uppercase}.browse-native-select select{background:var(--surface-soft);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.74rem;height:38px;min-width:0;padding:0 .65rem;width:100%}
 .browse-density{display:flex;gap:.3rem}
 .browse-density .ds-button{height:36px;padding:0;width:36px}
 .browse-grid.density-list{grid-template-columns:1fr}
@@ -91,4 +92,3 @@
   color: var(--accent-bright);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
-

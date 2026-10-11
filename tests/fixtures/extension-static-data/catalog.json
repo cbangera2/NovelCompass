@@ -1,0 +1,33 @@
+{
+  "fields": [
+    "id",
+    "slug",
+    "title",
+    "author",
+    "cover",
+    "rating",
+    "votes",
+    "readers",
+    "year",
+    "language",
+    "status_trans",
+    "translated_chapters",
+    "genre_ids",
+    "source",
+    "external_id",
+    "external_url"
+  ],
+  "rows": [
+    [101, "i-became-a-regressed-mercenary", "I Became a Regressed Mercenary", "Fixture Author A", "", 4.4, 120, 4200, 2024, "Korean", "Ongoing", 30, [0, 1], "novelupdates", "101", "https://www.novelupdates.com/series/i-became-a-regressed-mercenary/"],
+    [102, "the-clockwork-sword", "The Clockwork Sword", "Fixture Author B", "", 4.8, 80, 900, 2021, "Chinese", "Completed", 210, [0, 1], "novelupdates", "102", "https://www.novelupdates.com/series/the-clockwork-sword/"],
+    [103, "letters-after-snowfall", "Letters After Snowfall", "Fixture Author C", "", 4.1, 35, 300, 2019, "Korean", "Completed", 88, [2], "novelupdates", "103", "https://www.novelupdates.com/series/letters-after-snowfall/"]
+  ],
+  "aliases": [
+    [101, ["Regressed Mercenary"]],
+    [102, ["Clockwork Blade"]]
+  ],
+  "languages": ["Korean", "Chinese"],
+  "statuses": ["Ongoing", "Completed"],
+  "genres": ["Action", "Fantasy", "Romance"],
+  "tags": ["Regression", "Mercenaries", "Slow Romance"]
+}

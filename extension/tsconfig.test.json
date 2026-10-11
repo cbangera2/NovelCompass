@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "vitest": ["../web/node_modules/vitest/dist/index.d.ts"],
+      "vitest/config": ["../web/node_modules/vitest/config.d.ts"]
+    }
+  },
+  "include": ["src", "tests", "vitest.config.ts"]
+}

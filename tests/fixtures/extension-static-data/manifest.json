@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "algorithm_version": 1,
+  "dataset_version": "extension-fixture-v1",
+  "novel_count": 3,
+  "bootstrap_novel_count": 3,
+  "detail_novel_count": 1,
+  "recommendation_seed_count": 1,
+  "catalog_url": "catalog.json",
+  "bootstrap_catalog_url": "catalog.json",
+  "facets_url": "facets.json",
+  "options_url": "options.json"
+}
