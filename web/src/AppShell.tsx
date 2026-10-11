@@ -9,6 +9,7 @@ import {
   Download,
   ExternalLink,
   LogOut,
+  Network,
   Search,
   Settings,
   Sparkles,
@@ -50,11 +51,12 @@ import {
 import './app-shell.css';
 import { useDataModePreference } from './dataModePreference';
 
-export type AppView = 'discover' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
+export type AppView = 'discover' | 'browse' | 'graph' | 'profile' | 'settings' | 'scraper' | 'novel';
 
 const NAV_ITEMS = [
   { view: 'discover' as const, label: 'Discover', note: 'Find related titles', icon: Sparkles },
   { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen },
+  { view: 'graph' as const, label: 'Graph', note: 'Visual media network', icon: Network },
   { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings },
   { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database },
 ];

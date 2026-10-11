@@ -82,6 +82,7 @@ export interface DatasetManifest {
   bootstrap_catalog_url?: string;
   facets_url?: string;
   options_url?: string;
+  graph_url?: string;
 }
 
 export interface FilterOptions {
@@ -226,3 +227,50 @@ export interface NovelInsights {
   cohort_definition: string;
   capabilities: { relationships: boolean; tags: boolean };
 }
+
+export interface GraphNode {
+  id: number;
+  title: string;
+  slug: string;
+  author?: string;
+  cover?: string;
+  rating: number;
+  votes: number;
+  readers: number;
+  year?: number;
+  media_type: string;
+  source: string;
+  degree: number;
+  cluster_id: number;
+  genre?: string;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+}
+
+export interface GraphEdge {
+  source: number | GraphNode;
+  target: number | GraphNode;
+  type: string;
+  weight: number;
+  votes?: number;
+}
+
+export interface GraphCluster {
+  id: number;
+  name: string;
+  seed_id: number;
+  size: number;
+  types: Record<string, number>;
+}
+
+export interface GraphData {
+  node_count: number;
+  edge_count: number;
+  cluster_count: number;
+  clusters: GraphCluster[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+

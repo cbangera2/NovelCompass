@@ -20,11 +20,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "3d-force-graph": "^1.80.0",
     "@base-ui/react": "^1.6.0",
+    "@types/three": "^0.185.1",
+    "force-graph": "^1.51.4",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",
