@@ -75,7 +75,10 @@ export default function AppShell({
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [homeUrl, setHomeUrl] = useState(defaultHomeUrl);
   const { mode: dataMode } = useDataModePreference();
-  const staticDeployment = dataMode === 'static' || window.location.hostname.endsWith('.github.io');
+  const staticDeployment =
+    dataMode === 'static' ||
+    window.location.hostname.endsWith('.github.io') ||
+    window.location.hostname.endsWith('.pages.dev');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
 
   useEffect(() => {

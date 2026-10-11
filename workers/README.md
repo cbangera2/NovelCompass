@@ -27,15 +27,66 @@ vectors are precomputed (see below).
 
 ## Setup
 
-1. Create the D1 database:
+1. Create the D1 database (already done):
    `wrangler d1 create novelcompass`
-   Paste the `database_id` into `wrangler.toml`.
-2. Run migrations: `pnpm db:migrate`
-3. Build the frontend: `cd ../web && pnpm build`
-4. Import data: export the serving tables from SQLite and import:
-   `wrangler d1 execute novelcompass --remote --file data.sql`
-   (or use `wrangler d1 execute` with batched inserts)
-5. Deploy: `pnpm deploy`
+   The id lives in `wrangler.toml` (D1 ids are not secrets). Local dev
+   always passes `--local`, which ignores the remote id.
+2. Run migrations: `npm run db:migrate` (remote) or `npm run db:migrate:local`
+3. Build the frontend: `cd ../web && pnpm build`. If `web/public/data` is a
+   git clone, strip its history first (`rm -rf web/public/data/.git`) — the
+   pack file exceeds the 25 MiB per-asset limit and fails the deploy.
+4. Import data: export the serving tables from SQLite and import, in ~2 MB
+   chunks (single huge `--file` uploads time out):
+   `python3 scripts/export_d1_seed.py --db ../data/recommender.db --output seed.sql`
+   then split and `wrangler d1 execute novelcompass --remote --file=chunk.sql`
+   per chunk.
+5. Deploy: `npm run deploy`
+
+Pushes to `main` that touch `workers/`, `web/`, or the workflow deploy
+automatically via `.github/workflows/deploy-worker.yml`, which needs the
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets (the D1 id is
+already committed in `wrangler.toml`).
+
+## Local development
+
+No Cloudflare account needed. All local commands pass `--local`, which uses
+ephemeral local state instead of the remote id in `wrangler.toml`:
+
+```bash
+cd workers
+npm install
+npx tsc --noEmit                                          # typecheck
+npx wrangler d1 migrations apply novelcompass --local     # schema
+PYTHONPATH=.. python3 ../scripts/create_ci_dataset.py /tmp/fixture.sqlite
+python3 - <<'EOF' > /tmp/seed.sql                         # serving tables only
+import sqlite3
+src = sqlite3.connect('/tmp/fixture.sqlite')
+for t in ['novels','tags','novel_tags','genres','novel_genres',
+          'direct_recs','related_series','rec_lists','rec_list_items']:
+    cols = [r[1] for r in src.execute(f'PRAGMA table_info({t})')]
+    for row in src.execute(f'SELECT * FROM {t}'):
+        vals = ','.join('NULL' if v is None
+                        else "'"+str(v).replace(\"'\",\"''\")+"'"
+                        if isinstance(v, str) else str(v) for v in row)
+        print(f'INSERT INTO {t} ({",".join(cols)}) VALUES ({vals});')
+EOF
+npx wrangler d1 execute novelcompass --local --file=/tmp/seed.sql
+npx wrangler dev --local --port 8787
+```
+
+Smoke-test in another terminal:
+
+```bash
+curl -s localhost:8787/api/health
+curl -s 'localhost:8787/api/search?query=fixture&limit=5'
+curl -s localhost:8787/api/novels/1
+curl -s -X POST localhost:8787/api/recommend \
+  -H 'content-type: application/json' -d '{"query":"1","limit":5}'
+```
+
+`wrangler dev` also serves `../web/dist` (build it first with
+`pnpm --dir web run build`), so the frontend talks to the local API on
+the same origin.
 
 ## Data refresh flow
 
