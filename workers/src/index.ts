@@ -14,6 +14,7 @@ import {
   calculateMatchPercent,
   calculateRrfScores,
   explainRecommendation,
+  getTagTables,
   filterCandidates,
   getCandidateChannels,
   type ChannelCandidates,
@@ -21,6 +22,11 @@ import {
 } from "./recommend";
 import {
   SEARCH_RESULT_COLUMNS,
+  type CohortIndex,
+  type MetricKey,
+  getCatalogDistributions,
+  getCohortIndexes,
+  rankInSorted,
   anilistUrl,
   datasetVersion,
   externalUrlFor,
@@ -88,16 +94,105 @@ function recommendPreferences(body: any, extraExclude: number[]): FilterPreferen
 // health
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Self-hosted snapshot assets
+// ---------------------------------------------------------------------------
+
+// The normalized JSON snapshot (catalog, facets, details, options, manifest)
+// is shipped as static assets alongside the frontend by the deploy pipeline.
+// Reading it there costs zero D1 rows, so prefer it for anything the static
+// export already computes.
+const STATIC_ASSET_PREFIX = "/data";
+
+async function fetchJsonAsset<T>(c: any, path: string): Promise<T | null> {
+  try {
+    const origin = new URL(c.req.url).origin;
+    const response = await fetch(`${origin}${STATIC_ASSET_PREFIX}/${path}`, {
+      headers: { "cache-control": "no-cache" },
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// health
+// ---------------------------------------------------------------------------
+
+// The static export already computes a ranked candidate pool per novel
+// ({candidate, per-channel ranks, shared tag ids}). Reading it costs zero D1
+// rows; D1 remains the source of truth for filtering and per-result evidence.
+const COMPACT_CHANNEL_ORDER = [
+  "tag",
+  "direct_rec",
+  "rec_list",
+  "structural",
+  "vector",
+];
+
+async function compactPoolChannels(
+  c: any,
+  seedId: number,
+): Promise<ChannelCandidates | null> {
+  const bucket = (seedId % 256).toString(16).padStart(2, "0");
+  const shard = await fetchJsonAsset<{
+    channels?: string[];
+    pools?: Record<string, Array<[number, Array<number | null>, number[]?]>>;
+  }>(c, `recommendation-index/${bucket}.json`);
+  const raw = shard?.pools?.[String(seedId)];
+  // `undefined` means the seed has no precomputed pool (e.g. local dev
+  // without the snapshot); fall back to computing channels in D1.
+  if (raw === undefined || !Array.isArray(raw)) return null;
+  const order =
+    shard?.channels?.length === COMPACT_CHANNEL_ORDER.length
+      ? (shard.channels as string[])
+      : COMPACT_CHANNEL_ORDER;
+  const channels: ChannelCandidates = {};
+  for (const name of order) channels[name] = [];
+  for (const entry of raw) {
+    const [id, ranks] = entry;
+    (ranks ?? []).forEach((rank, index) => {
+      if (rank == null) return;
+      const name = order[index];
+      if (!name) return;
+      channels[name].push([id, Number(rank)] as [number, number]);
+    });
+  }
+  // RRF treats array position as the rank, so each channel must be rebuilt in
+  // ascending rank order from the recorded numbers.
+  for (const name of Object.keys(channels)) {
+    channels[name].sort((a, b) => a[1] - b[1]);
+  }
+  return channels;
+}
+
+// ---------------------------------------------------------------------------
+// health
+// ---------------------------------------------------------------------------
+
 app.get("/api/health", async (c) => {
   const db = c.env.DB;
-  const row = await db.prepare("SELECT COUNT(*) AS n FROM novels").first<{ n: number }>();
-  const novelCount = row?.n ?? 0;
+  // A one-row probe proves D1 is reachable without burning a full scan, and
+  // its failure is what makes the frontend fall back to the static snapshot.
+  const probe = await db
+    .prepare("SELECT id FROM novels LIMIT 1")
+    .first<{ id: number }>()
+    .catch(() => null);
+  if (!probe) {
+    return c.json({ status: "unreachable" }, 503);
+  }
+  const manifest = await fetchJsonAsset<{
+    dataset_version?: string;
+    novel_count?: number;
+  }>(c, "manifest.json");
   return c.json({
-    status: novelCount ? "ok" : "empty",
+    status: "ok",
     schema_version: SCHEMA_VERSION,
     algorithm_version: ALGORITHM_VERSION,
-    dataset_version: await datasetVersion(db),
-    novel_count: novelCount,
+    dataset_version: manifest?.dataset_version ?? (await datasetVersion(db)),
+    novel_count: manifest?.novel_count ?? 0,
   });
 });
 
@@ -531,106 +626,116 @@ app.get("/api/novels/:id/insights", async (c) => {
     .first<any>();
   if (!novel) return c.json({ detail: `Novel ${novelId} not found.` }, 404);
 
-  const totalRow = await db.prepare("SELECT COUNT(*) AS t FROM novels").first<{ t: number }>();
-  const total = totalRow?.t ?? 0;
+  // Catalog-wide distributions are built once per isolate; each request then
+  // answers from memory with a binary search instead of ~12 full scans.
+  const [distributions, cohorts, { tagsMap }] = await Promise.all([
+    getCatalogDistributions(db),
+    getCohortIndexes(db),
+    getTagTables(db),
+  ]);
+  const total = distributions.total;
 
-  const metrics: any[] = [];
-  for (const [key, column] of [
-    ["rating", "rating"],
-    ["rating_votes", "rating_votes"],
-    ["readers", "reading_list_count"],
-  ] as const) {
+  const metrics = (
+    [
+      ["rating", "rating"],
+      ["rating_votes", "rating_votes"],
+      ["readers", "reading_list_count"],
+    ] as Array<[string, MetricKey]>
+  ).map(([key, column]) => {
     const value = novel[column] ?? 0;
-    const [below, above] = await Promise.all([
-      db.prepare(`SELECT COUNT(*) AS t FROM novels WHERE COALESCE(${column}, 0) <= ?`)
-        .bind(value).first<{ t: number }>(),
-      db.prepare(`SELECT COUNT(*) AS t FROM novels WHERE COALESCE(${column}, 0) > ?`)
-        .bind(value).first<{ t: number }>(),
-    ]);
-    metrics.push({
-      key, value,
-      percentile: total ? Math.round((100 * (below?.t ?? 0)) / total * 10) / 10 : 0,
-      rank: (above?.t ?? 0) + 1,
+    const { below, above } = rankInSorted(distributions.sorted[column], value);
+    return {
+      key,
+      value,
+      percentile: total ? Math.round((100 * below) / total * 10) / 10 : 0,
+      rank: above + 1,
       population: total,
-    });
-  }
+    };
+  });
 
-  const genreRow = await db
-    .prepare(
-      `SELECT MIN(g.name) AS g FROM novel_genres ng
-       JOIN genres g ON g.id=ng.genre_id WHERE ng.novel_id=?`,
-    )
-    .bind(novelId)
-    .first<{ g: string }>();
-  const primaryGenre = genreRow?.g ?? null;
+  const genres = (cohorts.novelGenres.get(novelId) ?? [])
+    .slice()
+    .sort((a, b) => a.localeCompare(b));
+  const primaryGenre = genres[0] ?? null;
 
-  const cohorts: any[] = [];
-  const cohortSpecs: Array<[string, string | null, string]> = [
-    ["primary_genre", primaryGenre,
-      "EXISTS (SELECT 1 FROM novel_genres x JOIN genres gx ON gx.id=x.genre_id WHERE x.novel_id=n.id AND gx.name=?)"],
-    ["language", novel.language, "n.language = ?"],
-    ["year", novel.year ? String(novel.year) : null, "n.year = ?"],
-  ];
-  for (const [dimension, value, clause] of cohortSpecs) {
-    if (!value) continue;
-    const parameter = dimension === "year" ? novel.year : value;
-    const [pop, above] = await Promise.all([
-      db.prepare(`SELECT COUNT(*) AS t FROM novels n WHERE ${clause}`)
-        .bind(parameter).first<{ t: number }>(),
-      db.prepare(
-        `SELECT COUNT(*) AS t FROM novels n WHERE ${clause} AND COALESCE(n.reading_list_count,0) > ?`,
-      ).bind(parameter, novel.reading_list_count ?? 0).first<{ t: number }>(),
-    ]);
-    cohorts.push({
-      dimension, value: String(value),
-      population: pop?.t ?? 0,
-      readership_rank: (above?.t ?? 0) + 1,
-    });
-  }
-
-  const peers: any[] = [];
+  const cohortSpecs: Array<[string, string, CohortIndex | undefined]> = [];
   if (primaryGenre) {
+    cohortSpecs.push(["primary_genre", primaryGenre, cohorts.byGenre.get(primaryGenre)]);
+  }
+  if (novel.language) {
+    cohortSpecs.push(["language", novel.language, cohorts.byLanguage.get(novel.language)]);
+  }
+  if (novel.year) {
+    cohortSpecs.push(["year", String(novel.year), cohorts.byYear.get(String(novel.year))]);
+  }
+  const cohortsOut = cohortSpecs.map(([dimension, value, index]) => {
+    if (!index) return { dimension, value, population: 0, readership_rank: 1 };
+    const { above } = rankInSorted(index.readers, novel.reading_list_count ?? 0);
+    return {
+      dimension,
+      value,
+      population: index.population,
+      readership_rank: above + 1,
+    };
+  });
+
+  // Peers: one bounded prefilter over the same language + primary genre, with
+  // shared genres/tags counted from the in-memory indexes instead of two
+  // correlated subqueries per candidate row.
+  const peers: any[] = [];
+  if (primaryGenre && novel.language) {
     const peerRows = await db
       .prepare(
         `SELECT n.id, n.title, n.slug, n.author, n.cover_url, n.rating,
-                n.rating_votes, n.reading_list_count, n.language, n.year,
-                (SELECT COUNT(*) FROM novel_genres a
-                 JOIN novel_genres b ON b.genre_id=a.genre_id
-                 WHERE a.novel_id=? AND b.novel_id=n.id) AS shared_genres,
-                (SELECT COUNT(*) FROM novel_tags a
-                 JOIN novel_tags b ON b.tag_id=a.tag_id
-                 WHERE a.novel_id=? AND b.novel_id=n.id) AS shared_tags
+                n.rating_votes, n.reading_list_count, n.language, n.year
          FROM novels n
-         WHERE n.id != ? AND n.language = ?
+         WHERE n.language = ? AND n.id != ?
            AND EXISTS (
-             SELECT 1 FROM novel_genres ng JOIN genres g ON g.id=ng.genre_id
-             WHERE ng.novel_id=n.id AND g.name=?
-           )
-         ORDER BY shared_tags DESC, shared_genres DESC,
-                  n.reading_list_count DESC, n.id
-         LIMIT 10`,
+             SELECT 1 FROM novel_genres ng JOIN genres g ON g.id = ng.genre_id
+             WHERE ng.novel_id = n.id AND g.name = ?)
+         ORDER BY n.reading_list_count DESC LIMIT 60`,
       )
-      .bind(novelId, novelId, novelId, novel.language, primaryGenre)
+      .bind(novel.language, novelId, primaryGenre)
       .all<any>();
+    const seedGenres = new Set(genres);
+    const seedTags = tagsMap.get(novelId) ?? new Set<string>();
     for (const r of peerRows.results ?? []) {
+      let sharedGenres = 0;
+      for (const g of seedGenres) if ((cohorts.novelGenres.get(r.id) ?? []).includes(g)) sharedGenres++;
+      let sharedTags = 0;
+      const peerTags = tagsMap.get(r.id);
+      if (peerTags) for (const t of seedTags) if (peerTags.has(t)) sharedTags++;
       peers.push({
-        id: r.id, title: r.title, slug: r.slug ?? "",
+        id: r.id,
+        title: r.title,
+        slug: r.slug ?? "",
         novelupdates_url: novelupdatesUrl(r.id, r.slug),
-        author: r.author ?? "", cover_url: r.cover_url,
-        rating: r.rating ?? 0, rating_votes: r.rating_votes ?? 0,
+        author: r.author ?? "",
+        cover_url: r.cover_url,
+        rating: r.rating ?? 0,
+        rating_votes: r.rating_votes ?? 0,
         reading_list_count: r.reading_list_count ?? 0,
-        language: r.language ?? "", year: r.year,
-        shared_genre_count: r.shared_genres,
-        shared_tag_count: r.shared_tags,
+        language: r.language ?? "",
+        year: r.year,
+        shared_genre_count: sharedGenres,
+        shared_tag_count: sharedTags,
       });
     }
+    peers.sort(
+      (a, b) =>
+        b.shared_tag_count - a.shared_tag_count ||
+        b.shared_genre_count - a.shared_genre_count ||
+        b.reading_list_count - a.reading_list_count ||
+        a.id - b.id,
+    );
+    peers.length = Math.min(peers.length, 10);
   }
 
   return c.json({
     novel_id: novelId,
     catalog_size: total,
     metrics,
-    cohorts,
+    cohorts: cohortsOut,
     peers,
     cohort_definition:
       "Peers share the alphabetically first catalog genre and exact language; " +
@@ -645,40 +750,103 @@ app.get("/api/novels/:id/insights", async (c) => {
 
 app.get("/api/options", async (c) => {
   const db = c.env.DB;
-  const [genreRows, tagRows, langRows, mediaRows, sourceRows] = await Promise.all([
-    db.prepare("SELECT name FROM genres ORDER BY name").all<{ name: string }>(),
-    db.prepare(
-      `SELECT t.name AS name FROM tags t JOIN novel_tags nt ON nt.tag_id = t.id
-       GROUP BY t.id ORDER BY COUNT(*) DESC, t.name LIMIT 100`,
-    ).all<{ name: string }>(),
-    db.prepare(
-      `SELECT language AS name FROM novels WHERE language != ''
-       GROUP BY language ORDER BY COUNT(*) DESC`,
-    ).all<{ name: string }>(),
-    db.prepare(
-      `SELECT COALESCE(media_type, 'novel') AS name FROM novels
-       GROUP BY COALESCE(media_type, 'novel') ORDER BY COUNT(*) DESC`,
-    ).all<{ name: string }>(),
-    db.prepare(
-      `SELECT COALESCE(source, 'novelupdates') AS name FROM novels
-       GROUP BY COALESCE(source, 'novelupdates') ORDER BY COUNT(*) DESC`,
-    ).all<{ name: string }>(),
-  ]);
-  const names = (r: any) => (r.results ?? []).map((x: any) => x.name);
+  // The snapshot already ships the genre/tag/language dictionaries; only the
+  // usage-ranked extras need D1, and those are cached per isolate.
+  const staticOptions = await fetchJsonAsset<{
+    genres?: string[];
+    tags?: string[];
+    languages?: string[];
+  }>(c, "options.json");
+  const [genres, tags, languages] = staticOptions
+    ? [staticOptions.genres ?? [], staticOptions.tags ?? [], staticOptions.languages ?? []]
+    : await optionsFromD1(db);
+
+  const ranked = await rankedOptions(db);
   return c.json({
-    genres: names(genreRows),
-    popular_tags: names(tagRows),
-    languages: names(langRows),
-    media_types: names(mediaRows),
-    sources: names(sourceRows),
+    genres,
+    tags,
+    languages,
+    popular_tags: ranked.popularTags,
+    media_types: ranked.mediaTypes,
+    sources: ranked.sources,
   });
 });
+
+async function optionsFromD1(
+  db: D1Database,
+): Promise<[string[], string[], string[]]> {
+  const [genreRows, langRows] = await Promise.all([
+    db.prepare("SELECT name FROM genres ORDER BY name").all<{ name: string }>(),
+    db
+      .prepare(
+        `SELECT language AS name FROM novels WHERE language != ''
+         GROUP BY language ORDER BY COUNT(*) DESC`,
+      )
+      .all<{ name: string }>(),
+  ]);
+  return [
+    (genreRows.results ?? []).map((r) => r.name),
+    [],
+    (langRows.results ?? []).map((r) => r.name),
+  ];
+}
+
+// media_types/sources/popular_tags change only when the dataset is refreshed,
+// so one scan per isolate is enough.
+let rankedOptionsCache: {
+  popularTags: string[];
+  mediaTypes: string[];
+  sources: string[];
+  expires: number;
+} | null = null;
+
+async function rankedOptions(db: D1Database): Promise<{
+  popularTags: string[];
+  mediaTypes: string[];
+  sources: string[];
+}> {
+  if (rankedOptionsCache && rankedOptionsCache.expires > Date.now()) {
+    return {
+      popularTags: rankedOptionsCache.popularTags,
+      mediaTypes: rankedOptionsCache.mediaTypes,
+      sources: rankedOptionsCache.sources,
+    };
+  }
+  const [tagRows, mediaRows, sourceRows] = await Promise.all([
+    db
+      .prepare(
+        `SELECT t.name AS name FROM tags t JOIN novel_tags nt ON nt.tag_id = t.id
+         GROUP BY t.id ORDER BY COUNT(*) DESC, t.name LIMIT 100`,
+      )
+      .all<{ name: string }>(),
+    db
+      .prepare(
+        `SELECT COALESCE(media_type, 'novel') AS name FROM novels
+         GROUP BY COALESCE(media_type, 'novel') ORDER BY COUNT(*) DESC`,
+      )
+      .all<{ name: string }>(),
+    db
+      .prepare(
+        `SELECT COALESCE(source, 'novelupdates') AS name FROM novels
+         GROUP BY COALESCE(source, 'novelupdates') ORDER BY COUNT(*) DESC`,
+      )
+      .all<{ name: string }>(),
+  ]);
+  const value = {
+    popularTags: (tagRows.results ?? []).map((r) => r.name),
+    mediaTypes: (mediaRows.results ?? []).map((r) => r.name),
+    sources: (sourceRows.results ?? []).map((r) => r.name),
+    expires: Date.now() + 30 * 60 * 1000,
+  };
+  rankedOptionsCache = value;
+  return value;
+}
 
 // ---------------------------------------------------------------------------
 // recommend
 // ---------------------------------------------------------------------------
 
-async function runRecommend(db: D1Database, body: any) {
+async function runRecommend(db: D1Database, body: any, c: any) {
   const query = String(body.query ?? "").trim();
   const limit = Math.min(100, Math.max(1, Number(body.limit ?? 20) || 20));
 
@@ -701,8 +869,10 @@ async function runRecommend(db: D1Database, body: any) {
   if (!seedRow) return { error: `Novel matching '${query}' not found.`, status: 404 };
 
   const seedId = seedRow.id as number;
-  const channels = await getCandidateChannels(db, seedId, 150);
   const preferences = recommendPreferences(body, [seedId]);
+  const channels =
+    (await compactPoolChannels(c, seedId)) ??
+    (await getCandidateChannels(db, seedId, 150));
 
   const allIds = new Set<number>();
   for (const cands of Object.values(channels)) for (const [nid] of cands) allIds.add(nid);
@@ -773,7 +943,7 @@ async function runRecommend(db: D1Database, body: any) {
 
 app.post("/api/recommend", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const result = await runRecommend(c.env.DB, body);
+  const result = await runRecommend(c.env.DB, body, c);
   if ((result as any).error) return c.json({ detail: (result as any).error }, (result as any).status ?? 400);
   return c.json(result);
 });
@@ -820,7 +990,9 @@ app.post("/api/recommend/for-you", async (c) => {
     const title = seed.title || row.title;
     seedsUsed.push({ id: seedId, title, weight });
 
-    const channels = await getCandidateChannels(db, seedId, 150);
+    const channels =
+      (await compactPoolChannels(c, seedId)) ??
+      (await getCandidateChannels(db, seedId, 150));
     const allIds = new Set<number>();
     for (const cands of Object.values(channels)) for (const [nid] of cands) allIds.add(nid);
     const valid = new Set(await filterCandidates(db, [...allIds], preferences));

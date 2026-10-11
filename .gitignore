@@ -45,3 +45,6 @@ web/public/data/
 
 .dev.vars*
 !.dev.vars.example
+
+# web/dist is a symlink during local worker verification
+/web/dist

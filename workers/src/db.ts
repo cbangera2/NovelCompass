@@ -175,3 +175,146 @@ export async function datasetVersion(db: D1Database): Promise<string> {
   cachedDatasetVersion = { value, expires: Date.now() + DATASET_VERSION_TTL_MS };
   return value;
 }
+
+// ---------------------------------------------------------------------------
+// Catalog-wide distributions (insights endpoints)
+// ---------------------------------------------------------------------------
+
+// Insights percentiles/ranks are derived from the whole catalog, so the
+// straightforward implementation full-scans `novels` ~10x per request. Build
+// the distributions once per isolate (~270k rows) and answer from memory:
+// binary search gives exact ranks with zero D1 rows per request.
+const DISTRIBUTIONS_TTL_MS = 30 * 60 * 1000;
+let cachedDistributions: CatalogDistributions | null = null;
+let distributionsExpires = 0;
+
+export type MetricKey = "rating" | "rating_votes" | "reading_list_count";
+
+export type CatalogDistributions = {
+  total: number;
+  sorted: Record<MetricKey, number[]>;
+};
+
+export async function getCatalogDistributions(
+  db: D1Database,
+): Promise<CatalogDistributions> {
+  if (cachedDistributions && distributionsExpires > Date.now()) {
+    return cachedDistributions;
+  }
+  const [rating, votes, readers] = await Promise.all([
+    db.prepare("SELECT COALESCE(rating, 0) AS v FROM novels").all<{ v: number }>(),
+    db.prepare("SELECT COALESCE(rating_votes, 0) AS v FROM novels").all<{ v: number }>(),
+    db
+      .prepare("SELECT COALESCE(reading_list_count, 0) AS v FROM novels")
+      .all<{ v: number }>(),
+  ]);
+  const toSorted = (rows: Array<{ v: number }>) =>
+    (rows ?? []).map((r) => r.v).sort((a, b) => a - b);
+  const sorted = {
+    rating: toSorted(rating.results ?? []),
+    rating_votes: toSorted(votes.results ?? []),
+    reading_list_count: toSorted(readers.results ?? []),
+  };
+  cachedDistributions = { total: sorted.rating.length, sorted };
+  distributionsExpires = Date.now() + DISTRIBUTIONS_TTL_MS;
+  return cachedDistributions;
+}
+
+/** Count of values <= value (below) and > value (above) in a sorted array. */
+export function rankInSorted(sorted: number[], value: number): {
+  below: number;
+  above: number;
+} {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] <= value) lo = mid + 1;
+    else hi = mid;
+  }
+  return { below: lo, above: sorted.length - lo };
+}
+
+// Per-cohort reader counts let a novel's readership rank come from a binary
+// search instead of a `COUNT(*) ... > ?` scan per cohort per request.
+export type CohortIndex = { population: number; readers: number[] };
+
+export type CohortIndexes = {
+  byGenre: Map<string, CohortIndex>;
+  byLanguage: Map<string, CohortIndex>;
+  byYear: Map<string, CohortIndex>;
+  novelGenres: Map<number, string[]>;
+};
+
+const COHORT_TTL_MS = 30 * 60 * 1000;
+let cachedCohorts: CohortIndexes | null = null;
+let cohortsExpires = 0;
+
+export async function getCohortIndexes(db: D1Database): Promise<CohortIndexes> {
+  if (cachedCohorts && cohortsExpires > Date.now()) return cachedCohorts;
+
+  const [genreRows, novelRows] = await Promise.all([
+    db
+      .prepare(
+        `SELECT ng.novel_id AS nid, g.name AS genre,
+                COALESCE(n.reading_list_count, 0) AS readers
+         FROM novel_genres ng
+         JOIN genres g ON g.id = ng.genre_id
+         JOIN novels n ON n.id = ng.novel_id`,
+      )
+      .all<{ nid: number; genre: string; readers: number }>(),
+    db
+      .prepare(
+        `SELECT language AS language, year AS year,
+                COALESCE(reading_list_count, 0) AS readers
+         FROM novels`,
+      )
+      .all<{ language: string | null; year: number | null; readers: number }>(),
+  ]);
+
+  const byGenre = new Map<string, CohortIndex>();
+  const novelGenres = new Map<number, string[]>();
+  for (const row of genreRows.results ?? []) {
+    let genre = byGenre.get(row.genre);
+    if (!genre) {
+      genre = { population: 0, readers: [] };
+      byGenre.set(row.genre, genre);
+    }
+    genre.population += 1;
+    genre.readers.push(row.readers);
+    const existing = novelGenres.get(row.nid);
+    if (existing) existing.push(row.genre);
+    else novelGenres.set(row.nid, [row.genre]);
+  }
+  for (const readers of byGenre.values()) readers.readers.sort((a, b) => a - b);
+
+  const byLanguage = new Map<string, CohortIndex>();
+  const byYear = new Map<string, CohortIndex>();
+  for (const row of novelRows.results ?? []) {
+    if (row.language) {
+      let entry = byLanguage.get(row.language);
+      if (!entry) {
+        entry = { population: 0, readers: [] };
+        byLanguage.set(row.language, entry);
+      }
+      entry.population += 1;
+      entry.readers.push(row.readers);
+    }
+    if (row.year) {
+      const key = String(row.year);
+      let entry = byYear.get(key);
+      if (!entry) {
+        entry = { population: 0, readers: [] };
+        byYear.set(key, entry);
+      }
+      entry.population += 1;
+      entry.readers.push(row.readers);
+    }
+  }
+  for (const entry of byLanguage.values()) entry.readers.sort((a, b) => a - b);
+  for (const entry of byYear.values()) entry.readers.sort((a, b) => a - b);
+
+  cachedCohorts = { byGenre, byLanguage, byYear, novelGenres };
+  cohortsExpires = Date.now() + COHORT_TTL_MS;
+  return cachedCohorts;
+}
