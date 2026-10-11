@@ -39,6 +39,14 @@ import {
   parseAssociatedNames,
   searchTokenClause,
 } from "./db";
+import {
+  browseCards,
+  cohortsFromCards,
+  distributionsFromCards,
+  loadSnapshot,
+  searchCards,
+  type BrowseFilters,
+} from "./snapshot";
 
 interface Env {
   DB: D1Database;
@@ -202,6 +210,14 @@ app.get("/api/health", async (c) => {
 
 app.post("/api/resolve-slugs", async (c) => {
   const body = await c.req.json().catch(() => ({}));
+  const snap = await loadSnapshot(c);
+  if (snap) {
+    const results = (body.slugs ?? [])
+      .map((raw: any) => snap.bySlug.get(String(raw).trim().toLowerCase()))
+      .filter(Boolean)
+      .map((card: any) => ({ id: card.id, title: card.title, slug: card.slug }));
+    return c.json({ results });
+  }
   const requested = [
     ...new Set(
       ((body.slugs ?? []) as string[])
@@ -228,6 +244,14 @@ app.post("/api/resolve-slugs", async (c) => {
 
 app.post("/api/resolve-ids", async (c) => {
   const body = await c.req.json().catch(() => ({}));
+  const snap = await loadSnapshot(c);
+  if (snap) {
+    const results = (body.ids ?? [])
+      .map((raw: any) => snap.cards.get(Number(raw)))
+      .filter(Boolean)
+      .map((card: any) => ({ id: card.id, title: card.title, slug: card.slug }));
+    return c.json({ results });
+  }
   const requested = [
     ...new Set(
       ((body.ids ?? []) as any[])
@@ -261,6 +285,14 @@ app.get("/api/search", async (c) => {
   const source = c.req.query("source") ?? "all";
   if (!q.trim()) return c.json({ query: q, results: [] }, 400);
 
+  const snap = await loadSnapshot(c);
+  if (snap) {
+    return c.json({
+      query: q,
+      results: searchCards(snap, q, limit, mediaType, source),
+    });
+  }
+
   const db = c.env.DB;
   const where: string[] = [];
   const params: any[] = [];
@@ -281,7 +313,7 @@ app.get("/api/search", async (c) => {
   const { clause, params: mp } = mediaTypeSqlFilter(mediaType);
   if (clause) {
     where.push(clause);
-    params.push(...mp);
+    params.push(mp);
   }
   if (source && source !== "all") {
     where.push("COALESCE(source, 'novelupdates') = ?");
@@ -306,33 +338,6 @@ app.get("/api/search", async (c) => {
 // ---------------------------------------------------------------------------
 // browse
 // ---------------------------------------------------------------------------
-
-interface BrowseFilters {
-  query: string;
-  sort: string;
-  language: string;
-  author: string;
-  genre: string;
-  tag: string;
-  min_rating: number;
-  max_rating: number;
-  min_votes: number;
-  min_year: number;
-  max_year: number;
-  status: string;
-  min_chapters: number;
-  max_chapters: number;
-  min_readers: number;
-  max_readers: number;
-  include_genres: string;
-  exclude_genres: string;
-  include_tags: string;
-  exclude_tags: string;
-  exclude_ids: string;
-  direction: string;
-  media_type: string;
-  source: string;
-}
 
 function browseFiltersFromQuery(c: any): BrowseFilters {
   const q = c.req.query.bind(c.req);
@@ -500,12 +505,17 @@ app.get("/api/browse", async (c) => {
   const f = browseFiltersFromQuery(c);
   const page = Math.max(1, Number(c.req.query("page") ?? 1) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(c.req.query("page_size") ?? 24) || 24));
+  const snap = await loadSnapshot(c);
+  if (snap) return c.json(browseCards(snap, f as BrowseFilters, page, pageSize));
   return c.json(await runBrowse(c.env.DB, f, page, pageSize));
 });
 
 app.get("/api/browse/random", async (c) => {
   const f = browseFiltersFromQuery(c);
-  const first = await runBrowse(c.env.DB, f, 1, 1);
+  const snap = await loadSnapshot(c);
+  const first = snap
+    ? browseCards(snap, f as BrowseFilters, 1, 1)
+    : await runBrowse(c.env.DB, f, 1, 1);
   if (first.total === 0)
     return c.json({ detail: "No novels match the active filters." }, 404);
   const seedParam = c.req.query("seed");
@@ -526,7 +536,9 @@ app.get("/api/browse/random", async (c) => {
     crypto.getRandomValues(buf);
     offset = buf[0] % first.total;
   }
-  const selected = await runBrowse(c.env.DB, f, offset + 1, 1);
+  const selected = snap
+    ? browseCards(snap, f as BrowseFilters, offset + 1, 1)
+    : await runBrowse(c.env.DB, f, offset + 1, 1);
   return c.json({ novel: selected.items[0], eligible_count: first.total });
 });
 
@@ -538,6 +550,64 @@ app.get("/api/novels/:id", async (c) => {
   const novelId = Number(c.req.param("id"));
   if (!Number.isInteger(novelId)) return c.json({ detail: "Invalid id." }, 400);
   const db = c.env.DB;
+
+  const snap = await loadSnapshot(c);
+  if (snap) {
+    const card = snap.cards.get(novelId);
+    if (!card) return c.json({ detail: `Item ${novelId} not found.` }, 404);
+    const bucket = (novelId % 256).toString(16).padStart(2, "0");
+    let detail: any = {};
+    try {
+      const origin = new URL(c.req.url).origin;
+      const response = await fetch(`${origin}/data/details/${bucket}.json`);
+      if (response.ok) detail = ((await response.json()) as Record<string, Record<string, any>>)[String(novelId)] ?? {};
+    } catch {
+      detail = {};
+    }
+    const genreIds: number[] = detail.genre_ids ?? [];
+    const tagIds: number[] = detail.tag_ids ?? [];
+    return c.json({
+      id: card.id,
+      title: card.title,
+      slug: card.slug,
+      associated_names: detail.associated_names ?? card.aliases,
+      author: card.author,
+      language: card.language,
+      synopsis: detail.synopsis ?? "",
+      rating: card.rating,
+      rating_votes: card.rating_votes,
+      rating_votes_5: detail.rating_votes_5 ?? 0,
+      rating_votes_4: detail.rating_votes_4 ?? 0,
+      rating_votes_3: detail.rating_votes_3 ?? 0,
+      rating_votes_2: detail.rating_votes_2 ?? 0,
+      rating_votes_1: detail.rating_votes_1 ?? 0,
+      rating_dist: {
+        "5": detail.rating_votes_5 ?? 0,
+        "4": detail.rating_votes_4 ?? 0,
+        "3": detail.rating_votes_3 ?? 0,
+        "2": detail.rating_votes_2 ?? 0,
+        "1": detail.rating_votes_1 ?? 0,
+      },
+      reading_list_count: card.reading_list_count,
+      chapters_orig: detail.original_chapters ?? 0,
+      chapters_trans: card.chapters_trans,
+      status_trans: card.status_trans,
+      year: card.year,
+      cover_url: card.cover_url,
+      genres: genreIds.length
+        ? genreIds.map((i: number) => snap.genres[i]).filter(Boolean)
+        : card.genre_names.filter(Boolean),
+      tags: tagIds.map((i: number) => snap.tags[i]).filter(Boolean),
+      novelupdates_url: card.external_url || `https://www.novelupdates.com/?p=${card.id}`,
+      external_url: card.external_url,
+      media_type: card.media_type,
+      source: card.source,
+      external_id: card.external_id,
+      direct_recommendation_count: detail.direct_recommendation_count ?? 0,
+      related_series_count: detail.related_series_count ?? 0,
+      recommendation_list_count: detail.recommendation_list_count ?? 0,
+    });
+  }
   const row = await db
     .prepare(
       `SELECT id, title, slug, associated_names, author, language, synopsis,
@@ -628,11 +698,13 @@ app.get("/api/novels/:id/insights", async (c) => {
 
   // Catalog-wide distributions are built once per isolate; each request then
   // answers from memory with a binary search instead of ~12 full scans.
+  const snap = await loadSnapshot(c);
   const [distributions, cohorts, { tagsMap }] = await Promise.all([
-    getCatalogDistributions(db),
-    getCohortIndexes(db),
+    snap ? distributionsFromCards(snap) : getCatalogDistributions(db),
+    snap ? cohortsFromCards(snap) : getCohortIndexes(db),
     getTagTables(db),
   ]);
+  const tagNameSets = snap ? snap.tagNames : null;
   const total = distributions.total;
 
   const metrics = (
@@ -698,12 +770,13 @@ app.get("/api/novels/:id/insights", async (c) => {
       .bind(novel.language, novelId, primaryGenre)
       .all<any>();
     const seedGenres = new Set(genres);
-    const seedTags = tagsMap.get(novelId) ?? new Set<string>();
+    const seedTags =
+      tagNameSets?.get(novelId) ?? tagsMap.get(novelId) ?? new Set<string>();
     for (const r of peerRows.results ?? []) {
       let sharedGenres = 0;
       for (const g of seedGenres) if ((cohorts.novelGenres.get(r.id) ?? []).includes(g)) sharedGenres++;
       let sharedTags = 0;
-      const peerTags = tagsMap.get(r.id);
+      const peerTags = tagNameSets?.get(r.id) ?? tagsMap.get(r.id);
       if (peerTags) for (const t of seedTags) if (peerTags.has(t)) sharedTags++;
       peers.push({
         id: r.id,
@@ -845,6 +918,69 @@ async function rankedOptions(db: D1Database): Promise<{
 // ---------------------------------------------------------------------------
 // recommend
 // ---------------------------------------------------------------------------
+
+// Filter recommendation candidates against the user's preferences. Uses the
+// snapshot when it is available so filtering costs no D1 rows; falls back to
+// the SQL path when it is not.
+async function filterCandidatesSnapshot(
+  c: any,
+  prefs: FilterPreferences,
+  ids: number[],
+): Promise<number[] | null> {
+  const snap = await loadSnapshot(c);
+  if (!snap) return null;
+  const excludeTags = new Set((prefs.exclude_tags ?? []).map((t) => t.toLowerCase()));
+  const includeTags = new Set((prefs.include_tags ?? []).map((t) => t.toLowerCase()));
+  const includeGenres = new Set((prefs.include_genres ?? []).map((g) => g.toLowerCase()));
+  const excludeGenres = new Set((prefs.exclude_genres ?? []).map((g) => g.toLowerCase()));
+  const language = (prefs.language ?? "").trim().toLowerCase();
+  const excludeIds = new Set(prefs.exclude_novel_ids ?? []);
+  const mediaTypes = (prefs.media_type ?? "")
+    .split(",")
+    .map((m) => m.trim().toLowerCase())
+    .filter(Boolean);
+
+  const kept: number[] = [];
+  for (const id of ids) {
+    const card = snap.cards.get(id);
+    if (!card) continue;
+    if (excludeIds.has(id)) continue;
+    if (language && card.language.toLowerCase() !== language) continue;
+    if ((prefs.min_rating ?? 0) > card.rating) continue;
+    if ((prefs.min_rating_votes ?? 0) > card.rating_votes) continue;
+    if (prefs.max_readers && card.reading_list_count > prefs.max_readers) continue;
+    if (prefs.min_year && (!card.year || card.year < prefs.min_year)) continue;
+    if (prefs.max_year && card.year && card.year > prefs.max_year) continue;
+    if (prefs.min_chapters && card.chapters_trans < prefs.min_chapters) continue;
+    if (
+      prefs.require_completed &&
+      !card.status_trans.toLowerCase().includes("complete")
+    ) {
+      continue;
+    }
+    const genres = card.genre_names.map((g) => g.toLowerCase()).filter(Boolean);
+    if (includeGenres.size && ![...includeGenres].every((g) => genres.includes(g)))
+      continue;
+    if (excludeGenres.size && [...excludeGenres].some((g) => genres.includes(g)))
+      continue;
+    if (excludeTags.size || includeTags.size) {
+      const tags = snap.tagNames.get(id);
+      if (excludeTags.size && tags && [...excludeTags].some((t) => tags.has(t)))
+        continue;
+      if (includeTags.size && ![...includeTags].every((t) => tags?.has(t) ?? false))
+        continue;
+    }
+    if (mediaTypes.length && !mediaTypes.includes("all")) {
+      const aliases =
+        { manga: ["manga", "manhwa", "manhua", "comic"], novel: ["novel", "light_novel", "web_novel"], anime: ["anime"] }[
+          card.media_type.toLowerCase()
+        ] ?? [card.media_type.toLowerCase()];
+      if (!aliases.some((t) => mediaTypes.includes(t))) continue;
+    }
+    kept.push(id);
+  }
+  return kept;
+}
 
 async function runRecommend(db: D1Database, body: any, c: any) {
   const query = String(body.query ?? "").trim();
@@ -995,7 +1131,10 @@ app.post("/api/recommend/for-you", async (c) => {
       (await getCandidateChannels(db, seedId, 150));
     const allIds = new Set<number>();
     for (const cands of Object.values(channels)) for (const [nid] of cands) allIds.add(nid);
-    const valid = new Set(await filterCandidates(db, [...allIds], preferences));
+    const valid = new Set(
+      (await filterCandidatesSnapshot(c, preferences, [...allIds])) ??
+        (await filterCandidates(db, [...allIds], preferences)),
+    );
     const filtered: ChannelCandidates = {};
     for (const [name, cands] of Object.entries(channels))
       filtered[name] = cands.filter(([nid]) => valid.has(nid));
