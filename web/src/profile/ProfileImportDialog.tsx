@@ -3,11 +3,11 @@ import { Dialog } from '@base-ui/react/dialog';
 import { FileJson, FileText, FileUp, X } from 'lucide-react';
 import { createDataSource } from '../data';
 import { enrichAniListTitles, parseAniListGdprFile } from './anilistGdpr';
-import { parseProfileFile, PROFILE_PARSER_VERSION, withStatus } from './parser';
+import { parseListFile, parseProfileFile, PROFILE_PARSER_VERSION, withListSignal, withStatus } from './parser';
 import { resolveEntries } from './resolve';
 import { mergeProfiles, saveLocalProfile } from './store';
 import { parseProfileBackup } from './transfer';
-import type { LocalUserProfile, ParsedProfileFile, ProfileEntry, ReadingStatus } from './types';
+import type { ListMembership, ListSignal, LocalUserProfile, ParsedListFile, ParsedProfileFile, ProfileEntry, ReadingStatus } from './types';
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
@@ -15,6 +15,12 @@ const STATUS_LABELS: Record<ReadingStatus, string> = {
   plan_to_read: 'Plan to read',
   dropped: 'Dropped',
   paused: 'Paused',
+};
+
+const LIST_SIGNAL_LABELS: Record<ListSignal, string> = {
+  favorites: 'Favorites (seeds + excluded)',
+  mixed: 'Mixed (weak seeds)',
+  to_read: 'To read (excluded only)',
 };
 
 type ImportMode = 'json' | 'html' | 'anilist';
@@ -30,6 +36,7 @@ export function ProfileImportDialog({
   const [mode, setMode] = useState<ImportMode>('json');
   const [files, setFiles] = useState<ParsedProfileFile[]>([]);
   const [entries, setEntries] = useState<ProfileEntry[]>([]);
+  const [listFiles, setListFiles] = useState<ParsedListFile[]>([]);
   const [datasetVersion, setDatasetVersion] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -41,6 +48,7 @@ export function ProfileImportDialog({
     setMessage('');
     setFiles([]);
     setEntries([]);
+    setListFiles([]);
     onImported?.(text);
   };
 
@@ -84,6 +92,52 @@ export function ProfileImportDialog({
     }
   };
 
+  /** Split saved HTML into reading-list pages vs recommendation-list pages. */
+  const parseHtmlFiles = async (selected: File[]): Promise<{ profile: ParsedProfileFile[]; lists: ParsedListFile[] }> => {
+    const profile: ParsedProfileFile[] = [];
+    const lists: ParsedListFile[] = [];
+    const failures: string[] = [];
+    for (const file of selected) {
+      try {
+        profile.push(await parseProfileFile(file));
+        continue;
+      } catch {
+        // Not a reading-list page — try a recommendation-list page.
+      }
+      try {
+        lists.push(await parseListFile(file));
+      } catch {
+        failures.push(file.name);
+      }
+    }
+    if (!profile.length && !lists.length) {
+      throw new Error(
+        `None of these look like saved Novel Updates pages${failures.length ? ` (${failures.join(', ')})` : ''}. ` +
+        'Save a reading-list category or a viewlist page after it fully loads.'
+      );
+    }
+    return { profile, lists };
+  };
+
+  const resolveListMembers = async (parsed: ParsedListFile[]) => {
+    const source = await createDataSource();
+    const manifest = await source.getManifest();
+    const resolved = await Promise.all(parsed.map(async (file) => {
+      const matches = await source.resolveSlugs(
+        file.members.map((member) => ({ slug: member.slug, title: member.imported_title }))
+      );
+      return {
+        ...file,
+        members: file.members.map((member) => ({
+          ...member,
+          novel_id: matches.get(member.slug)?.id,
+        })),
+      };
+    }));
+    setListFiles(resolved);
+    setDatasetVersion(manifest.dataset_version);
+  };
+
   const prepareHtml = async (event: ChangeEvent<HTMLInputElement>) => {
     const selected = [...(event.target.files || [])];
     event.target.value = '';
@@ -91,11 +145,23 @@ export function ProfileImportDialog({
     setBusy(true);
     setMessage('Parsing saved pages and matching titles…');
     try {
-      const parsed = await Promise.all(selected.map(parseProfileFile));
-      await prepareParsed(parsed, 'Matching titles against the catalog…');
+      const { profile, lists } = await parseHtmlFiles(selected);
+      if (profile.length) await prepareParsed(profile, 'Matching titles against the catalog…');
+      else {
+        setFiles([]);
+        setEntries([]);
+      }
+      if (lists.length) {
+        setMessage('Matching list titles against the catalog…');
+        await resolveListMembers(lists);
+      } else {
+        setListFiles([]);
+      }
+      setMessage('');
     } catch (error) {
       setFiles([]);
       setEntries([]);
+      setListFiles([]);
       setMessage(error instanceof Error ? error.message : 'Those saved pages could not be imported.');
       setBusy(false);
     }
@@ -139,27 +205,75 @@ export function ProfileImportDialog({
     }
   };
 
+  const changeListSignal = (fingerprint: string, signal: ListSignal) => {
+    setListFiles((current) =>
+      current.map((file) => (file.fingerprint === fingerprint ? withListSignal(file, signal) : file))
+    );
+  };
+
   const commitImport = async (importMode: 'replace' | 'merge') => {
-    if (!files.length || !entries.length) return;
+    if ((!files.length || !entries.length) && !listFiles.length) return;
     if (importMode === 'replace' && profile && !window.confirm('Replace your current local profile with this import?')) return;
+    // Same list saved across several pages merges here (member slugs union).
+    const grouped = new Map<number, ParsedListFile>();
+    for (const file of listFiles) {
+      const prev = grouped.get(file.list_id);
+      if (!prev) {
+        grouped.set(file.list_id, file);
+        continue;
+      }
+      const seen = new Set(prev.members.map((m) => m.slug));
+      const extra = file.members.filter((m) => !seen.has(m.slug));
+      grouped.set(file.list_id, { ...prev, members: [...prev.members, ...extra] });
+    }
+    const membership: ListMembership[] = [...grouped.values()].map((file) => ({
+      list_id: file.list_id,
+      title: file.title,
+      signal: file.selected_signal,
+      members: file.members.map(({ slug, imported_title, novel_id }) => ({ slug, imported_title, novel_id })),
+      source_file: file.filename,
+    }));
     const incoming: LocalUserProfile = {
       profile_id: crypto.randomUUID(),
       parser_version: PROFILE_PARSER_VERSION,
       dataset_version: datasetVersion,
       username: files.find((file) => file.username)?.username,
       imported_at: new Date().toISOString(),
-      source_fingerprints: files.map((file) => file.fingerprint),
+      source_fingerprints: [
+        ...files.map((file) => file.fingerprint),
+        ...listFiles.map((file) => file.fingerprint),
+      ],
       entries,
-      curated_lists: [...new Map(files.flatMap((file) => file.curated_lists).map((list) => [list.id, list])).values()],
+      curated_lists: [
+        ...new Map([
+          ...files.flatMap((file) => file.curated_lists).map((list) => [list.id, list] as const),
+          // Imported membership supersedes stale summaries for the same list.
+          ...[...grouped.values()].map((file) => [file.list_id, {
+            id: file.list_id,
+            title: file.title,
+            series_count: file.members.length,
+            membership_available: true as const,
+          }] as const),
+        ]).values(),
+      ],
+      list_membership: membership,
+      taste_overrides: profile?.taste_overrides,
       feedback: importMode === 'merge' ? profile?.feedback || [] : [],
     };
     const next = importMode === 'merge' ? mergeProfiles(profile, incoming) : incoming;
     await saveLocalProfile(next);
-    finish(`Saved ${next.entries.length.toLocaleString()} normalized titles locally.`);
+    const listCount = membership.reduce((sum, m) => sum + m.members.length, 0);
+    finish(
+      `Saved ${next.entries.length.toLocaleString()} normalized titles locally` +
+      (listCount ? ` plus ${listCount.toLocaleString()} list titles (${membership.length} lists).` : '.')
+    );
   };
 
   const matched = entries.filter((entry) => entry.novel_id != null).length;
-  const showPreview = files.length > 0 && (mode === 'html' || mode === 'anilist');
+  const listMatched = listFiles.reduce(
+    (sum, file) => sum + file.members.filter((member) => member.novel_id != null).length, 0);
+  const listTotal = listFiles.reduce((sum, file) => sum + file.members.length, 0);
+  const showPreview = (files.length > 0 || listFiles.length > 0) && (mode === 'html' || mode === 'anilist');
   const isAniListMode = mode === 'anilist';
 
   return (
@@ -200,12 +314,13 @@ export function ProfileImportDialog({
           ) : mode === 'html' ? (
             <section className="profile-import-pane" role="tabpanel">
               <h3>Import saved NovelUpdates pages</h3>
-              <p>Open each Reading, Completed, or Plan to Read category, wait for its table, then save the page. Select one or several HTML files here.</p>
+              <p>Open each Reading, Completed, or Plan to Read category, wait for its table, then save the page. You can also save your own recommendation-list pages (…/viewlist/ID/) — list membership is your strongest like-signal. Select one or several HTML files here.</p>
               <label className="profile-import-primary">
                 <FileUp size={16} /> Choose saved HTML pages
                 <input type="file" accept=".html,.htm,text/html" multiple onChange={prepareHtml} disabled={busy} hidden />
               </label>
-              <p className="profile-import-note"><strong>Why no profile-link field?</strong> NovelUpdates pages cannot be fetched reliably from a static site because of browser cross-origin rules and bot protection. Saving the loaded page preserves a private, dependable import.</p>
+              <p className="profile-import-note"><strong>Why no profile-link field?</strong> NovelUpdates pages cannot be fetched reliably from a static site because of browser cross-origin rules and bot protection. Saving the loaded page preserves a private, dependable import — and works for private lists too.</p>
+              <p className="profile-import-note">Lists spanning multiple pages: save every page; files for the same list merge on import.</p>
             </section>
           ) : (
             <section className="profile-import-pane" role="tabpanel">
@@ -243,9 +358,22 @@ export function ProfileImportDialog({
               {isAniListMode && files[0]?.warnings?.map((warning) => (
                 <p key={warning} className="profile-import-note">{warning}</p>
               ))}
+              {listFiles.map((file) => (
+                <div key={file.fingerprint}>
+                  <span><strong>{file.title}</strong><small>{file.filename} · {file.members.length} titles · {file.members.filter((m) => m.novel_id != null).length} matched</small></span>
+                  <label>List signal
+                    <select value={file.selected_signal} onChange={(event) => changeListSignal(file.fingerprint, event.target.value as ListSignal)}>
+                      {Object.entries(LIST_SIGNAL_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </label>
+                </div>
+              ))}
               <p>
                 {entries.length} unique titles · {matched} matched in catalog · {entries.length - matched} unmatched
                 {isAniListMode ? ' (still saved with AniList IDs)' : ''}
+                {listFiles.length > 0 && (
+                  <> · {listTotal} list titles · {listMatched} matched</>
+                )}
               </p>
               <div>
                 {profile && <button type="button" onClick={() => commitImport('merge')} disabled={busy}>Merge with profile</button>}

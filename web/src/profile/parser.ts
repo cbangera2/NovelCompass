@@ -1,4 +1,4 @@
-import { CuratedListSummary, ParsedProfileFile, ProfileEntry, ReadingStatus } from './types';
+import { CuratedListSummary, ListSignal, ParsedListFile, ParsedProfileFile, ProfileEntry, ReadingStatus } from './types';
 
 export const PROFILE_PARSER_VERSION = 1;
 export const MAX_PROFILE_FILE_BYTES = 15 * 1024 * 1024;
@@ -122,4 +122,88 @@ export async function parseProfileFile(file: File): Promise<ParsedProfileFile> {
 
 export function withStatus(file: ParsedProfileFile, status: ReadingStatus): ParsedProfileFile {
   return { ...file, selected_status: status, entries: file.entries.map((entry) => ({ ...entry, status })) };
+}
+
+/** Pure heuristic for a list's signal, testable without a DOM. */
+export function detectListSignal(title: string): ListSignal {
+  if (/to[\s-]*read|\bplan\b|\btbr\b|queue|watchlist/i.test(title || '')) return 'to_read';
+  return 'favorites';
+}
+
+const VIEWLIST_ID = /novelupdates\.com\/viewlist\/(\d+)(?:[/?#]|$)/i;
+
+function listIdFromDocument(doc: Document): number | null {
+  const canonical = doc.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href || '';
+  const fromCanonical = canonical.match(VIEWLIST_ID);
+  if (fromCanonical) return Number(fromCanonical[1]);
+  const ownLink = [...doc.querySelectorAll<HTMLAnchorElement>('a[href*="/viewlist/"]')]
+    .map((anchor) => anchor.href.match(VIEWLIST_URL))
+    .find(Boolean);
+  return ownLink?.[1] ? Number(ownLink[1]) : null;
+}
+
+/**
+ * Parse a saved Novel Updates recommendation-list page (…/viewlist/ID/).
+ * Structure mirrors the crawler's parse_viewlist_page: series live in
+ * `div.search_main_box_nu` boxes with the title link in `div.search_title`;
+ * the numeric box class is the Novel Updates series id. Works for private
+ * lists too, since the user saves the page while logged in.
+ */
+export async function parseListFile(file: File): Promise<ParsedListFile> {
+  if (file.size > MAX_PROFILE_FILE_BYTES) throw new Error(`${file.name} is larger than 15 MB.`);
+  const html = await file.text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const listId = listIdFromDocument(doc);
+  const boxes = [...doc.querySelectorAll<HTMLDivElement>('div.search_main_box_nu')];
+  if (listId == null || !boxes.length) {
+    throw new Error(`${file.name} is not a saved Novel Updates list page (…/viewlist/ID/).`);
+  }
+  const titleNode =
+    doc.querySelector('.uclp_title') ||
+    doc.querySelector('h3.mypage') ||
+    doc.querySelector('h1');
+  const title = clean(titleNode?.textContent) || `List ${listId}`;
+  const members: ParsedListFile['members'] = [];
+  const duplicateSlugs: string[] = [];
+  const seen = new Set<string>();
+  let malformed = 0;
+  let position = 0;
+  for (const box of boxes) {
+    const anchor = box.querySelector<HTMLAnchorElement>('.search_title a[href]');
+    const match = anchor?.href.match(SERIES_URL);
+    if (!anchor || !match) {
+      malformed += 1;
+      continue;
+    }
+    const slug = match[1].toLowerCase();
+    if (seen.has(slug)) {
+      duplicateSlugs.push(slug);
+      continue;
+    }
+    seen.add(slug);
+    position += 1;
+    members.push({
+      slug,
+      imported_title: clean(anchor.getAttribute('title')) || clean(anchor.textContent),
+      position,
+    });
+  }
+  if (!members.length) {
+    throw new Error(`${file.name} has no recognizable list entries. Save the list page after it fully loads.`);
+  }
+  return {
+    filename: file.name,
+    fingerprint: await sha256(html),
+    list_id: listId,
+    title,
+    detected_signal: detectListSignal(title),
+    selected_signal: detectListSignal(title),
+    members,
+    duplicate_slugs: duplicateSlugs,
+    warnings: malformed ? [`${malformed} malformed entr${malformed === 1 ? 'y' : 'ies'} skipped.`] : [],
+  };
+}
+
+export function withListSignal(file: ParsedListFile, signal: ListSignal): ParsedListFile {
+  return { ...file, selected_signal: signal };
 }

@@ -1,7 +1,8 @@
-import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
+import type { ListMembership, ListSignal, LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
 
 const STATUSES = new Set<ReadingStatus>(['reading', 'completed', 'plan_to_read', 'dropped', 'paused']);
 const SIGNALS = new Set(['love', 'read', 'not_for_me']);
+const LIST_SIGNALS = new Set<ListSignal>(['favorites', 'mixed', 'to_read']);
 
 function object(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object.`);
@@ -46,6 +47,27 @@ function entry(value: unknown, index: number): ProfileEntry {
   };
 }
 
+function listMembership(value: unknown, index: number): ListMembership {
+  const item = object(value, `list_membership[${index}]`);
+  const signal = string(item.signal, `list_membership[${index}].signal`) as ListSignal;
+  if (!LIST_SIGNALS.has(signal)) throw new Error(`list_membership[${index}].signal is not supported.`);
+  if (!Array.isArray(item.members)) throw new Error(`list_membership[${index}].members must be an array.`);
+  return {
+    list_id: number(item.list_id, `list_membership[${index}].list_id`)!,
+    title: string(item.title, `list_membership[${index}].title`)!,
+    signal,
+    members: item.members.map((member, memberIndex) => {
+      const row = object(member, `list_membership[${index}].members[${memberIndex}]`);
+      return {
+        slug: string(row.slug, 'member.slug')!,
+        imported_title: string(row.imported_title, 'member.imported_title')!,
+        novel_id: number(row.novel_id, 'member.novel_id', true),
+      };
+    }),
+    source_file: string(item.source_file, `list_membership[${index}].source_file`)!,
+  };
+}
+
 export function parseProfileBackup(value: unknown): LocalUserProfile {
   const item = object(value, 'Profile backup');
   if (!Array.isArray(item.entries) || !Array.isArray(item.curated_lists) || !Array.isArray(item.source_fingerprints)) {
@@ -71,9 +93,12 @@ export function parseProfileBackup(value: unknown): LocalUserProfile {
         series_count: number(list.series_count, `curated_lists[${index}].series_count`, true),
         followers: number(list.followers, `curated_lists[${index}].followers`, true),
         is_private: typeof list.is_private === 'boolean' ? list.is_private : undefined,
-        membership_available: false as const,
+        membership_available: list.membership_available === true,
       };
     }),
+    list_membership: Array.isArray(item.list_membership)
+      ? item.list_membership.map((value, index) => listMembership(value, index))
+      : [],
     feedback: (item.feedback || []).map((value, index) => {
       const feedback = object(value, `feedback[${index}]`);
       const signal = string(feedback.signal, `feedback[${index}].signal`)!;
@@ -86,6 +111,9 @@ export function parseProfileBackup(value: unknown): LocalUserProfile {
         updated_at: string(feedback.updated_at, `feedback[${index}].updated_at`)!,
       };
     }),
+    taste_overrides: item.taste_overrides && typeof item.taste_overrides === 'object' && !Array.isArray(item.taste_overrides)
+      ? item.taste_overrides as LocalUserProfile['taste_overrides']
+      : undefined,
   };
 }
 

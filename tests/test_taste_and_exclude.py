@@ -31,8 +31,7 @@ const compiled = ts.transpileModule(patched, {
 }).outputText;
 (async () => {
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`;
-  const { selectPositiveSeeds, buildExcludeIds, mergeSeedRecommendations, computeTasteProfile } = await import(moduleUrl);
-  const profile = {
+  const { selectPositiveSeeds, buildExcludeIds, mergeSeedRecommendations, computeTasteProfile, affinityMapsFromTaste } = await import(moduleUrl);  const profile = {
     profile_id: 'p',
     parser_version: 1,
     dataset_version: 't',
@@ -80,6 +79,33 @@ const compiled = ts.transpileModule(patched, {
   const taste = computeTasteProfile(profile, []);
   if (taste.evidence.unmatched !== 1) throw new Error('unmatched count');
   if (!taste.evidence.caveats.length) throw new Error('expected caveats');
+  // Manual overrides: pins merge as manual facets, mutes drop from affinity.
+  const tuned = computeTasteProfile({ ...profile, taste_overrides: {
+    likes: [{ name: 'Yandere', kind: 'tag' }],
+    avoids: [],
+    muted: [{ name: 'X', kind: 'tag' }],
+  } }, []);
+  const pinned = tuned.liked_tags.find((f) => f.name === 'Yandere');
+  if (!pinned || !pinned.manual || pinned.weight !== 12) throw new Error('pin missing: ' + JSON.stringify(tuned.liked_tags));
+  const tunedMaps = affinityMapsFromTaste(tuned);
+  if (!tunedMaps.likedTags.has('yandere')) throw new Error('pinned tag missing from affinity maps');
+  // List membership: favorites seed, to-read never seeds, all members excluded.
+  const listProfile = { ...profile, list_membership: [
+    { list_id: 1, title: 'Peak Fiction', signal: 'favorites',
+      members: [{ slug: 'e', imported_title: 'E-list', novel_id: 5 }], source_file: 'l.html' },
+    { list_id: 2, title: 'To read', signal: 'to_read',
+      members: [{ slug: 'f', imported_title: 'F-plan', novel_id: 6 }], source_file: 'l.html' },
+  ] };
+  const listSeeds = selectPositiveSeeds(listProfile, { limit: 12 });
+  const fromList = listSeeds.find((s) => s.novel_id === 5);
+  if (!fromList || !fromList.reason.startsWith('In your list')) throw new Error('favorites list did not seed');
+  if (listSeeds.some((s) => s.novel_id === 6)) throw new Error('to-read list seeded');
+  const listExclude = buildExcludeIds(listProfile);
+  if (!listExclude.includes(5) || !listExclude.includes(6)) throw new Error('list members not excluded');
+  const mutedMaps = affinityMapsFromTaste({ ...tuned, taste_overrides: {
+    likes: [], avoids: [], muted: [{ name: 'Yandere', kind: 'tag' }],
+  } });
+  if (mutedMaps.likedTags.has('yandere')) throw new Error('muted tag leaked into affinity maps');
   process.stdout.write(JSON.stringify({ ok: true, seeds: seeds.length, merged: merged.length }));
 })().catch((e) => { console.error(e); process.exit(1); });
 """
@@ -107,17 +133,30 @@ const compiled = ts.transpileModule(patched, {
 }).outputText;
 (async () => {
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`;
-  const { tasteAffinityAdjustment, mergeSeedRecommendations } = await import(moduleUrl);
+  const { tasteAffinityAdjustment, mergeSeedRecommendations, affinityMapsFromTaste } = await import(moduleUrl);
   const affinity = {
     likedTags: new Map([['progression', 8]]),
     avoidTags: new Map([['harem', 6]]),
     likedGenres: new Map(),
     avoidGenres: new Map(),
+    contested: new Map(),
   };
   const boost = tasteAffinityAdjustment(['Progression', 'other'], [], affinity);
   if (!(boost.multiplier > 1)) throw new Error('expected boost');
   const pen = tasteAffinityAdjustment(['Harem'], [], affinity);
   if (!(pen.multiplier < 1)) throw new Error('expected penalty');
+  // Contested tags: discounted weight, reported separately, mixed-signal evidence.
+  const maps = affinityMapsFromTaste({
+    liked_tags: [{ name: 'Harem', weight: 12, count: 3, polarity: 'like' }],
+    avoid_tags: [{ name: 'harem', weight: 8, count: 5, polarity: 'avoid' }],
+    liked_genres: [],
+    avoid_genres: [],
+  });
+  if (maps.likedTags.get('harem') !== 3) throw new Error('expected contested discount 12*0.25, got ' + maps.likedTags.get('harem'));
+  if (maps.avoidTags.get('harem') !== 2) throw new Error('expected contested discount 8*0.25');
+  if (!maps.contested.has('harem')) throw new Error('expected contested set');
+  const mixed = tasteAffinityAdjustment(['Harem'], [], maps);
+  if (!mixed.contested.includes('Harem')) throw new Error('expected contested name, got ' + JSON.stringify(mixed.contested));
   const seed = { novel_id: 1, title: 'S', weight: 5, reason: '5★' };
   const merged = mergeSeedRecommendations([{
     seed,
@@ -133,6 +172,21 @@ const compiled = ts.transpileModule(patched, {
     }
   }], { affinity, limit: 5 });
   if (!merged[0].evidence_bullets.some((b) => b.includes('Taste boost'))) throw new Error('missing boost evidence');
+  const mergedMixed = mergeSeedRecommendations([{
+    seed,
+    response: {
+      seed_novel: { id: 1, title: 'S', slug: 's', novelupdates_url: '' },
+      count: 1,
+      recommendations: [{
+        target_id: 10, title: 'U', author: '', slug: 'u', novelupdates_url: '', language: '',
+        rating: 4, rating_votes: 1, reading_list_count: 10, status_trans: '', chapters_trans: 0,
+        rrf_score: 0.1, match_score_percent: 50, channel_ranks: {}, shared_tags: ['Harem'],
+        evidence_bullets: []
+      }]
+    }
+  }], { affinity: maps, limit: 5 });
+  if (!mergedMixed[0].evidence_bullets.some((b) => b.includes('Mixed signal'))) throw new Error('missing mixed-signal evidence: ' + JSON.stringify(mergedMixed[0].evidence_bullets));
+  if (mergedMixed[0].evidence_bullets.some((b) => b.includes('Taste penalty'))) throw new Error('contested tag leaked into penalty evidence');
   process.stdout.write(JSON.stringify({ ok: true }));
 })().catch((e) => { console.error(e); process.exit(1); });
 """
@@ -183,6 +237,22 @@ const compiled = ts.transpileModule(patched, {
     bullets = " ".join(body["recommendations"][0].get("evidence_bullets") or [])
     assert "seed" in bullets.lower() or "Taste" in bullets
 
+    contested = client.post(
+        "/api/recommend/for-you",
+        json={
+            "seeds": [{"id": 1, "weight": 5, "title": "SeedA"}],
+            "liked_tags": [{"name": "Progression", "weight": 8}],
+            "contested_tags": ["progression"],
+            "limit": 10,
+        },
+    )
+    assert contested.status_code == 200, contested.text
+    cbullets = " ".join(
+        contested.json()["recommendations"][0].get("evidence_bullets") or []
+    )
+    assert "Mixed signal" in cbullets, cbullets
+    assert "Taste boost" not in cbullets, cbullets
+
 
 def test_recommend_excludes_library_ids(tmp_path, monkeypatch):
     db_file = str(tmp_path / "taste.db")
@@ -220,3 +290,29 @@ def test_recommend_excludes_library_ids(tmp_path, monkeypatch):
     assert closed.status_code == 200
     closed_ids = {item["target_id"] for item in closed.json()["recommendations"]}
     assert 3 not in closed_ids
+
+
+def test_list_membership_seeds():
+    from src.eval.personal_eval import select_positive_seeds
+
+    entries = [
+        {"slug": "abc", "novel_id": 1, "imported_title": "Unrated", "status": "reading"},
+        {"slug": "def", "novel_id": 2, "imported_title": "Rated 2", "status": "reading", "rating": 2},
+        {"slug": "ghi", "novel_id": 3, "imported_title": "Rated 5", "status": "completed", "rating": 5},
+    ]
+    # Ratings-only: unrated reading does not seed; low-rated does not seed.
+    assert [s["novel_id"] for s in select_positive_seeds(entries, 12)] == [3]
+    # Favorites-list membership seeds the unrated title (4.5 < 5.0).
+    with_list = select_positive_seeds(entries, 12, {"abc"})
+    assert [s["novel_id"] for s in with_list] == [3, 1]
+    assert with_list[1]["reason"] == "In your favorites list"
+    from src.api.main import _mixed_signal_bullet, _partition_affinity_hits
+
+    clean_like, clean_avoid, contested = _partition_affinity_hits(
+        ["Harem", "Progression"], ["Harem", "Gore"], {"harem"}
+    )
+    assert clean_like == ["Progression"]
+    assert clean_avoid == ["Gore"]
+    assert contested == ["Harem"]
+    assert "Mixed signal" in _mixed_signal_bullet(contested)
+    assert "counted lightly" in _mixed_signal_bullet(contested)
