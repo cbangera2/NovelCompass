@@ -2,7 +2,8 @@ export const DISCOVER_DEFAULTS = {
   hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
   requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
   minYear: 0, maxYear: 0, includeTagsText: '', excludeTagsText: '', tagWeight: .8,
-  directRecWeight: 1.2, listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60,
+  directRecWeight: 1.2, listWeight: 1, structuralWeight: .6, vectorWeight: 1,
+  hiddenGemStrength: .3, maxResults: 60,
   types: '',
   genreStates: {} as Record<string, 'include' | 'exclude'>
 };
@@ -49,6 +50,7 @@ export function parseDiscoverRoute(params: URLSearchParams, fallback: DiscoverRo
     includeTagsText: params.has('ti') ? params.get('ti') || '' : fallback.includeTagsText,
     excludeTagsText: params.has('tx') ? params.get('tx') || '' : fallback.excludeTagsText,
     tagWeight: numberValue(params, 'wt', fallback.tagWeight, 0, 3),
+    vectorWeight: numberValue(params, 'wv', fallback.vectorWeight, 0, 3),
     directRecWeight: numberValue(params, 'wd', fallback.directRecWeight, 0, 3),
     listWeight: numberValue(params, 'wl', fallback.listWeight, 0, 3),
     structuralWeight: numberValue(params, 'ws', fallback.structuralWeight, 0, 3),
@@ -75,6 +77,7 @@ export function discoverSearchParams(state: DiscoverRouteState): URLSearchParams
   set('ti', state.includeTagsText.trim(), ''); set('tx', state.excludeTagsText.trim(), '');
   set('wt', state.tagWeight, DISCOVER_DEFAULTS.tagWeight); set('wd', state.directRecWeight, DISCOVER_DEFAULTS.directRecWeight);
   set('wl', state.listWeight, DISCOVER_DEFAULTS.listWeight); set('ws', state.structuralWeight, DISCOVER_DEFAULTS.structuralWeight);
+  set('wv', state.vectorWeight, DISCOVER_DEFAULTS.vectorWeight);
   set('wh', state.hiddenGemStrength, DISCOVER_DEFAULTS.hiddenGemStrength); set('n', state.maxResults, DISCOVER_DEFAULTS.maxResults);
   if (state.types) params.set('types', state.types);
   return params;

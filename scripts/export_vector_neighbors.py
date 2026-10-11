@@ -3,8 +3,14 @@
 The Worker cannot run the Python embedding model, so the vector channel is
 served from a precomputed ``vector_neighbors`` table in D1. This script
 computes top-K cosine-similarity neighbors per novel using the same embedder
-as the live engine (``src.nlp.embedder.SynopsisEmbedder``) and writes them to
-the SQLite DB the refresh pipeline later imports into D1.
+*and the same input text* as the live engine
+(``src.engine.candidate_gen.CandidateGenerator.get_vector_texts``, i.e. title +
+genres + tags + synopsis) and writes them to the SQLite DB the refresh
+pipeline later imports into D1.
+
+Train/serve parity matters: the live API builds its in-memory vectors from
+``get_vector_texts``, so a synopsis-only export here would rank differently
+than the engine it is supposed to precompute.
 
 Usage:
     .venv/bin/python scripts/export_vector_neighbors.py \
@@ -14,7 +20,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -23,7 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.db.schema import get_connection  # noqa: E402
-from src.nlp.embedder import SynopsisEmbedder  # noqa: E402
+from src.engine.candidate_gen import CandidateGenerator  # noqa: E402
 
 
 def main() -> None:
@@ -34,25 +39,20 @@ def main() -> None:
 
     conn = get_connection(args.db)
     cur = conn.cursor()
-    cur.execute(
-        "SELECT id, title, synopsis FROM novels "
-        "WHERE synopsis IS NOT NULL AND synopsis != '' ORDER BY id"
-    )
-    rows = cur.fetchall()
-    if not rows:
-        print("no novels with synopses; nothing to export")
+
+    generator = CandidateGenerator(conn)
+    ids, texts = generator.get_vector_texts()
+    if not ids:
+        print("no novels with usable text; nothing to export")
         return
 
-    embedder = SynopsisEmbedder()
-    texts = [embedder.construct_text(title, synopsis) for _, title, synopsis in rows]
-    print(f"encoding {len(texts)} synopses...", flush=True)
-    vectors = embedder.encode(texts)
+    print(f"encoding {len(texts)} titles (title + genres + tags + synopsis)...", flush=True)
+    vectors = generator.embedder.encode(texts)
     # L2-normalize so dot product == cosine similarity
     norms = np.linalg.norm(vectors, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     vectors = vectors / norms
 
-    ids = [row[0] for row in rows]
     limit = min(args.limit, len(ids) - 1)
 
     cur.execute(

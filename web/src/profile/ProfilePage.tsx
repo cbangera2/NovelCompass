@@ -2,10 +2,10 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { BookOpen, ExternalLink, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { createDataSource, RecommendationDataSource } from '../data';
 import { useDataModePreference } from '../dataModePreference';
-import { DatasetManifest, NovelDetail, NovelSearchResult } from '../types';
+import { DatasetManifest, FilterOptions, NovelDetail, NovelSearchResult } from '../types';
 import { ProfilePanel } from './ProfilePanel';
-import { loadLocalProfile } from './store';
-import { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
+import { loadLocalProfile, saveLocalProfile } from './store';
+import { LocalUserProfile, ProfileEntry, ReadingStatus, TastePin } from './types';
 import { computeTasteProfile, TasteProfile } from './taste';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { novelPageUrl } from '../novelLinks';
@@ -42,6 +42,9 @@ export default function ProfilePage(): JSX.Element {
   const [tasteDetails, setTasteDetails] = useState<NovelDetail[]>([]);
   const [tasteLoading, setTasteLoading] = useState(false);
   const [tasteLoadFailed, setTasteLoadFailed] = useState(0);
+  const [facetOptions, setFacetOptions] = useState<FilterOptions | null>(null);
+  const [tuneName, setTuneName] = useState('');
+  const [tuneMessage, setTuneMessage] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +150,81 @@ export default function ProfilePage(): JSX.Element {
     window.location.href = appUrl(`?seed=${entry.novel_id}`);
   };
 
+  useEffect(() => {
+    if (!source) {
+      setFacetOptions(null);
+      return;
+    }
+    let cancelled = false;
+    source.getOptions()
+      .then((options) => { if (!cancelled) setFacetOptions(options); })
+      .catch(() => { if (!cancelled) setFacetOptions(null); });
+    return () => { cancelled = true; };
+  }, [source]);
+
+  const mutedNames = useMemo(() => new Set(
+    (profile?.taste_overrides?.muted || []).map((m) => m.name.trim().toLowerCase()).filter(Boolean)
+  ), [profile]);
+  const listMemberships = useMemo(
+    () => profile?.list_membership || [], [profile]);
+  const listMembershipById = useMemo(
+    () => new Map(listMemberships.map((m) => [m.list_id, m])), [listMemberships]);
+
+  const resolveTuneKind = (name: string): TastePin['kind'] => {
+    const genres = facetOptions?.genres || [];
+    return genres.some((g) => g.toLowerCase() === name.toLowerCase()) ? 'genre' : 'tag';
+  };
+
+  const saveOverrides = async (
+    mutator: (current: NonNullable<LocalUserProfile['taste_overrides']>) => void,
+    doneMessage: string
+  ) => {
+    if (!profile) return;
+    const overrides = {
+      likes: [...(profile.taste_overrides?.likes || [])],
+      avoids: [...(profile.taste_overrides?.avoids || [])],
+      muted: [...(profile.taste_overrides?.muted || [])],
+    };
+    mutator(overrides);
+    const next = { ...profile, taste_overrides: overrides };
+    await saveLocalProfile(next);
+    setProfile(next);
+    setTuneMessage(doneMessage);
+  };
+
+  const addTuneOverride = (list: 'likes' | 'avoids' | 'muted') => {
+    const name = tuneName.trim();
+    if (!name) {
+      setTuneMessage('Type a tag or genre first.');
+      return;
+    }
+    if (name.length > 60) {
+      setTuneMessage('That name is too long to be a tag or genre.');
+      return;
+    }
+    const key = name.toLowerCase();
+    const others: Array<'likes' | 'avoids' | 'muted'> = ['likes', 'avoids', 'muted'];
+    void saveOverrides((overrides) => {
+      for (const other of others) {
+        const at = overrides[other].findIndex((p) => p.name.toLowerCase() === key);
+        if (at >= 0 && other !== list) overrides[other].splice(at, 1);
+      }
+      if (!overrides[list].some((p) => p.name.toLowerCase() === key)) {
+        overrides[list].push({ name, kind: resolveTuneKind(name) });
+      }
+    }, list === 'muted'
+      ? `'${name}' muted — ignored in ranking.`
+      : `'${name}' pinned as ${list === 'likes' ? 'liked' : 'avoided'}.`);
+    setTuneName('');
+  };
+
+  const removeTuneOverride = (list: 'likes' | 'avoids' | 'muted', name: string) => {
+    const key = name.toLowerCase();
+    void saveOverrides((overrides) => {
+      overrides[list] = overrides[list].filter((p) => p.name.toLowerCase() !== key);
+    }, `Removed '${name}'.`);
+  };
+
   const openLibraryDetail = async (entry: ProfileEntry) => {
     if (entry.novel_id == null) return;
     openDetailById(entry.novel_id);
@@ -243,6 +321,8 @@ export default function ProfilePage(): JSX.Element {
                   {taste.positive_seeds.length} positive seeds · {taste.negative_ids.length} negatives ·{' '}
                   {taste.exclude_ids.length} matched IDs excluded from ranking ·{' '}
                   {taste.evidence.matched}/{taste.evidence.total_entries} library titles matched to catalog.
+                  {taste.evidence.lists_with_membership > 0 &&
+                    ` · ${taste.evidence.list_seeds} seeds from ${taste.evidence.lists_with_membership} imported list${taste.evidence.lists_with_membership === 1 ? '' : 's'}.`}
                   {tasteLoadFailed ? ` ${tasteLoadFailed} detail shard${tasteLoadFailed === 1 ? '' : 's'} failed to load.` : ''}
                   {' '}Facet weights use rating/status/feedback — not equal title counts.
                 </p>
@@ -263,7 +343,9 @@ export default function ProfilePage(): JSX.Element {
                     <div className="taste-chips">
                       {taste.liked_genres.map((facet) => (
                         <a key={facet.name} href={browseFacetUrl('genre', facet.name)}>
-                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong>
+                          {facet.manual ? <small>pinned</small> : <small>×{facet.count}</small>}
+                          {mutedNames.has(facet.name.toLowerCase()) && <small>muted</small>}
                         </a>
                       ))}
                       {!taste.liked_genres.length && <small>Need matched seed details for genres.</small>}
@@ -274,7 +356,9 @@ export default function ProfilePage(): JSX.Element {
                     <div className="taste-chips">
                       {taste.liked_tags.map((facet) => (
                         <a key={facet.name} href={browseFacetUrl('tag', facet.name)}>
-                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong>
+                          {facet.manual ? <small>pinned</small> : <small>×{facet.count}</small>}
+                          {mutedNames.has(facet.name.toLowerCase()) && <small>muted</small>}
                         </a>
                       ))}
                       {!taste.liked_tags.length && <small>Need matched seed details for tags.</small>}
@@ -285,7 +369,9 @@ export default function ProfilePage(): JSX.Element {
                     <div className="taste-chips taste-chips-avoid">
                       {taste.avoid_genres.map((facet) => (
                         <a key={facet.name} href={browseFacetUrl('genre', facet.name)}>
-                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong>
+                          {facet.manual ? <small>pinned</small> : <small>×{facet.count}</small>}
+                          {mutedNames.has(facet.name.toLowerCase()) && <small>muted</small>}
                         </a>
                       ))}
                       {!taste.avoid_genres.length && <small>No dropped / low-rated / not-for-me signal yet.</small>}
@@ -296,12 +382,84 @@ export default function ProfilePage(): JSX.Element {
                     <div className="taste-chips taste-chips-avoid">
                       {taste.avoid_tags.map((facet) => (
                         <a key={facet.name} href={browseFacetUrl('tag', facet.name)}>
-                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
+                          {facet.name}<strong>{facet.weight.toFixed(1)}</strong>
+                          {facet.manual ? <small>pinned</small> : <small>×{facet.count}</small>}
+                          {mutedNames.has(facet.name.toLowerCase()) && <small>muted</small>}
                         </a>
                       ))}
                       {!taste.avoid_tags.length && <small>No negative tag signal yet.</small>}
                     </div>
                   </div>
+                </div>
+                {taste.contested_facets.length > 0 && (
+                  <div className="taste-contested">
+                    <h3>Mixed signals — in your liked and dropped titles, counted lightly</h3>
+                    <div className="taste-chips taste-chips-contested">
+                      {taste.contested_facets.map((facet) => (
+                        <span key={`${facet.kind}:${facet.name}`} title={`${facet.kind}`}>
+                          {facet.name}
+                          <strong>liked {facet.like_weight.toFixed(1)}×{facet.like_count}</strong>
+                          <small>avoided {facet.avoid_weight.toFixed(1)}×{facet.avoid_count}</small>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="taste-tune">
+                  <h3>Teach your taste</h3>
+                  <p className="profile-list-note">
+                    Pin tags or genres you love or want to avoid, or mute ones the engine
+                    got wrong. Pins shape For You ranking softly — they don't add new seed pools.
+                  </p>
+                  <div className="taste-tune-row">
+                    <input
+                      value={tuneName}
+                      onChange={(event) => setTuneName(event.target.value)}
+                      placeholder="e.g. yandere"
+                      list="taste-tune-suggestions"
+                      aria-label="Tag or genre name"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') addTuneOverride('likes');
+                      }}
+                    />
+                    <datalist id="taste-tune-suggestions">
+                      {(facetOptions?.genres || []).map((name) => <option key={`g:${name}`} value={name} />)}
+                      {(facetOptions?.tags || []).map((name) => <option key={`t:${name}`} value={name} />)}
+                    </datalist>
+                    <button type="button" onClick={() => addTuneOverride('likes')}>Pin like</button>
+                    <button type="button" onClick={() => addTuneOverride('avoids')}>Pin avoid</button>
+                    <button type="button" onClick={() => addTuneOverride('muted')}>Mute</button>
+                  </div>
+                  {tuneMessage && <p className="profile-list-note" role="status">{tuneMessage}</p>}
+                  {(profile?.taste_overrides?.likes.length ||
+                    profile?.taste_overrides?.avoids.length ||
+                    profile?.taste_overrides?.muted.length) ? (
+                    <ul className="taste-tune-list">
+                      {(profile?.taste_overrides?.likes || []).map((pin) => (
+                        <li key={`likes:${pin.name}`}>
+                          <span>{pin.name}<small>pinned like · {pin.kind}</small></span>
+                          <button type="button" aria-label={`Remove pinned like ${pin.name}`}
+                            onClick={() => removeTuneOverride('likes', pin.name)}>✕</button>
+                        </li>
+                      ))}
+                      {(profile?.taste_overrides?.avoids || []).map((pin) => (
+                        <li key={`avoids:${pin.name}`}>
+                          <span>{pin.name}<small>pinned avoid · {pin.kind}</small></span>
+                          <button type="button" aria-label={`Remove pinned avoid ${pin.name}`}
+                            onClick={() => removeTuneOverride('avoids', pin.name)}>✕</button>
+                        </li>
+                      ))}
+                      {(profile?.taste_overrides?.muted || []).map((pin) => (
+                        <li key={`muted:${pin.name}`}>
+                          <span>{pin.name}<small>muted · {pin.kind}</small></span>
+                          <button type="button" aria-label={`Unmute ${pin.name}`}
+                            onClick={() => removeTuneOverride('muted', pin.name)}>✕</button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="profile-list-note">No manual adjustments yet — everything above is inferred from your library.</p>
+                  )}
                 </div>
                 <details className="taste-sample" open={taste.positive_seeds.length > 0 && taste.positive_seeds.length <= 8}>
                   <summary>Positive seeds ({taste.positive_seeds.length}) — used for For You</summary>
@@ -385,20 +543,50 @@ export default function ProfilePage(): JSX.Element {
           <Card className="profile-lists-section">
             <div className="profile-library-heading">
               <div><span className="eyebrow">Saved metadata</span><h2>Created lists</h2></div>
-              <span>{profile.curated_lists.length} summaries</span>
+              <span>{profile.curated_lists.length} summaries{listMemberships.length ? ` · ${listMemberships.length} with membership` : ''}</span>
             </div>
-            <p className="profile-list-note">Saved profile pages include list summaries, not the novels inside each list. Membership badges and personalization are omitted until membership data is available.</p>
+            {listMemberships.length ? (
+              <p className="profile-list-note">
+                Favorites lists seed personalization, to-read lists are excluded from recommendations, mixed lists seed weakly.
+                Re-save a list page from Novel Updates anytime to refresh its members.
+              </p>
+            ) : (
+              <p className="profile-list-note">
+                List summaries show titles and sizes, not membership. Save individual list pages
+                (…/viewlist/ID/) and import them to make those lists drive personalization.
+              </p>
+            )}
             <div className="profile-list-grid">
-              {profile.curated_lists.map((list) => (
-                <article key={list.id}>
-                  <div><h3>{list.title}</h3>{list.is_private && <span>Private</span>}</div>
-                  {list.description && <p>{list.description}</p>}
-                  <footer>
-                    <span>{list.series_count != null ? `${list.series_count} series` : 'Series count unavailable'}</span>
-                    {!list.is_private && <a href={`https://www.novelupdates.com/viewlist/${list.id}/`} target="_blank" rel="noopener noreferrer">View summary source <ExternalLink size={13} /></a>}
-                  </footer>
-                </article>
-              ))}
+              {profile.curated_lists.map((list) => {
+                const membership = listMembershipById.get(list.id);
+                return (
+                  <article key={list.id} className={membership ? 'list-with-membership' : ''}>
+                    <div>
+                      <h3>{list.title}</h3>
+                      {list.is_private && <span>Private</span>}
+                      {membership && (
+                        <span className={`list-signal list-signal-${membership.signal}`}>
+                          {membership.signal === 'favorites' ? 'Favorites' :
+                            membership.signal === 'to_read' ? 'To read' : 'Mixed'}
+                        </span>
+                      )}
+                    </div>
+                    {list.description && <p>{list.description}</p>}
+                    <footer>
+                      <span>
+                        {membership
+                          ? `${membership.members.length} imported titles`
+                          : list.series_count != null ? `${list.series_count} series` : 'Series count unavailable'}
+                      </span>
+                      {list.membership_available && (
+                        <a href={`https://www.novelupdates.com/viewlist/${list.id}/`} target="_blank" rel="noopener noreferrer">
+                          Open list <ExternalLink size={13} />
+                        </a>
+                      )}
+                    </footer>
+                  </article>
+                );
+              })}
             </div>
           </Card>
         </>

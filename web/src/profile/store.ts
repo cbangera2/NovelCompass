@@ -59,12 +59,31 @@ export function mergeProfiles(current: LocalUserProfile | null, incoming: LocalU
   for (const entry of incoming.entries) entries.set(entry.slug, entry);
   const lists = new Map(current.curated_lists.map((list) => [list.id, list]));
   for (const list of incoming.curated_lists) lists.set(list.id, list);
+  // List membership merges by list id; member slugs union, incoming signal wins.
+  const membership = new Map((current.list_membership || []).map((m) => [m.list_id, m]));
+  for (const m of incoming.list_membership || []) {
+    const prev = membership.get(m.list_id);
+    if (!prev) {
+      membership.set(m.list_id, m);
+      continue;
+    }
+    const seen = new Set(prev.members.map((member) => member.slug));
+    const members = [...prev.members];
+    for (const member of m.members) {
+      if (seen.has(member.slug)) continue;
+      seen.add(member.slug);
+      members.push(member);
+    }
+    membership.set(m.list_id, { ...m, members });
+  }
   return {
     ...incoming,
     profile_id: current.profile_id,
     source_fingerprints: [...new Set([...(current.source_fingerprints || []), ...incoming.source_fingerprints])],
     entries: [...entries.values()],
     curated_lists: [...lists.values()],
+    list_membership: [...membership.values()],
+    taste_overrides: incoming.taste_overrides ?? current.taste_overrides,
     feedback: [...new Map([...(current.feedback || []), ...(incoming.feedback || [])].map((item) => [item.novel_id, item])).values()]
   };
 }

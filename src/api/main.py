@@ -15,9 +15,11 @@ from src.engine.candidate_gen import CandidateGenerator
 from src.engine.filters import HardFilterEngine
 from src.engine.rrf_ranker import (
     DEFAULT_CHANNEL_WEIGHTS,
+    apply_mmr_reranking,
     calculate_rrf_scores,
     apply_hidden_gem_boost,
 )
+from src.nlp.taxonomy import weighted_tag_similarity
 from src.engine.explainer import EvidenceExplainer
 from src.engine.ranking_contract import (
     ALGORITHM_VERSION,
@@ -207,6 +209,8 @@ class RecommendRequest(BaseModel):
     source: str = "all"
     # Client library / feedback exclusions (matched catalog IDs only).
     exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)
+    # Diversity rerank blend (0 = off, preserves legacy order).
+    mmr_lambda: float = 0.0
 
 
 class ForYouSeed(BaseModel):
@@ -247,6 +251,11 @@ class ForYouRecommendRequest(BaseModel):
     exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)
     liked_tags: List[TasteTagWeight] = Field(default_factory=list, max_length=40)
     avoid_tags: List[TasteTagWeight] = Field(default_factory=list, max_length=40)
+    # Tags/genres present in liked AND avoided titles (pre-discounted client-side;
+    # used for honest evidence text, not scoring).
+    contested_tags: List[str] = Field(default_factory=list, max_length=40)
+    # Diversity rerank blend (0 = off, preserves legacy order).
+    mmr_lambda: float = 0.0
 
 
 class SlugResolveRequest(BaseModel):
@@ -1007,6 +1016,62 @@ def _affinity_multiplier(shared_tags: List[str], liked: Dict[str, float], avoide
     return max(0.55, min(1.45, raw)), hit_like[:4], hit_avoid[:4]
 
 
+def _mmr_select(conn: sqlite3.Connection, cand_gen: CandidateGenerator,
+                ranked: List[Tuple[int, float]], limit: int,
+                lambda_param: float) -> List[Tuple[int, float]]:
+    """Diversity rerank over an already-scored pool (IDF-weighted tag Jaccard).
+
+    lambda_param=0 returns the pool unchanged. Otherwise selects `limit` ids
+    balancing score vs max-similarity to already-selected items.
+    """
+    lambda_param = max(0.0, min(1.0, float(lambda_param or 0.0)))
+    if lambda_param <= 0 or len(ranked) <= 1:
+        return ranked[:limit]
+    ids = [nid for nid, _ in ranked]
+    placeholders = ",".join("?" for _ in ids)
+    tag_rows = conn.execute(
+        f"""SELECT nt.novel_id, t.name FROM novel_tags nt
+            JOIN tags t ON t.id = nt.tag_id WHERE nt.novel_id IN ({placeholders})""",
+        ids).fetchall()
+    tags_by_id: Dict[int, set] = {nid: set() for nid in ids}
+    for nid, name in tag_rows:
+        tags_by_id[nid].add((name or "").lower())
+    idf = cand_gen._get_idf_dict()
+    sim: Dict[Tuple[int, int], float] = {}
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            s = weighted_tag_similarity(tags_by_id[ids[i]], tags_by_id[ids[j]], idf)
+            sim[(ids[i], ids[j])] = s
+            sim[(ids[j], ids[i])] = s
+    scores = dict(ranked)
+    order = apply_mmr_reranking(ids, scores, sim, top_k=limit, lambda_param=lambda_param)
+    return [(nid, scores[nid]) for nid in order]
+
+
+def _partition_affinity_hits(hit_like: List[str], hit_avoid: List[str],
+                             contested: set) -> tuple[list, list, list]:
+    """Split affinity hits into clean likes, clean avoids, and contested tags.
+
+    Contested tags (liked AND dropped in the user's library) get their own
+    evidence line instead of masquerading as a pure boost or penalty.
+    """
+    contested_hits = [t for t in hit_like + hit_avoid if t.lower() in contested]
+    seen: set = set()
+    unique: list = []
+    for tag in contested_hits:
+        if tag.lower() not in seen:
+            seen.add(tag.lower())
+            unique.append(tag)
+    clean_like = [t for t in hit_like if t.lower() not in contested]
+    clean_avoid = [t for t in hit_avoid if t.lower() not in contested]
+    return clean_like, clean_avoid, unique
+
+
+def _mixed_signal_bullet(contested_hits: List[str]) -> str:
+    return (f"Mixed signal — counted lightly: {', '.join(contested_hits)} "
+            "(in your liked and dropped titles)")
+
+
 def _get_for_you_recommendations(conn: sqlite3.Connection, req: ForYouRecommendRequest):
     if not req.seeds:
         raise HTTPException(status_code=400, detail="For You requires at least one seed id.")
@@ -1077,6 +1142,8 @@ def _get_for_you_recommendations(conn: sqlite3.Connection, req: ForYouRecommendR
     ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     # Pre-trim before expensive explain
     ranked = ranked[: max(req.limit * 3, req.limit)]
+    if req.mmr_lambda:
+        ranked = _mmr_select(conn, cand_gen, ranked, req.limit, req.mmr_lambda)
 
     explainer = EvidenceExplainer(conn)
     recommendations = []
@@ -1108,11 +1175,16 @@ def _get_for_you_recommendations(conn: sqlite3.Connection, req: ForYouRecommendR
             bullets.insert(0, f"Appeared under {len(hits)} of your seeds (e.g. {titles})")
         elif hits:
             bullets.insert(0, f"From your seed: {hits[0]['title']}")
+        contested = {str(t).lower() for t in (req.contested_tags or [])}
+        clean_like, clean_avoid, contested_hits = _partition_affinity_hits(
+            hit_like, hit_avoid, contested)
+        if contested_hits:
+            bullets.insert(1, _mixed_signal_bullet(contested_hits))
         if mult != 1.0:
-            if hit_like:
-                bullets.insert(1, f"Taste boost ×{mult:.2f} via liked tropes: {', '.join(hit_like)}")
-            if hit_avoid:
-                bullets.insert(1, f"Taste penalty ×{mult:.2f} via avoided tropes: {', '.join(hit_avoid)}")
+            if clean_like:
+                bullets.insert(1, f"Taste boost ×{mult:.2f} via liked tropes: {', '.join(clean_like)}")
+            if clean_avoid:
+                bullets.insert(1, f"Taste penalty ×{mult:.2f} via avoided tropes: {', '.join(clean_avoid)}")
         exp["evidence_bullets"] = bullets[:7]
         exp["_sort_score"] = score
         exp["_unboosted"] = base_score * mult
@@ -1210,7 +1282,9 @@ def _get_recommendations(conn: sqlite3.Connection, req: RecommendRequest):
         else:
             final_scores[nid] = score
 
-    sorted_recs = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)[:req.limit]
+    pool = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)
+    pool = pool[: max(req.limit * 3, 25)]
+    sorted_recs = _mmr_select(conn, cand_gen, pool, req.limit, req.mmr_lambda)
 
     # Format recommendations with evidence
     explainer = EvidenceExplainer(conn)

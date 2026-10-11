@@ -5,12 +5,22 @@
  */
 import type { NovelDetail, Recommendation, RecommendRequest, RecommendResponse } from '../types';
 import type { RecommendationDataSource } from '../data';
-import type { LocalUserProfile, ProfileEntry, ProfileMediaKind } from './types';
+import type { LocalUserProfile, ProfileEntry, ProfileMediaKind, TasteOverrides, TastePin } from './types';
 import { inferMediaKind } from './profileStats';
 
 export const TASTE_PROFILE_VERSION = 1;
 export const DEFAULT_SEED_LIMIT = 12;
 export const DEFAULT_DETAIL_LIMIT = 80;
+/** Seed weight for titles in the user's own favorites-type lists. */
+export const LIST_FAVORITE_WEIGHT = 4.5;
+/** Seed weight for titles in mixed-curiosity lists. */
+export const LIST_MIXED_WEIGHT = 3.2;
+/** Affinity weight kept for tags/genres present in liked AND avoided titles. */
+export const CONTESTED_FACET_DISCOUNT = 0.25;
+/** Soft affinity weight of a user-pinned like (≈ two 5★ seeds: strong, not tyrannical). */
+export const PIN_LIKE_WEIGHT = 12;
+/** Soft affinity weight of a user-pinned avoid. */
+export const PIN_AVOID_WEIGHT = 10;
 
 export type WeightedFacet = {
   name: string;
@@ -18,6 +28,8 @@ export type WeightedFacet = {
   count: number;
   /** Positive affinity vs avoid */
   polarity: 'like' | 'avoid';
+  /** True when pinned by the user rather than inferred from the library. */
+  manual?: boolean;
 };
 
 export type TasteSeed = {
@@ -25,6 +37,18 @@ export type TasteSeed = {
   title: string;
   weight: number;
   reason: string;
+};
+
+/** A tag/genre found in both liked and avoided titles (e.g. harem loved in
+ *  Xuanhuan but dropped in Romance). Displayed explicitly and discounted in
+ *  affinity so one side can't dominate by luck. */
+export type ContestedFacet = {
+  name: string;
+  kind: 'tag' | 'genre';
+  like_weight: number;
+  like_count: number;
+  avoid_weight: number;
+  avoid_count: number;
 };
 
 export type TasteProfile = {
@@ -40,6 +64,7 @@ export type TasteProfile = {
   liked_tags: WeightedFacet[];
   avoid_genres: WeightedFacet[];
   avoid_tags: WeightedFacet[];
+  contested_facets: ContestedFacet[];
   evidence: {
     total_entries: number;
     matched: number;
@@ -49,6 +74,9 @@ export type TasteProfile = {
     dropped: number;
     feedback_love: number;
     feedback_not_for_me: number;
+    lists_with_membership: number;
+    list_members_matched: number;
+    list_seeds: number;
     sources: string[];
     /** Honest limitations shown in UI. */
     caveats: string[];
@@ -123,6 +151,50 @@ function topFacets(
     .slice(0, limit);
 }
 
+export function findContestedFacets(
+  liked: WeightedFacet[],
+  avoid: WeightedFacet[],
+  kind: 'tag' | 'genre'
+): ContestedFacet[] {
+  const avoidByName = new Map(avoid.map((f) => [f.name.toLowerCase(), f]));
+  const out: ContestedFacet[] = [];
+  for (const like of liked) {
+    const other = avoidByName.get(like.name.toLowerCase());
+    if (!other) continue;
+    out.push({
+      name: like.name,
+      kind,
+      like_weight: like.weight,
+      like_count: like.count,
+      avoid_weight: other.weight,
+      avoid_count: other.count,
+    });
+  }
+  return out.sort(
+    (a, b) => b.like_weight + b.avoid_weight - (a.like_weight + a.avoid_weight)
+  );
+}
+
+/** Merge user-pinned likes/avoids into inferred facets (pinned wins on name clash). */
+export function mergePinnedFacets(
+  inferred: WeightedFacet[],
+  pins: TastePin[] | undefined,
+  weight: number,
+  polarity: 'like' | 'avoid'
+): WeightedFacet[] {
+  if (!pins?.length) return inferred;
+  const out = [...inferred];
+  for (const pin of pins) {
+    const name = pin.name.trim();
+    if (!name) continue;
+    const entry: WeightedFacet = { name, weight, count: 0, polarity, manual: true };
+    const idx = out.findIndex((f) => f.name.toLowerCase() === name.toLowerCase());
+    if (idx >= 0) out[idx] = entry;
+    else out.push(entry);
+  }
+  return out.sort((a, b) => b.weight - a.weight || b.count - a.count || a.name.localeCompare(b.name));
+}
+
 export function selectPositiveSeeds(
   profile: LocalUserProfile,
   options: { limit?: number; scope?: 'all' | ProfileMediaKind } = {}
@@ -145,6 +217,22 @@ export function selectPositiveSeeds(
       reason: scored.reason,
     });
   }
+  // The user's own lists are explicit curation: favorites-type lists seed
+  // strongly (ratings are sparse on Novel Updates), mixed lists seed mildly,
+  // to-read lists never seed. Dedupe below keeps the highest weight on clash.
+  for (const membership of profile.list_membership || []) {
+    if (membership.signal === 'to_read') continue;
+    const weight = membership.signal === 'favorites' ? LIST_FAVORITE_WEIGHT : LIST_MIXED_WEIGHT;
+    for (const member of membership.members) {
+      if (member.novel_id == null) continue;
+      seeds.push({
+        novel_id: member.novel_id,
+        title: member.imported_title,
+        weight,
+        reason: `In your list “${membership.title}”`,
+      });
+    }
+  }
   seeds.sort((a, b) => b.weight - a.weight || a.title.localeCompare(b.title));
   // Dedupe by novel_id keeping highest weight
   const seen = new Set<number>();
@@ -162,6 +250,12 @@ export function buildExcludeIds(profile: LocalUserProfile): number[] {
   const ids = new Set<number>();
   for (const entry of profile.entries) {
     if (entry.novel_id != null) ids.add(entry.novel_id);
+  }
+  // List members are known titles too, whatever the list's signal.
+  for (const membership of profile.list_membership || []) {
+    for (const member of membership.members) {
+      if (member.novel_id != null) ids.add(member.novel_id);
+    }
   }
   for (const fb of profile.feedback || []) {
     if (fb.signal === 'not_for_me') ids.add(fb.novel_id);
@@ -224,6 +318,12 @@ export function computeTasteProfile(
   const feedback_love = (profile.feedback || []).filter((f) => f.signal === 'love').length;
   const feedback_not_for_me = (profile.feedback || []).filter((f) => f.signal === 'not_for_me').length;
   const sources = [...new Set(profile.entries.map((e) => e.source_file).filter(Boolean))];
+  const listMemberships = profile.list_membership || [];
+  const lists_with_membership = listMemberships.length;
+  const list_members_matched = listMemberships.reduce(
+    (sum, m) => sum + m.members.filter((member) => member.novel_id != null).length, 0);
+  const list_members_total = listMemberships.reduce((sum, m) => sum + m.members.length, 0);
+  const list_seeds = seeds.filter((s) => s.reason.startsWith('In your list')).length;
 
   const caveats: string[] = [];
   if (unmatched > 0) {
@@ -231,9 +331,14 @@ export function computeTasteProfile(
       `${unmatched.toLocaleString()} library titles are not in this catalog snapshot, so they cannot seed or exclude recommendations yet.`
     );
   }
+  if (list_members_total - list_members_matched > 0) {
+    caveats.push(
+      `${(list_members_total - list_members_matched).toLocaleString()} list titles are not in this catalog snapshot, so they cannot seed recommendations yet.`
+    );
+  }
   if (seeds.length === 0) {
     caveats.push(
-      'No strong positive seeds yet. Rate titles 4★+, mark Completed, or use Love on recommendations.'
+      'No strong positive seeds yet. Rate titles 4★+, mark Completed, import your favorites lists, or use Love on recommendations.'
     );
   } else if (seeds.length < 3) {
     caveats.push(
@@ -252,6 +357,24 @@ export function computeTasteProfile(
     caveats.push('Import Completed lists or add personal ratings for a useful taste signal.');
   }
 
+  const overrides = profile.taste_overrides;
+  const liked_genres = mergePinnedFacets(
+    topFacets(likedGenreMap, 'like', 10),
+    overrides?.likes.filter((p) => p.kind === 'genre'), PIN_LIKE_WEIGHT, 'like');
+  const liked_tags = mergePinnedFacets(
+    topFacets(likedTagMap, 'like', 16),
+    overrides?.likes.filter((p) => p.kind === 'tag'), PIN_LIKE_WEIGHT, 'like');
+  const avoid_genres = mergePinnedFacets(
+    topFacets(avoidGenreMap, 'avoid', 8),
+    overrides?.avoids.filter((p) => p.kind === 'genre'), PIN_AVOID_WEIGHT, 'avoid');
+  const avoid_tags = mergePinnedFacets(
+    topFacets(avoidTagMap, 'avoid', 12),
+    overrides?.avoids.filter((p) => p.kind === 'tag'), PIN_AVOID_WEIGHT, 'avoid');
+  const contested_facets: ContestedFacet[] = [
+    ...findContestedFacets(liked_tags, avoid_tags, 'tag'),
+    ...findContestedFacets(liked_genres, avoid_genres, 'genre'),
+  ];
+
   return {
     version: TASTE_PROFILE_VERSION,
     computed_at: new Date().toISOString(),
@@ -260,10 +383,11 @@ export function computeTasteProfile(
     positive_seeds: seeds,
     negative_ids,
     exclude_ids,
-    liked_genres: topFacets(likedGenreMap, 'like', 10),
-    liked_tags: topFacets(likedTagMap, 'like', 16),
-    avoid_genres: topFacets(avoidGenreMap, 'avoid', 8),
-    avoid_tags: topFacets(avoidTagMap, 'avoid', 12),
+    liked_genres,
+    liked_tags,
+    avoid_genres,
+    avoid_tags,
+    contested_facets,
     evidence: {
       total_entries: profile.entries.length,
       matched,
@@ -273,27 +397,82 @@ export function computeTasteProfile(
       dropped,
       feedback_love,
       feedback_not_for_me,
+      lists_with_membership,
+      list_members_matched,
+      list_seeds,
       sources,
       caveats,
     },
   };
 }
 
+export type ContestedStat = {
+  display: string;
+  kind: 'tag' | 'genre';
+  likeCount: number;
+  avoidCount: number;
+};
+
 export type AffinityMaps = {
   likedTags: Map<string, number>;
   avoidTags: Map<string, number>;
   likedGenres: Map<string, number>;
   avoidGenres: Map<string, number>;
+  /** Lowercased names present on both sides (discounted, for evidence text). */
+  contested: Map<string, ContestedStat>;
 };
 
-export function affinityMapsFromTaste(taste: Pick<TasteProfile, 'liked_tags' | 'avoid_tags' | 'liked_genres' | 'avoid_genres'>): AffinityMaps {
+export function affinityMapsFromTaste(taste: Pick<TasteProfile, 'liked_tags' | 'avoid_tags' | 'liked_genres' | 'avoid_genres'> & { taste_overrides?: TasteOverrides }): AffinityMaps {
   const toMap = (facets: WeightedFacet[]) => new Map(facets.map((f) => [f.name.toLowerCase(), f.weight]));
-  return {
-    likedTags: toMap(taste.liked_tags),
-    avoidTags: toMap(taste.avoid_tags),
-    likedGenres: toMap(taste.liked_genres),
-    avoidGenres: toMap(taste.avoid_genres),
+  const contested = new Map<string, ContestedStat>();
+  const markContested = (liked: WeightedFacet[], avoid: WeightedFacet[], kind: 'tag' | 'genre') => {
+    const avoidNames = new Set(avoid.map((f) => f.name.toLowerCase()));
+    for (const f of liked) {
+      const key = f.name.toLowerCase();
+      if (avoidNames.has(key) && !contested.has(key)) {
+        contested.set(key, { display: f.name, kind, likeCount: 0, avoidCount: 0 });
+      }
+    }
   };
+  markContested(taste.liked_tags, taste.avoid_tags, 'tag');
+  markContested(taste.liked_genres, taste.avoid_genres, 'genre');
+  const discount = (map: Map<string, number>) => {
+    for (const key of contested.keys()) {
+      const w = map.get(key);
+      if (w !== undefined) map.set(key, w * CONTESTED_FACET_DISCOUNT);
+    }
+    return map;
+  };
+  // Fill counts for evidence text from the facet arrays.
+  const fillCounts = (facets: WeightedFacet[], field: 'likeCount' | 'avoidCount') => {
+    for (const f of facets) {
+      const stat = contested.get(f.name.toLowerCase());
+      if (stat) stat[field] = f.count;
+    }
+  };
+  fillCounts(taste.liked_tags, 'likeCount');
+  fillCounts(taste.avoid_tags, 'avoidCount');
+  fillCounts(taste.liked_genres, 'likeCount');
+  fillCounts(taste.avoid_genres, 'avoidCount');
+  // Muted names are ignored in ranking entirely (they stay visible in the
+  // inferred lists so the display remains truthful to the library).
+  const muted = new Set(
+    (taste.taste_overrides?.muted || []).map((m) => m.name.trim().toLowerCase()).filter(Boolean)
+  );
+  const maps = {
+    likedTags: discount(toMap(taste.liked_tags)),
+    avoidTags: discount(toMap(taste.avoid_tags)),
+    likedGenres: discount(toMap(taste.liked_genres)),
+    avoidGenres: discount(toMap(taste.avoid_genres)),
+    contested,
+  };
+  if (muted.size) {
+    for (const map of [maps.likedTags, maps.avoidTags, maps.likedGenres, maps.avoidGenres]) {
+      for (const key of muted) map.delete(key);
+    }
+    for (const key of muted) maps.contested.delete(key);
+  }
+  return maps;
 }
 
 /**
@@ -304,12 +483,20 @@ export function tasteAffinityAdjustment(
   tags: string[] | undefined,
   genres: string[] | undefined,
   affinity?: AffinityMaps | null
-): { multiplier: number; liked: string[]; avoided: string[] } {
-  if (!affinity) return { multiplier: 1, liked: [], avoided: [] };
+): { multiplier: number; liked: string[]; avoided: string[]; contested: string[] } {
+  if (!affinity) return { multiplier: 1, liked: [], avoided: [], contested: [] };
+  const contestedNames = affinity.contested ?? new Map<string, ContestedStat>();
   let likeScore = 0;
   let avoidScore = 0;
   const liked: string[] = [];
   const avoided: string[] = [];
+  const contested: string[] = [];
+  const noteContested = (raw: string) => {
+    const key = raw.toLowerCase();
+    if (contestedNames.has(key) && !contested.some((c) => c.toLowerCase() === key)) {
+      contested.push(contestedNames.get(key)?.display || raw);
+    }
+  };
   for (const raw of tags || []) {
     const key = raw.toLowerCase();
     const lw = affinity.likedTags.get(key);
@@ -322,6 +509,7 @@ export function tasteAffinityAdjustment(
       avoidScore += aw;
       avoided.push(raw);
     }
+    if (lw || aw) noteContested(raw);
   }
   for (const raw of genres || []) {
     const key = raw.toLowerCase();
@@ -335,11 +523,12 @@ export function tasteAffinityAdjustment(
       avoidScore += aw * 0.85;
       avoided.push(raw);
     }
+    if (lw || aw) noteContested(raw);
   }
   // Scale: a few strong tags → ~±15–30%; hard cap so multi-seed structure remains.
   const raw = 1 + Math.min(0.35, likeScore * 0.012) - Math.min(0.4, avoidScore * 0.016);
   const multiplier = Math.max(0.55, Math.min(1.45, raw));
-  return { multiplier, liked: liked.slice(0, 4), avoided: avoided.slice(0, 4) };
+  return { multiplier, liked: liked.slice(0, 4), avoided: avoided.slice(0, 4), contested: contested.slice(0, 4) };
 }
 
 /** Merge multi-seed recommendation responses with seed weights (static + API safe). */
@@ -410,18 +599,26 @@ export function mergeSeedRecommendations(
           : `From your seed: ${seedTitles[0] || 'library favorite'}`;
       const affinity = (item as Acc & { affinity?: ReturnType<typeof tasteAffinityAdjustment> }).affinity;
       const affinityBullets: string[] = [];
+      if (affinity && affinity.contested.length) {
+        affinityBullets.push(
+          `Mixed signal — counted lightly: ${affinity.contested.join(', ')} (in your liked and dropped titles)`
+        );
+      }
       if (affinity && affinity.multiplier !== 1) {
-        if (affinity.liked.length) {
+        const contestedLower = new Set(affinity.contested.map((c) => c.toLowerCase()));
+        const cleanLiked = affinity.liked.filter((t) => !contestedLower.has(t.toLowerCase()));
+        const cleanAvoided = affinity.avoided.filter((t) => !contestedLower.has(t.toLowerCase()));
+        if (cleanLiked.length) {
           affinityBullets.push(
-            `Taste boost ×${affinity.multiplier.toFixed(2)} via liked tropes: ${affinity.liked.join(', ')}`
+            `Taste boost ×${affinity.multiplier.toFixed(2)} via liked tropes: ${cleanLiked.join(', ')}`
           );
         }
-        if (affinity.avoided.length) {
+        if (cleanAvoided.length) {
           affinityBullets.push(
-            `Taste penalty ×${affinity.multiplier.toFixed(2)} via avoided tropes: ${affinity.avoided.join(', ')}`
+            `Taste penalty ×${affinity.multiplier.toFixed(2)} via avoided tropes: ${cleanAvoided.join(', ')}`
           );
         }
-        if (!affinity.liked.length && !affinity.avoided.length && affinity.multiplier !== 1) {
+        if (!cleanLiked.length && !cleanAvoided.length && affinity.multiplier !== 1) {
           affinityBullets.push(`Taste affinity ×${affinity.multiplier.toFixed(2)}`);
         }
       }
@@ -490,8 +687,14 @@ export async function fetchForYouRecommendations(
         ...baseRequest,
         seeds: seeds.map((s) => ({ id: s.novel_id, weight: s.weight, title: s.title })),
         exclude_novel_ids: excludeIds,
-        liked_tags: options.taste?.liked_tags.map((f) => ({ name: f.name, weight: f.weight })) || [],
-        avoid_tags: options.taste?.avoid_tags.map((f) => ({ name: f.name, weight: f.weight })) || [],
+        // Weights are pre-discounted for contested tags via affinityMapsFromTaste.
+        liked_tags: affinity
+          ? [...affinity.likedTags.entries()].map(([name, weight]) => ({ name, weight }))
+          : options.taste?.liked_tags.map((f) => ({ name: f.name, weight: f.weight })) || [],
+        avoid_tags: affinity
+          ? [...affinity.avoidTags.entries()].map(([name, weight]) => ({ name, weight }))
+          : options.taste?.avoid_tags.map((f) => ({ name: f.name, weight: f.weight })) || [],
+        contested_tags: affinity ? [...affinity.contested.keys()] : [],
         limit: baseRequest.limit || 40,
       });
       if (response?.recommendations) {

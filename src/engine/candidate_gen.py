@@ -33,17 +33,52 @@ class CandidateGenerator:
             self._novel_tags_map = m
         return self._novel_tags_map
 
+    def _get_novel_genres_map(self) -> Dict[int, Set[str]]:
+        cur = self.conn.cursor()
+        cur.execute("""
+            SELECT ng.novel_id, g.name FROM novel_genres ng
+            JOIN genres g ON g.id = ng.genre_id
+        """)
+        m: Dict[int, Set[str]] = {}
+        for nid, gname in cur.fetchall():
+            if nid not in m:
+                m[nid] = set()
+            m[nid].add(gname)
+        return m
+
+    def get_vector_texts(self) -> Tuple[List[int], List[str]]:
+        """Embedding texts for every novel with any signal (title is always
+        present; synopsis/tags/genres enrich when available).
+
+        Same construction MUST be used by the offline neighbor export
+        (scripts/export_vector_neighbors.py) so live API vectors and the
+        precomputed D1 `vector_neighbors` table agree.
+        """
+        cur = self.conn.cursor()
+        cur.execute("SELECT id, title, synopsis FROM novels ORDER BY id")
+        novel_tags_map = self._get_novel_tags_map()
+        novel_genres_map = self._get_novel_genres_map()
+        c_ids: List[int] = []
+        c_texts: List[str] = []
+        for nid, title, synopsis in cur.fetchall():
+            tags = sorted(novel_tags_map.get(nid, ()))
+            genres = sorted(novel_genres_map.get(nid, ()))
+            if not (synopsis and synopsis.strip()) and not tags and not genres:
+                continue
+            c_ids.append(nid)
+            c_texts.append(self.embedder.construct_text(
+                title or "", synopsis or "",
+                tags=tags or None, genres=genres or None,
+            ))
+        return c_ids, c_texts
+
     def _get_vector_data(self):
         if self._vector_cache is None:
-            cur = self.conn.cursor()
-            cur.execute("SELECT id, title, synopsis FROM novels WHERE synopsis IS NOT NULL AND synopsis != '' ORDER BY id")
-            candidates = cur.fetchall()
-            if not candidates:
+            c_ids, c_texts = self.get_vector_texts()
+            if not c_ids:
                 self._vector_cache = ([], {}, None)
             else:
-                c_ids = [c[0] for c in candidates]
                 id_to_idx = {cid: i for i, cid in enumerate(c_ids)}
-                c_texts = [self.embedder.construct_text(c[1], c[2]) for c in candidates]
                 vectors = self.embedder.encode(c_texts)
                 self._vector_cache = (c_ids, id_to_idx, vectors)
         return self._vector_cache
