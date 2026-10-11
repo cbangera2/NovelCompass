@@ -224,14 +224,20 @@ async function structuralCandidates(
   return scored.slice(0, limit);
 }
 
+// Tag tables cost ~1M row reads to build (~458k novel_tags rows twice).
+// Cache per isolate with a TTL so data refreshes propagate without paying
+// the full scan on every cold request.
 export let cachedTagIdf: Map<string, number> | null = null;
 let cachedTagsMap: Map<number, Set<string>> | null = null;
+let tagTablesExpires = 0;
+const TAG_TABLES_TTL_MS = 30 * 60 * 1000;
 
 async function getTagTables(db: D1Database) {
-  if (!cachedTagIdf || !cachedTagsMap) {
+  if (!cachedTagIdf || !cachedTagsMap || tagTablesExpires <= Date.now()) {
     const [idf, tagsMap] = await Promise.all([calculateTagIdf(db), novelTagsMap(db)]);
     cachedTagIdf = idf;
     cachedTagsMap = tagsMap;
+    tagTablesExpires = Date.now() + TAG_TABLES_TTL_MS;
   }
   return { idf: cachedTagIdf, tagsMap: cachedTagsMap };
 }
