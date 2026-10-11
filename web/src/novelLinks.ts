@@ -43,4 +43,15 @@ export function novelPageUrl(id: number, from?: number, mediaType?: string): str
   return itemPageUrl(id, from, mediaType);
 }
 
+/** NovelUpdates' generic "no image" placeholder counts as no cover. */
+export function hasUsableCover(coverUrl?: string | null): boolean {
+  if (!coverUrl) return false;
+  return !coverUrl.toLowerCase().includes('noimagefound');
+}
 
+/** Translate raw status_trans values ("Yes"/"No") into human-readable labels. */
+export function formatStatusLabel(status?: string | null): string {
+  if (status === 'Yes') return 'Completed';
+  if (status === 'No') return 'Ongoing';
+  return status || '';
+}

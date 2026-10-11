@@ -12,7 +12,10 @@ from src.db.schema import DEFAULT_DB_PATH, init_db
 from src.scraper.client import (
     DEFAULT_BROWSER_PROFILE,
     BrowserSessionTransport,
+    CloudflareBrowserTransport,
+    CurlCffiTransport,
     ScraperClient,
+    WaybackTransport,
 )
 from src.scraper.crawler import Crawler
 from src.scraper.seed_loader import CBBOSS_PROFILE_URL, SEED_LIST_IDS
@@ -240,7 +243,7 @@ def main() -> int:
     crawl.add_argument("--min-delay", type=float, default=3.0)
     crawl.add_argument("--max-delay", type=float, default=5.5)
     crawl.add_argument(
-        "--transport", choices=("urllib", "browser"), default="urllib"
+        "--transport", choices=("urllib", "browser", "cf-browser", "wayback"), default="urllib"
     )
     crawl.add_argument(
         "--browser-profile", type=Path, default=DEFAULT_BROWSER_PROFILE
@@ -310,6 +313,23 @@ def main() -> int:
             except RuntimeError as exc:
                 conn.close()
                 parser.error(str(exc))
+        elif args.transport == "cf-browser":
+            try:
+                transport = CloudflareBrowserTransport(args.browser_profile)
+            except RuntimeError as exc:
+                conn.close()
+                parser.error(str(exc))
+        elif args.transport == "wayback":
+            # primary curl_cffi for open pages, wayback snapshots for challenged ones
+            client_headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+            transport = WaybackTransport(CurlCffiTransport(client_headers))
         client = ScraperClient(
             delay_range=(args.min_delay, args.max_delay),
             transport=transport,

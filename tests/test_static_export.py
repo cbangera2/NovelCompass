@@ -2,20 +2,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from build_static_export import CATALOG_FIELDS, bucket_for_id, export_static_dataset
 from src.db.schema import init_db
-
-
-class FakeCandidateGenerator:
-    def __init__(self, _conn):
-        pass
-
-    def get_candidate_channels(self, seed_id, limit_per_channel):
-        if seed_id == 1:
-            return {"tag": [(257, 0.8)], "direct_rec": [(257, 1.0)]}
-        return {}
 
 
 class StaticExportTest(unittest.TestCase):
@@ -56,8 +45,7 @@ class StaticExportTest(unittest.TestCase):
                 )
             conn.close()
 
-            with patch("build_static_export.CandidateGenerator", FakeCandidateGenerator):
-                manifest = export_static_dataset(root / "out", max_novels=1, db_path=str(database))
+            manifest = export_static_dataset(root / "out", max_novels=1, db_path=str(database))
 
             catalog = json.loads((root / "out/catalog.json").read_text())
             self.assertEqual(catalog["fields"], list(CATALOG_FIELDS))
@@ -87,13 +75,12 @@ class StaticExportTest(unittest.TestCase):
             self.assertEqual(options["genres"], ["Fantasy"])
             self.assertEqual(options["tags"], ["Academy"])
 
-            with patch("build_static_export.CandidateGenerator", FakeCandidateGenerator):
-                layered = export_static_dataset(
-                    root / "layered",
-                    max_novels=1,
-                    db_path=str(database),
-                    catalog_limit=1,
-                )
+            layered = export_static_dataset(
+                root / "layered",
+                max_novels=1,
+                db_path=str(database),
+                catalog_limit=1,
+            )
             full_catalog = json.loads((root / "layered/catalog.json").read_text())
             bootstrap = json.loads((root / "layered/bootstrap-catalog.json").read_text())
             self.assertEqual([row[0] for row in full_catalog["rows"]], [1, 257])

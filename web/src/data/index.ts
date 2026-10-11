@@ -7,7 +7,10 @@ const sourcePromises = new Map<DataMode, Promise<RecommendationDataSource>>();
 const DATA_MODE_KEY = 'novel-compass:data-mode:v1';
 
 export function forcedDataMode(): Exclude<DataMode, 'auto'> | null {
-  if (typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io')) return 'static';
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.endsWith('.github.io') || hostname.endsWith('.pages.dev')) return 'static';
+  }
   const configured = import.meta.env.VITE_DATA_MODE;
   return configured === 'api' || configured === 'static' ? configured : null;
 }

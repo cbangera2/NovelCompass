@@ -29,7 +29,7 @@ import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
 import type { NovelSearchResult } from './types';
-import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
 import { NovelCompassMark } from './NovelCompassMark';
 import {
   Sidebar,
@@ -75,7 +75,10 @@ export default function AppShell({
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [homeUrl, setHomeUrl] = useState(defaultHomeUrl);
   const { mode: dataMode } = useDataModePreference();
-  const staticDeployment = dataMode === 'static' || window.location.hostname.endsWith('.github.io');
+  const staticDeployment =
+    dataMode === 'static' ||
+    window.location.hostname.endsWith('.github.io') ||
+    window.location.hostname.endsWith('.pages.dev');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
 
   useEffect(() => {
@@ -470,7 +473,7 @@ function GlobalNovelSearch({
               const badge = getMediaBadgeInfo(novel);
               return (
                 <a key={novel.id} href={novelPageUrl(novel.id)} onClick={() => choose(novel)}>
-                  {novel.cover_url ? (
+                  {hasUsableCover(novel.cover_url) ? (
                     <img src={novel.cover_url} alt="" loading="lazy" />
                   ) : (
                     <span>
