@@ -16,6 +16,7 @@ export interface RecommendationDataSource {
   getManifest(): Promise<DatasetManifest>;
   searchNovels(query: string, limit: number, signal?: AbortSignal): Promise<NovelSearchResult[]>;
   getOptions(): Promise<FilterOptions>;
+  getGenreCounts(): Promise<Array<{ genre: string; count: number }>>;
   resolveSlugs(items: Array<{ slug: string; title: string }>): Promise<Map<string, NovelSearchResult>>;
   /** Batch-confirm catalog membership by numeric id (used by AniList GDPR import). */
   resolveNovelIds(ids: number[]): Promise<Map<number, NovelSearchResult>>;

@@ -26,7 +26,8 @@ export default function BrowsePage(): JSX.Element {
     query: '', sort: 'popular', direction: 'desc', language: '', author: '', genre: '', tag: '',
     minRating: 0, maxRating: 0, minVotes: 0, minYear: 0, maxYear: 0, status: '',
     minChapters: 0, maxChapters: 0, minReaders: 0, maxReaders: 0, includeGenres: '',
-    excludeGenres: '', includeTags: '', excludeTags: '', excludeLibrary: false, density: 'grid'
+    excludeGenres: '', includeTags: '', excludeTags: '', tagMatch: 'every',
+    excludeLibrary: false, density: 'grid'
   });
   const savedSort: BrowseSort = ['popular', 'rating', 'votes', 'title', 'newest'].includes(String(saved.sort))
     ? saved.sort as BrowseSort : 'popular';
@@ -36,6 +37,7 @@ export default function BrowsePage(): JSX.Element {
   const initialNumber = (key: string, savedKey: keyof typeof saved) => initialParams.has(key) ? Number(initialParams.get(key) || 0) : Number(saved[savedKey] || 0);
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
+  const [genreCounts, setGenreCounts] = useState<Array<{ genre: string; count: number }>>([]);
   const [items, setItems] = useState<BrowseNovel[]>([]);
   const [query, setQuery] = useState(initialString('q', 'query'));
   const [sort, setSort] = useState<BrowseSort>(initialParams.has('sort') && ['popular', 'rating', 'votes', 'title', 'newest'].includes(initialParams.get('sort') || '') ? initialParams.get('sort') as BrowseSort : savedSort);
@@ -57,6 +59,10 @@ export default function BrowsePage(): JSX.Element {
   const [includeGenres, setIncludeGenres] = useState(initialString('include_genres', 'includeGenres'));
   const [excludeGenres, setExcludeGenres] = useState(initialString('exclude_genres', 'excludeGenres'));
   const [includeTags, setIncludeTags] = useState(initialString('include_tags', 'includeTags'));
+  const [tagMatch, setTagMatch] = useState<'any' | 'every'>(() => {
+    if (initialParams.has('tag_match')) return initialParams.get('tag_match') === 'any' ? 'any' : 'every';
+    return saved.tagMatch === 'any' ? 'any' : 'every';
+  });
   const [excludeTags, setExcludeTags] = useState(initialString('exclude_tags', 'excludeTags'));
   const [excludeLibrary, setExcludeLibrary] = useState(initialParams.has('exclude_library') ? initialParams.get('exclude_library') === '1' : Boolean(saved.excludeLibrary));
   const [libraryIds, setLibraryIds] = useState<number[]>([]);
@@ -85,6 +91,9 @@ export default function BrowsePage(): JSX.Element {
       if (cancelled) return;
       setSource(next);
       setOptions(nextOptions);
+      next.getGenreCounts()
+        .then((counts) => { if (!cancelled) setGenreCounts(counts); })
+        .catch(() => { if (!cancelled) setGenreCounts([]); });
     }).catch((reason) => !cancelled && setError(reason.message || `Could not load the ${dataMode} data source.`));
     return () => { cancelled = true; };
   }, [dataMode]);
@@ -92,10 +101,10 @@ export default function BrowsePage(): JSX.Element {
   useEffect(() => {
     saveFilterSnapshot('browse', { query, sort, direction, language, author, genre, tag, minRating, maxRating,
       minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders,
-      includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density, mediaType: selectedTypes.join(',') });
+      includeGenres, excludeGenres, includeTags, excludeTags, tagMatch, excludeLibrary, density, mediaType: selectedTypes.join(',') });
   }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear,
     status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags,
-    excludeTags, excludeLibrary, density, selectedTypes]);
+    excludeTags, tagMatch, excludeLibrary, density, selectedTypes]);
 
   useEffect(() => {
     loadLocalProfile().then((profile) => setLibraryIds(
@@ -117,7 +126,7 @@ export default function BrowsePage(): JSX.Element {
           status, min_chapters: minChapters, max_chapters: maxChapters,
           min_readers: minReaders, max_readers: maxReaders,
           include_genres: includeGenres, exclude_genres: excludeGenres,
-          include_tags: includeTags, exclude_tags: excludeTags,
+          include_tags: includeTags, exclude_tags: excludeTags, tag_match: tagMatch,
           exclude_ids: excludeLibrary ? libraryIds.join(',') : '', direction,
           media_type: selectedTypes.join(','),
           page, page_size: PAGE_SIZE
@@ -142,7 +151,7 @@ export default function BrowsePage(): JSX.Element {
       }
     }, page === 1 ? 240 : 0);
     return () => window.clearTimeout(timer);
-  }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, libraryIds, page, retryToken, selectedTypes]);
+  }, [source, query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, tagMatch, excludeLibrary, libraryIds, page, retryToken, selectedTypes]);
 
   const resetPage = (action: () => void) => {
     action();
@@ -195,6 +204,7 @@ export default function BrowsePage(): JSX.Element {
       min_readers: minReaders, max_readers: maxReaders,
       include_genres: includeGenres, exclude_genres: excludeGenres,
       include_tags: includeTags, exclude_tags: excludeTags,
+      tag_match: tagMatch === 'any' ? 'any' : '',
       exclude_library: excludeLibrary, density
     };
     Object.entries(values).forEach(([key, value]) => {
@@ -204,7 +214,7 @@ export default function BrowsePage(): JSX.Element {
       params.set('types', selectedTypes.join(','));
     }
     window.history.replaceState(null, '', stableRouteUrl(params));
-  }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, excludeLibrary, density, selectedTypes, isAllSelected]);
+  }, [query, sort, direction, language, author, genre, tag, minRating, maxRating, minVotes, minYear, maxYear, status, minChapters, maxChapters, minReaders, maxReaders, includeGenres, excludeGenres, includeTags, excludeTags, tagMatch, excludeLibrary, density, selectedTypes, isAllSelected]);
 
   useEffect(() => {
     const restore = () => {
@@ -223,6 +233,7 @@ export default function BrowsePage(): JSX.Element {
       setMinReaders(number('min_readers')); setMaxReaders(number('max_readers'));
       setIncludeGenres(text('include_genres')); setExcludeGenres(text('exclude_genres'));
       setIncludeTags(text('include_tags')); setExcludeTags(text('exclude_tags'));
+      setTagMatch(text('tag_match') === 'any' ? 'any' : 'every');
       setExcludeLibrary(text('exclude_library') === '1'); setPage(1); setBatchError(''); loadRequestedRef.current = false;
       const mediaTypes = parseMediaTypesFromUrl(params);
       if (mediaTypes) setTypes(mediaTypes);
@@ -238,7 +249,7 @@ export default function BrowsePage(): JSX.Element {
     min_chapters: minChapters, max_chapters: maxChapters,
     min_readers: minReaders, max_readers: maxReaders,
     include_genres: includeGenres, exclude_genres: excludeGenres,
-    include_tags: includeTags, exclude_tags: excludeTags,
+    include_tags: includeTags, exclude_tags: excludeTags, tag_match: tagMatch,
     exclude_ids: excludeLibrary ? libraryIds.join(',') : '', direction
   });
 
@@ -247,6 +258,7 @@ export default function BrowsePage(): JSX.Element {
     setMinRating(0); setMaxRating(0); setMinVotes(0); setMinYear(0); setMaxYear(0);
     setStatus(''); setMinChapters(0); setMaxChapters(0); setMinReaders(0); setMaxReaders(0);
     setIncludeGenres(''); setExcludeGenres(''); setIncludeTags(''); setExcludeTags('');
+    setTagMatch('every');
     setExcludeLibrary(false); setSort('popular'); setDirection('desc');
   });
 
@@ -342,6 +354,26 @@ export default function BrowsePage(): JSX.Element {
         <DSButton variant="ghost" onClick={() => applyPreset('newest')}>Newest</DSButton>
         <DSButton variant="ghost" onClick={() => applyPreset('completed')}>Completed</DSButton>
       </nav>
+      {genreCounts.length > 0 && (
+        <section className="genre-tiles" aria-label="Browse by genre">
+          {/* Top 16 by series count; the full genre list stays in the Genre dropdown below. */}
+          {genreCounts.slice(0, 16).map(({ genre: tileGenre, count }) => {
+            const tileActive = genre === tileGenre;
+            return (
+              <button
+                key={tileGenre}
+                className={`genre-tile${tileActive ? ' active' : ''}`}
+                aria-pressed={tileActive}
+                onClick={() => resetPage(() => { setGenre(tileActive ? '' : tileGenre); setIncludeGenres(''); })}
+                title={`${count.toLocaleString()} series`}
+              >
+                <span className="genre-tile-name">{tileGenre}</span>
+                <span className="genre-tile-count">{count.toLocaleString()}</span>
+              </button>
+            );
+          })}
+        </section>
+      )}
       <Card className="browse-controls" aria-label="Catalog filters">
         <label className="browse-search">
           <span>Search</span>
@@ -401,6 +433,10 @@ export default function BrowsePage(): JSX.Element {
             <label className="browse-text-filter"><span>Include genres</span><input value={includeGenres} onChange={(event) => resetPage(() => setIncludeGenres(event.target.value))} placeholder="Fantasy, Adventure" /></label>
             <label className="browse-text-filter"><span>Exclude genres</span><input value={excludeGenres} onChange={(event) => resetPage(() => setExcludeGenres(event.target.value))} placeholder="Harem" /></label>
             <label className="browse-text-filter"><span>Include tags</span><input value={includeTags} onChange={(event) => resetPage(() => setIncludeTags(event.target.value))} placeholder="Time Loop" /></label>
+            <label className="browse-text-filter"><span>Tag match</span><select value={tagMatch} onChange={(event) => resetPage(() => setTagMatch(event.target.value as 'any' | 'every'))}>
+              <option value="every">Match every tag</option>
+              <option value="any">Match any tag</option>
+            </select></label>
             <label className="browse-text-filter"><span>Exclude tags</span><input value={excludeTags} onChange={(event) => resetPage(() => setExcludeTags(event.target.value))} placeholder="Netorare" /></label>
             <label className="browse-library-filter"><input type="checkbox" checked={excludeLibrary} disabled={!libraryIds.length} onChange={(event) => resetPage(() => setExcludeLibrary(event.target.checked))} /> Hide titles in my local library</label>
           </FieldGroup>

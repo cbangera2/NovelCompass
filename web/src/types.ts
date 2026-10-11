@@ -174,6 +174,7 @@ export interface BrowseRequest {
   exclude_genres?: string;
   include_tags?: string;
   exclude_tags?: string;
+  tag_match?: 'any' | 'every';
   exclude_ids?: string;
   direction?: BrowseSortDirection;
   media_type?: string;

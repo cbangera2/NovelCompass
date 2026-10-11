@@ -233,6 +233,7 @@ interface BrowseFilters {
   exclude_genres: string;
   include_tags: string;
   exclude_tags: string;
+  tag_match: string;
   exclude_ids: string;
   direction: string;
   media_type: string;
@@ -259,12 +260,13 @@ function browseFiltersFromQuery(c: any): BrowseFilters {
     min_readers: num("min_readers"), max_readers: num("max_readers"),
     include_genres: str("include_genres"), exclude_genres: str("exclude_genres"),
     include_tags: str("include_tags"), exclude_tags: str("exclude_tags"),
+    tag_match: str("tag_match") === "any" ? "any" : "every",
     exclude_ids: str("exclude_ids"), direction,
     media_type: str("media_type"), source: str("source"),
   };
 }
 
-function browseWhere(f: BrowseFilters): { joins: string[]; where: string[]; params: any[] } {
+export function browseWhere(f: BrowseFilters): { joins: string[]; where: string[]; params: any[] } {
   const joins: string[] = [];
   const where = ["n.rating >= ?", "n.rating_votes >= ?"];
   const params: any[] = [f.min_rating, f.min_votes];
@@ -306,7 +308,7 @@ function browseWhere(f: BrowseFilters): { joins: string[]; where: string[]; para
   }
   const facets: Array<[string, string, boolean]> = [
     ["genre", f.include_genres, false], ["genre", f.exclude_genres, true],
-    ["tag", f.include_tags, false], ["tag", f.exclude_tags, true],
+    ["tag", f.exclude_tags, true],
   ];
   for (const [facet, values, excluded] of facets) {
     const names = values.split(",").map((v) => v.trim()).filter(Boolean);
@@ -319,6 +321,26 @@ function browseWhere(f: BrowseFilters): { joins: string[]; where: string[]; para
         "WHERE bf.novel_id=n.id AND LOWER(bv.name)=LOWER(?))",
       );
       params.push(name);
+    }
+  }
+  // include_tags: "every" (default) requires each tag; "any" requires at least one
+  const includeTagNames = f.include_tags.split(",").map((v) => v.trim()).filter(Boolean);
+  if (includeTagNames.length) {
+    if (f.tag_match === "any" && includeTagNames.length > 1) {
+      const placeholders = includeTagNames.map(() => "LOWER(?)").join(",");
+      where.push(
+        `EXISTS (SELECT 1 FROM novel_tags bf JOIN tags bv ON bv.id=bf.tag_id ` +
+        `WHERE bf.novel_id=n.id AND LOWER(bv.name) IN (${placeholders}))`,
+      );
+      params.push(...includeTagNames);
+    } else {
+      for (const name of includeTagNames) {
+        where.push(
+          "EXISTS (SELECT 1 FROM novel_tags bf JOIN tags bv ON bv.id=bf.tag_id " +
+          "WHERE bf.novel_id=n.id AND LOWER(bv.name)=LOWER(?))",
+        );
+        params.push(name);
+      }
     }
   }
   return { joins, where, params };
@@ -642,6 +664,16 @@ app.get("/api/novels/:id/insights", async (c) => {
 // ---------------------------------------------------------------------------
 // options
 // ---------------------------------------------------------------------------
+
+app.get("/api/genre-counts", async (c) => {
+  const db = c.env.DB;
+  const rows = await db.prepare(
+    `SELECT g.name AS genre, COUNT(DISTINCT ng.novel_id) AS count FROM genres g
+     JOIN novel_genres ng ON ng.genre_id = g.id
+     GROUP BY g.id ORDER BY count DESC`,
+  ).all<{ genre: string; count: number }>();
+  return c.json({ genres: rows.results ?? [] });
+});
 
 app.get("/api/options", async (c) => {
   const db = c.env.DB;

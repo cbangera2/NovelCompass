@@ -10,5 +10,3 @@
 .shell-media-selector .media-pill-group{align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;gap:2px;padding:3px}
 .shell-media-selector .ds-button.media-pill{font-size:.7rem;font-weight:600;gap:.35rem;height:32px;padding:0 .65rem}
 .shell-media-selector .media-pill-group .ds-button.media-pill:not(.ds-button-primary){border:0}
-
-
