@@ -142,9 +142,18 @@ const SEARCH_RESULT_COLUMNS = `
 
 export { SEARCH_RESULT_COLUMNS };
 
+// datasetVersion full-scans 9 tables (~750k rows on the current catalog),
+// and /api/health calls it on every frontend boot. Cache per isolate so
+// steady-state traffic costs ~0 rows; data refreshes show up after the TTL.
+const DATASET_VERSION_TTL_MS = 60 * 60 * 1000;
+let cachedDatasetVersion: { value: string; expires: number } | null = null;
+
 export async function datasetVersion(db: D1Database): Promise<string> {
   const override = (globalThis as any).__DATASET_VERSION__ as string | undefined;
   if (override) return override;
+  if (cachedDatasetVersion && cachedDatasetVersion.expires > Date.now()) {
+    return cachedDatasetVersion.value;
+  }
   const novelStats = await db
     .prepare("SELECT COUNT(*) AS n, COALESCE(MAX(updated_at), '') AS u, COALESCE(MAX(id), 0) AS m FROM novels")
     .first<any>();
@@ -162,5 +171,7 @@ export async function datasetVersion(db: D1Database): Promise<string> {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("")
     .slice(0, 12);
-  return `db-${hex}`;
+  const value = `db-${hex}`;
+  cachedDatasetVersion = { value, expires: Date.now() + DATASET_VERSION_TTL_MS };
+  return value;
 }
