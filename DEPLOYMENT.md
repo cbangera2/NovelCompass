@@ -70,7 +70,7 @@ Full seed recipe and endpoint smoke tests are in
 Two gotchas found while getting this running:
 
 - Strip `.git` from the data snapshot before building (`rm -rf
-  web/public/data/.git`). The nested clone's pack file exceeds the 25 MiB
+web/public/data/.git`). The nested clone's pack file exceeds the 25 MiB
   per-asset Workers limit and fails `wrangler dev`/`deploy`. The workflow
   does this automatically.
 - D1 caps `LIKE` patterns at 50 bytes and binds at 100 variables per
