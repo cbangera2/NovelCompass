@@ -88,6 +88,31 @@ curl -s -X POST localhost:8787/api/recommend \
 `pnpm --dir web run build`), so the frontend talks to the local API on
 the same origin.
 
+## Which data comes from where
+
+The deploy pipeline ships the normalized JSON snapshot (`web/public/data`,
+from the novelcompass-data repo) as static assets at `/data/*`. The Worker
+reads it directly, so anything the static export already computes costs
+**zero D1 rows**:
+
+| Read | Source | D1 rows |
+|---|---|---|
+| `dataset_version`, `novel_count` (`/api/health`) | `manifest.json` | 1 (liveness probe) |
+| genre/tag/language dictionaries (`/api/options`) | `options.json` | 0 |
+| recommendation candidate pools (`/api/recommend`) | `recommendation-index/{bucket}.json` | 0 |
+| catalog distributions for percentiles (`/api/novels/:id/insights`) | derived once per isolate, then cached in memory | ~245k once per isolate |
+
+D1 stays the source of truth for the ad-hoc, interactive parts: search,
+browse/sort, slug/id resolution, per-result filtering, and the evidence
+detail behind each recommendation. Every read falls back to D1 automatically
+when the snapshot is missing (e.g. `wrangler dev --local` without a built
+`web/dist`).
+
+Measured effect on the live 30,696-novel catalog (see
+`scripts/measure_d1_rows.py`): recommendation requests drop from ~98k rows to
+~6k, `/api/health` from ~789k to 1, `/api/options` from ~550k to 0. That is
+what keeps this inside the D1 free tier's 5M rows/day cap.
+
 ## Data refresh flow
 
 1. Run the scraper on the VM as usual (SQLite).

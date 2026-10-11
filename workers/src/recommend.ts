@@ -232,7 +232,7 @@ let cachedTagsMap: Map<number, Set<string>> | null = null;
 let tagTablesExpires = 0;
 const TAG_TABLES_TTL_MS = 30 * 60 * 1000;
 
-async function getTagTables(db: D1Database) {
+export async function getTagTables(db: D1Database) {
   if (!cachedTagIdf || !cachedTagsMap || tagTablesExpires <= Date.now()) {
     const [idf, tagsMap] = await Promise.all([calculateTagIdf(db), novelTagsMap(db)]);
     cachedTagIdf = idf;
