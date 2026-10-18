@@ -48,3 +48,4 @@ web/public/data/
 
 # web/dist is a symlink during local worker verification
 /web/dist
+data/*.bak-*
