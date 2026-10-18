@@ -1,8 +1,8 @@
 """Sync the local SQLite catalog from the published novelcompass-data static dataset.
 
-Adds Novel Updates titles the local DB is missing and refreshes metadata and
-popularity numbers for the ones it has. The recommendation graph (direct recs,
-list memberships), imported lists, AniList rows and local-only titles are left
+Adds Novel Updates and AniList titles the local DB is missing and refreshes
+metadata and popularity numbers for the ones it has. The recommendation graph
+(direct recs, list memberships), imported lists and local-only titles are left
 untouched: the static dataset only carries counts for those, not the edges.
 
     .venv/bin/python scripts/sync_catalog.py [--ref main] [--dry-run]
@@ -54,14 +54,14 @@ def main() -> None:
 
     catalog = fetch_json(args.ref, manifest.get("catalog_url", "catalog.json"), cache)
     fields = {name: i for i, name in enumerate(catalog["fields"])}
-    rows = [r for r in catalog["rows"] if r[fields["source"]] == "novelupdates"]
+    rows = catalog["rows"]
     with ThreadPoolExecutor(8) as pool:
         buckets = list(pool.map(lambda b: fetch_json(args.ref, f"details/{b}.json", cache), BUCKETS))
     details = {int(k): v for bucket in buckets for k, v in bucket.items()}
-    print(f"downloaded catalog ({len(rows)} Novel Updates rows) and {len(details)} detail records")
+    print(f"downloaded catalog ({len(rows)} rows) and {len(details)} detail records")
 
     conn = sqlite3.connect(args.db)
-    existing = {r[0] for r in conn.execute("SELECT id FROM novels WHERE COALESCE(source,'novelupdates')='novelupdates'")}
+    existing = {r[0] for r in conn.execute("SELECT id FROM novels")}
     new_rows = [r for r in rows if r[fields["id"]] not in existing]
     print(f"{len(rows) - len(new_rows)} to refresh, {len(new_rows)} new, {len(existing - {r[fields['id']] for r in rows})} local-only (kept)")
     if args.dry_run:
@@ -126,9 +126,17 @@ def main() -> None:
                 marks = ", ".join("?" * (len(record) + 5))
                 conn.execute(
                     f"INSERT INTO novels ({cols}) VALUES ({marks})",
-                    (nid, *record.values(), g("media_type") or "novel", "novelupdates", g("external_id") or str(nid), g("external_url")),
+                    (nid, *record.values(), g("media_type") or "novel", g("source"), g("external_id") or str(nid), g("external_url")),
                 )
                 inserted += 1
+            if g("source") != "novelupdates":
+                conn.execute(
+                    "INSERT INTO source_records (source_key, external_id, novel_id, raw_media_type, updated_at) "
+                    "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) "
+                    "ON CONFLICT(source_key, external_id) DO UPDATE SET novel_id=excluded.novel_id, "
+                    "raw_media_type=excluded.raw_media_type, updated_at=CURRENT_TIMESTAMP",
+                    (g("source"), g("external_id") or str(nid), nid, g("media_type")),
+                )
             gids = d.get("genre_ids") or g("genre_ids") or []
             tids = d.get("tag_ids") or []
             if gids:
