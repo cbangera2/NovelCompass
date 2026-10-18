@@ -1032,7 +1032,7 @@ class ForYouRowRequest(BaseModel):
     list_ids: List[int] = Field(min_length=1, max_length=40)
     blend: bool = False  # True = "Top picks" row mixing all list_ids
     seeds_per_list: int = Field(default=12, ge=1, le=20)
-    limit: int = Field(default=20, ge=1, le=60)
+    limit: int = Field(default=20, ge=1, le=150)  # 150 backs the "See all" grid
     media_type: str = "novel"
     hide_known: bool = False  # drop titles that appear on any of list_ids
     exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)  # e.g. the user's library
