@@ -2,12 +2,14 @@ import {
   BrowseNovel,
   BrowseRequest,
   BrowseResponse,
+  CuratedListSummary,
   DatasetManifest,
   FilterOptions,
   NovelDetail,
   NovelInsights,
   NovelSearchResult,
   RecommendRequest,
+  RelatedSeriesItem,
   RecommendResponse
 } from '../types';
 import { DataSourceError, RecommendationDataSource } from './source';
@@ -123,6 +125,14 @@ export class ApiDataSource implements RecommendationDataSource {
 
   getNovelInsights(id: number): Promise<NovelInsights> {
     return apiFetch(`/api/novels/${id}/insights`);
+  }
+
+  async getRelatedSeries(id: number): Promise<RelatedSeriesItem[]> {
+    return (await apiFetch<{ items: RelatedSeriesItem[] }>(`/api/novels/${id}/series`)).items;
+  }
+
+  async getCuratedLists(id: number): Promise<CuratedListSummary[]> {
+    return (await apiFetch<{ lists: CuratedListSummary[] }>(`/api/novels/${id}/lists`)).lists;
   }
 
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse> {

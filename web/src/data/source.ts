@@ -4,8 +4,10 @@ import {
   BrowseResponse,
   DatasetManifest,
   FilterOptions,
+  CuratedListSummary,
   NovelDetail,
   NovelInsights,
+  RelatedSeriesItem,
   NovelSearchResult,
   RecommendRequest,
   RecommendResponse
@@ -21,6 +23,10 @@ export interface RecommendationDataSource {
   resolveNovelIds(ids: number[]): Promise<Map<number, NovelSearchResult>>;
   getNovel(id: number): Promise<NovelDetail>;
   getNovelInsights(id: number): Promise<NovelInsights>;
+  /** Sequels, spin-offs and adaptations. Only the live API carries relation edges. */
+  getRelatedSeries?(id: number): Promise<RelatedSeriesItem[]>;
+  /** Curated Novel Updates lists that include this title (live API only). */
+  getCuratedLists?(id: number): Promise<CuratedListSummary[]>;
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse>;
   browseNovels(request: BrowseRequest): Promise<BrowseResponse>;
   getRandomNovel(request: BrowseRequest, randomValue?: number): Promise<BrowseNovel>;

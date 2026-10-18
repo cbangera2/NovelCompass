@@ -12,3 +12,36 @@
 .shell-media-selector .media-pill-group .ds-button.media-pill:not(.ds-button-primary){border:0}
 
 
+
+/* Sidebar polish */
+.sidebar-root{padding:.85rem .7rem}
+.sidebar-content{scrollbar-width:thin}
+.sidebar-group{margin-top:1.1rem}
+.sidebar-group-label{margin-bottom:.25rem}
+.sidebar-menu{gap:.12rem}
+.sidebar-menu-button{min-height:38px;padding:.4rem .6rem;gap:.65rem}
+.sidebar-menu-button strong{font-weight:600}
+.sidebar-menu-button small{font-size:.58rem;line-height:1.25}
+.sidebar-group-compact .sidebar-menu-button{min-height:32px}
+.sidebar-group-compact .sidebar-menu-button small{display:none}
+.sidebar-group-compact .sidebar-menu-button strong{font-size:.72rem;font-weight:500}
+.sidebar-collapse{border-color:transparent;height:30px;justify-content:flex-start}
+.sidebar-footer{border-top:1px solid var(--border);padding-top:.6rem}
+.sidebar-footer .shell-account{border-color:transparent}
+.sidebar-footer .shell-account.active{box-shadow:none}
+.sidebar-header{gap:.45rem;padding-bottom:.2rem}.sidebar-collapse{margin-top:.1rem}
+
+/* Active nav: quiet tint, no border or bar */
+.sidebar-menu-button.active{background:var(--surface-raised);border-color:transparent;color:var(--text)}
+.sidebar-menu-button.active>svg{color:var(--accent-bright)}
+.sidebar-menu-button.active strong{font-weight:650}
+.sidebar-format{background:transparent;cursor:pointer;font:inherit;opacity:.62}
+.sidebar-format:hover{opacity:1}
+.sidebar-format.on{color:var(--text);opacity:1}
+.sidebar-format.on>svg{color:var(--accent-bright)}
+.sidebar-format-check{align-items:center;border:1px solid var(--border-strong);border-radius:5px;color:var(--bg,#fff);display:flex;flex:none;height:16px;justify-content:center;margin-left:auto;width:16px}
+.sidebar-format.on .sidebar-format-check{background:var(--accent);border-color:var(--accent)}
+.sidebar-format-hint{display:block;font-size:.6rem;margin-top:.35rem}
+.sidebar-provider[data-collapsible="icon"] .sidebar-format-check{display:none}
+.sidebar-provider[data-collapsible="icon"] .sidebar-format-hint{display:none}
+.sidebar-provider[data-collapsible="icon"] .sidebar-external-icon{display:none}

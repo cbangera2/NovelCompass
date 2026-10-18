@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMediaFilterState, MediaTypeChoice } from './mediaFilterState';
-import { Film, Image as ImageIcon, Book } from 'lucide-react';
+import { Check, Film, Image as ImageIcon, Book } from 'lucide-react';
 import type { LocalUserProfile } from './profile/types';
 import {
   clearLocalProfile,
@@ -168,7 +168,7 @@ export default function AppShell({
             </SidebarMenu>
           </SidebarGroup>
           <SidebarMediaGroup />
-          <SidebarGroup>
+          <SidebarGroup className="sidebar-group-compact">
             <SidebarGroupLabel>Project</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -287,41 +287,38 @@ export default function AppShell({
 
 function SidebarMediaGroup() {
   const { isSelected, toggleType, isAllSelected, scopeLabel } = useMediaFilterState();
-  const choices: Array<{ type: MediaTypeChoice; label: string; note: string; icon: any }> = [
-    { type: 'novel', label: 'Light Novels', note: 'Web & Light novels', icon: Book },
-    { type: 'manga', label: 'Manga & Comics', note: 'Manga, Manhwa, Manhua', icon: ImageIcon },
-    { type: 'anime', label: 'Anime & Series', note: 'TV, Movies, OVAs', icon: Film },
+  const choices: Array<{ type: MediaTypeChoice; label: string; icon: any }> = [
+    { type: 'novel', label: 'Light Novels', icon: Book },
+    { type: 'manga', label: 'Manga & Comics', icon: ImageIcon },
+    { type: 'anime', label: 'Anime & Series', icon: Film },
   ];
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="sidebar-group-compact sidebar-group-formats">
       <SidebarGroupLabel>Formats</SidebarGroupLabel>
-      <p className="sidebar-format-hint">
-        {isAllSelected
-          ? 'All formats · scopes search, browse, and recommendations'
-          : `Looking at ${scopeLabel} · search, browse, and recs`}
-      </p>
       <SidebarMenu>
-        {choices.map(({ type, label, note, icon: Icon }) => {
-          const active = isSelected(type);
+        {choices.map(({ type, label, icon: Icon }) => {
+          const on = isSelected(type);
           return (
             <SidebarMenuItem key={type}>
-              <SidebarMenuButton
-                active={active}
-                tooltip={label}
+              <button
+                type="button"
+                className={`sidebar-menu-button sidebar-format ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                title={`${label} — ${on ? 'included' : 'excluded'} in search, browse and recommendations`}
                 onClick={() => toggleType(type)}
               >
                 <Icon size={18} />
-                <span>
-                  <strong>{label}</strong>
-                  <small>{note}</small>
-                </span>
-                {active && !isAllSelected && <Badge tone="violet">On</Badge>}
-              </SidebarMenuButton>
+                <span><strong>{label}</strong></span>
+                <span className="sidebar-format-check" aria-hidden="true">{on && <Check size={11} strokeWidth={3} />}</span>
+              </button>
             </SidebarMenuItem>
           );
         })}
       </SidebarMenu>
+      <p className="sidebar-format-hint">
+        {isAllSelected ? 'Everything is included.' : `Only ${scopeLabel}.`} Applies to search, browse and recs.
+      </p>
     </SidebarGroup>
   );
 }
