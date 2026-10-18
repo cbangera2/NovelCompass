@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react';
-import { Badge, DSButton, Skeleton } from './design-system';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { DSButton, Skeleton } from './design-system';
 import { hasUsableCover, novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { computeTasteProfile, type TasteProfile } from './profile/taste';
@@ -8,6 +8,7 @@ import type { LocalUserProfile, ReadingStatus } from './profile/types';
 import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
+import { cleanListTitle } from './forYouNames';
 import './for-you.css';
 
 export interface ListSummary {
@@ -44,6 +45,7 @@ type RowState = { status: 'loading' } | { status: 'error'; message: string } | (
 interface RowJob {
   key: string;
   fallbackTitle: string;
+  heading?: string; // overrides the server's title
   load: (limit: number, signal: AbortSignal) => Promise<RowData>;
 }
 
@@ -58,6 +60,7 @@ const STATUS_LABELS: Record<ReadingStatus, string> = {
 const ROW_LIMIT = 24;
 const GRID_LIMIT = 150; // /api/for-you/row's cap; ranking quality falls off well before this
 const GRID_BATCH = 30;
+const BLEND_LISTS = 4; // the 'Top picks' row blends the best-matching shelves only
 
 async function loadLists(): Promise<ListSummary[]> {
   if (await isStaticSource()) return staticLists();
@@ -187,12 +190,14 @@ function seedLine(data: RowData) {
 function Row({
   state,
   fallbackTitle,
+  heading,
   library,
   onSeeAll,
   onVisible,
 }: {
   state: RowState;
   fallbackTitle: string;
+  heading?: string;
   library: Map<number, ReadingStatus>;
   onSeeAll: () => void;
   onVisible: () => void;
@@ -218,7 +223,7 @@ function Row({
     <section className="fy-row" ref={section}>
       <header>
         <div>
-          <h2>{state.status === 'ready' ? state.title : fallbackTitle}</h2>
+          <h2>{heading ?? (state.status === 'ready' ? state.title : fallbackTitle)}</h2>
           {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{seedLine(state)}</p>}
         </div>
         {state.status === 'ready' && (
@@ -283,7 +288,7 @@ function RowGrid({
       <header>
         <div>
           <DSButton variant="ghost" className="fy-back" onClick={onBack}><ArrowLeft size={16} /> Back to rows</DSButton>
-          <h2>{state.status === 'ready' ? state.title : job.fallbackTitle}</h2>
+          <h2>{job.heading ?? (state.status === 'ready' ? state.title : job.fallbackTitle)}</h2>
           {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{seedLine(state)}</p>}
         </div>
       </header>
@@ -308,6 +313,7 @@ export default function ForYouPage(): JSX.Element {
   const [selected, setSelected] = useState<number[]>([]);
   const [hideKnown, setHideKnown] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [shelvesOpen, setShelvesOpen] = useState(false);
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [listError, setListError] = useState('');
@@ -321,15 +327,14 @@ export default function ForYouPage(): JSX.Element {
         const data = { lists: response };
         if (cancelled) return;
         setLists(data.lists);
-        const mine = new Set((profile?.curated_lists ?? []).map((l) => l.id));
-        const preferred = data.lists.filter((l) => mine.has(l.id));
-        const fallback = data.lists.filter((l) => l.curator).slice(0, 3);
-        if (preferred.length) return setSelected(preferred.map((l) => l.id));
-        // No lists of their own: pick the shelves closest to what their library covers.
+        // Every named list becomes a shelf. Order: your own lists, then the closest matches to your library, then the rest.
         const curated = data.lists.filter((l) => l.curator);
-        const matched = await rankListsByLibrary(curated, profile?.entries ?? []).catch(() => []);
+        const mine = new Set((profile?.curated_lists ?? []).map((l) => l.id));
+        const matched = await rankListsByLibrary(curated, profile?.entries ?? []).catch(() => [] as number[]);
         if (cancelled) return;
-        setSelected(matched.length ? matched.slice(0, 4) : fallback.map((l) => l.id));
+        const priority = [...curated.filter((l) => mine.has(l.id)).map((l) => l.id), ...matched];
+        const order = [...new Set([...priority, ...curated.map((l) => l.id)])];
+        setSelected(order);
       } catch (error) {
         if (!cancelled) setListError(error instanceof Error ? error.message : 'Could not load your lists');
       }
@@ -386,7 +391,7 @@ export default function ForYouPage(): JSX.Element {
       out.push({
         key: 'blend',
         fallbackTitle: 'Top picks for you',
-        load: (limit, signal) => fetchListRow(selected, true, hideKnown, exclude, profileTitles, limit, signal),
+        load: (limit, signal) => fetchListRow(selected.slice(0, BLEND_LISTS), true, hideKnown, exclude, profileTitles, limit, signal),
       });
     }
     for (const id of selected) {
@@ -431,6 +436,8 @@ export default function ForYouPage(): JSX.Element {
 
   const expandedJob = expanded ? jobs.find((j) => j.key === expanded) : undefined;
   const hasLibraryRows = plan.rated.length > 0 || plan.finished.length > 0;
+  const headingFor = (job: RowJob) =>
+    job.key.startsWith('list-') ? cleanListTitle(titles.get(Number(job.key.slice(5))) ?? '') || undefined : undefined;
   const fallbackTitle = (job: RowJob) =>
     job.key.startsWith('list-') ? `Because you love ${titles.get(Number(job.key.slice(5))) ?? 'this list'}` : job.fallbackTitle;
 
@@ -438,7 +445,7 @@ export default function ForYouPage(): JSX.Element {
     return (
       <main className="fy-shell">
         <RowGrid
-          job={{ ...expandedJob, fallbackTitle: fallbackTitle(expandedJob) }}
+          job={{ ...expandedJob, fallbackTitle: fallbackTitle(expandedJob), heading: headingFor(expandedJob) }}
           preview={rows[expandedJob.key] ?? { status: 'loading' }}
           library={library}
           onBack={() => setExpanded(null)}
@@ -460,17 +467,24 @@ export default function ForYouPage(): JSX.Element {
       </header>
 
       <div className="fy-controls">
-        <div className="fy-lists" role="group" aria-label="Lists used for recommendations">
-          {(lists ?? []).filter((list) => list.curator || selected.includes(list.id) || showAll).slice(0, 40).map((list) => (
+        <DSButton variant="outline" onClick={() => setShelvesOpen((v) => !v)} aria-expanded={shelvesOpen}>
+          <SlidersHorizontal size={15} /> Shelves · {selected.length}
+        </DSButton>
+        <DSButton variant="outline" onClick={() => setHideKnown((v) => !v)} aria-pressed={hideKnown}>
+          {hideKnown ? <EyeOff size={15} /> : <Eye size={15} />} {hideKnown ? `Hiding ${seenIds.length.toLocaleString()} I've read` : 'Showing titles I\'ve read'}
+        </DSButton>
+      </div>
+      {shelvesOpen && (
+        <div className="fy-lists" role="group" aria-label="Shelves">
+          {(lists ?? []).filter((list) => list.curator || selected.includes(list.id) || showAll).map((list) => (
             <button
               key={list.id}
               className={selected.includes(list.id) ? 'active' : ''}
               onClick={() => toggle(list.id)}
               aria-pressed={selected.includes(list.id)}
-              title={list.theme?.length ? `Themes: ${list.theme.join(', ')}` : undefined}
+              title={list.theme?.length ? `${titles.get(list.id) ?? list.title} · ${list.items} titles · ${list.theme.join(', ')}` : undefined}
             >
-              {titles.get(list.id) ?? list.title}
-              <Badge>{list.items}</Badge>
+              {cleanListTitle(titles.get(list.id) ?? list.title)}
             </button>
           ))}
           {(lists ?? []).some((list) => !list.curator) && (
@@ -479,10 +493,7 @@ export default function ForYouPage(): JSX.Element {
             </button>
           )}
         </div>
-        <DSButton variant="outline" onClick={() => setHideKnown((v) => !v)} aria-pressed={hideKnown}>
-          {hideKnown ? <EyeOff size={15} /> : <Eye size={15} />} {hideKnown ? `Hiding ${seenIds.length.toLocaleString()} I've read` : 'Showing titles I\'ve read'}
-        </DSButton>
-      </div>
+      )}
 
       {listError && <p className="fy-error">{listError}. For You needs the live API or a For You snapshot.</p>}
       {profile && !hasLibraryRows && (
@@ -502,6 +513,7 @@ export default function ForYouPage(): JSX.Element {
           key={`${epoch}-${job.key}`}
           state={rows[job.key] ?? { status: 'loading' }}
           fallbackTitle={fallbackTitle(job)}
+          heading={headingFor(job)}
           library={library}
           onSeeAll={() => setExpanded(job.key)}
           onVisible={() => requestRow(job)}

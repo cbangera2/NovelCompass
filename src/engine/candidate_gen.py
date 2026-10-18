@@ -31,7 +31,12 @@ def _shared_property(name: str):
 
 
 def _vector_fingerprint(conn: sqlite3.Connection) -> str:
-    novels, newest = conn.execute("SELECT COUNT(*), COALESCE(MAX(updated_at), '') FROM novels").fetchone()
+    # Content-based, not MAX(updated_at): importing a list touches updated_at on rows whose text did not change,
+    # and a 4-minute re-embed must not be triggered by that.
+    novels, newest, synopsis_chars = conn.execute(
+        "SELECT COUNT(*), COALESCE(MAX(id), 0), COALESCE(SUM(LENGTH(synopsis)), 0) FROM novels"
+    ).fetchone()
+    newest = f"{newest}:{synopsis_chars}"
     tags = conn.execute("SELECT COUNT(*) FROM novel_tags").fetchone()[0]
     genres = conn.execute("SELECT COUNT(*) FROM novel_genres").fetchone()[0]
     return fingerprint("vectors", DEFAULT_MODEL_NAME, novels, newest, tags, genres)

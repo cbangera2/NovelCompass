@@ -1,6 +1,6 @@
 .fy-shell{margin:0 auto;max-width:1280px;padding:2rem clamp(1rem,4vw,3rem) 5rem}
 .fy-hero{margin:1.5rem 0 1.5rem;max-width:720px}.fy-hero h1{font-size:clamp(2rem,5vw,3.4rem);letter-spacing:-.05em;line-height:1;margin:.4rem 0 .8rem}.fy-hero p:last-child{color:var(--muted);line-height:1.6}.fy-hero .eyebrow{align-items:center;color:var(--accent);display:flex;font-size:.72rem;font-weight:750;gap:.35rem;letter-spacing:.08em;margin:0;text-transform:uppercase}
-.fy-controls{align-items:flex-start;display:flex;gap:1rem;justify-content:space-between;margin-bottom:1.5rem}
+.fy-controls{align-items:center;display:flex;gap:.6rem;margin-bottom:1rem}.fy-controls+.fy-lists{margin:-.2rem 0 1.4rem}
 .fy-lists{display:flex;flex-wrap:wrap;gap:.4rem}.fy-lists button{align-items:center;background:var(--surface-soft);border:1px solid var(--border);border-radius:999px;color:var(--muted);cursor:pointer;display:inline-flex;font-size:.78rem;gap:.45rem;padding:.35rem .7rem}.fy-lists button.active{border-color:var(--accent);color:var(--text)}
 .fy-row{margin:0 0 2.2rem}.fy-row>header{align-items:flex-end;display:flex;gap:.75rem;justify-content:space-between;margin-bottom:.7rem}.fy-row h2{font-size:1.25rem;letter-spacing:-.02em;margin:0}.fy-row header p{color:var(--muted);font-size:.78rem;margin:.25rem 0 0;max-width:70ch}.fy-row-nav{align-items:center;display:flex;flex:0 0 auto;gap:.25rem}
 .fy-track{display:flex;gap:.85rem;overflow-x:auto;padding-bottom:.6rem;scroll-snap-type:x proximity;scrollbar-width:thin}
