@@ -7,7 +7,7 @@ import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
 import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
-import { isStaticSource, staticLibraryRow, staticListRow, staticLists } from './forYouStatic';
+import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import './for-you.css';
 
 export interface ListSummary {
@@ -15,6 +15,7 @@ export interface ListSummary {
   title: string;
   curator?: string | null;
   items: number;
+  theme?: string[];
 }
 
 export interface RowRec {
@@ -323,7 +324,12 @@ export default function ForYouPage(): JSX.Element {
         const mine = new Set((profile?.curated_lists ?? []).map((l) => l.id));
         const preferred = data.lists.filter((l) => mine.has(l.id));
         const fallback = data.lists.filter((l) => l.curator).slice(0, 3);
-        setSelected((preferred.length ? preferred : fallback).map((l) => l.id));
+        if (preferred.length) return setSelected(preferred.map((l) => l.id));
+        // No lists of their own: pick the shelves closest to what their library covers.
+        const curated = data.lists.filter((l) => l.curator);
+        const matched = await rankListsByLibrary(curated, profile?.entries ?? []).catch(() => []);
+        if (cancelled) return;
+        setSelected(matched.length ? matched.slice(0, 4) : fallback.map((l) => l.id));
       } catch (error) {
         if (!cancelled) setListError(error instanceof Error ? error.message : 'Could not load your lists');
       }
@@ -461,6 +467,7 @@ export default function ForYouPage(): JSX.Element {
               className={selected.includes(list.id) ? 'active' : ''}
               onClick={() => toggle(list.id)}
               aria-pressed={selected.includes(list.id)}
+              title={list.theme?.length ? `Themes: ${list.theme.join(', ')}` : undefined}
             >
               {titles.get(list.id) ?? list.title}
               <Badge>{list.items}</Badge>

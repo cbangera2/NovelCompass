@@ -33,6 +33,18 @@ def wait_for_ease(timeout: float = 600.0) -> None:
         conn.close()
 
 
+def list_theme(gen, members: list, top: int = 4) -> list:
+    """Tags that are common on a list's members and rare in the catalog, e.g. ['yandere', 'romance']."""
+    idf = gen._get_idf_dict()
+    tag_map = gen._get_novel_tags_map()
+    counts: dict = {}
+    for nid in members:
+        for tag in tag_map.get(nid, ()):
+            counts[tag] = counts.get(tag, 0) + 1
+    ranked = sorted(counts, key=lambda t: counts[t] / len(members) * idf.get(t, 1.0) if counts[t] >= 3 else 0, reverse=True)
+    return [t for t in ranked if counts[t] >= 3][:top]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "web" / "public" / "for-you-data"))
@@ -52,6 +64,8 @@ def main() -> None:
         # Without a curator name nothing says anyone likes a list, so don't ship it.
         lists = [l for l in lists if l["curator"]]
     kept = []
+    conn = api.get_db()
+    gen = api.CandidateGenerator(conn)
     for entry in lists:
         lid = entry["id"]
         try:
@@ -67,8 +81,9 @@ def main() -> None:
         recs = [[r["target_id"], r["match_score_percent"], r.get("shared_tags", [])[:3]] for r in row["recommendations"]]
         payload = {"id": lid, "title": entry["title"], "seeds": row["seeds"], "members": members, "recs": recs}
         (out / f"list-{lid}.json").write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
-        kept.append(entry)
+        kept.append({**entry, "theme": list_theme(gen, members)})
         print(f"list {lid}: {len(recs)} recs", flush=True)
+    conn.close()
     (out / "lists.json").write_text(json.dumps({"lists": kept}, separators=(",", ":")), encoding="utf-8")
     print(f"wrote {len(kept)} lists to {out}")
 

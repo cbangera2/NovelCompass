@@ -5,6 +5,7 @@
  */
 import { createDataSource } from './data';
 import type { LibrarySeed } from './forYouLibrary';
+import type { ProfileEntry } from './profile/types';
 import type { ListSummary, RowData, RowRec } from './ForYouPage';
 
 const BASE = `${import.meta.env.BASE_URL}for-you-data`;
@@ -139,4 +140,30 @@ export async function staticLibraryRow(
     seeds: used.map((s) => ({ id: s.id, title: s.title })),
     recommendations: ranked.map(({ score, rec }) => ({ ...rec, match_score_percent: Math.round((100 * score) / top) })),
   };
+}
+
+/**
+ * How well each precomputed list matches a reader's library: titles on the list count most, titles
+ * among its recommendations count by rank. Rating scales the pull; dropped and low-rated titles
+ * and plan-to-read count for nothing. Returns list ids, best match first, omitting zero matches.
+ */
+export async function rankListsByLibrary(lists: ListSummary[], entries: ProfileEntry[]): Promise<number[]> {
+  const weights = new Map<number, number>();
+  for (const e of entries) {
+    if (e.novel_id == null || e.status === 'plan_to_read' || e.status === 'dropped') continue;
+    if (e.rating != null && e.rating <= 2.5) continue;
+    weights.set(e.novel_id, Math.max(0.25, 1 + ((e.rating ?? 3.5) - 3) * 0.5));
+  }
+  if (!weights.size) return [];
+  const files = await Promise.allSettled(lists.map((l) => loadListFile(l.id)));
+  const scored: Array<[number, number]> = [];
+  files.forEach((result, i) => {
+    if (result.status !== 'fulfilled') return;
+    const { members, recs } = result.value;
+    let score = 0;
+    for (const m of members) score += 3 * (weights.get(m) ?? 0);
+    recs.forEach(([id], rank) => { score += (1 - rank / recs.length) * (weights.get(id) ?? 0); });
+    if (score > 0) scored.push([lists[i].id, score]);
+  });
+  return scored.sort((a, b) => b[1] - a[1]).map(([id]) => id);
 }
