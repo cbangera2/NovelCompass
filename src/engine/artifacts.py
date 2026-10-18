@@ -32,7 +32,7 @@ def db_file(conn: sqlite3.Connection) -> Optional[str]:
 
 
 def open_readonly(path: str) -> sqlite3.Connection:
-    return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    return sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)
 
 
 def fingerprint(*parts: object) -> str:
@@ -133,7 +133,7 @@ class CachedArtifact:
         arrays["fingerprint"] = np.array(fp)
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_suffix(".tmp.npz")
+            tmp = self._path.with_name(f"{self._path.stem}.{os.getpid()}.tmp.npz")  # unique per process
             np.savez(tmp, **arrays)
             os.replace(tmp, self._path)  # readers never see a partial file
         self.value = self._decode_fn(arrays)

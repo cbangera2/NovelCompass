@@ -177,7 +177,10 @@ CREATE TABLE IF NOT EXISTS source_records (
 
 def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    # A generous busy timeout plus WAL lets request handlers, importers and the
+    # engine's background builders share one database file without "database is locked".
+    conn = sqlite3.connect(db_path, timeout=30)
+    conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.row_factory = sqlite3.Row
     return conn
@@ -275,6 +278,9 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
         )
         conn.execute(
             "INSERT OR IGNORE INTO sources (key, display_name, base_url) VALUES ('anilist', 'AniList', 'https://anilist.co')"
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO sources (key, display_name, base_url) VALUES ('novelphoenix', 'Novel Phoenix', 'https://novelphoenix.com')"
         )
     return conn
 
