@@ -9,3 +9,22 @@
 @media(max-width:850px){.insight-peers>div:last-child{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.insight-metrics,.insight-cohorts>div,.insight-peers>div:last-child{grid-template-columns:1fr}.insight-peer-card{grid-template-columns:42px minmax(0,1fr)}.insight-peer-card img,.peer-cover-fallback{height:56px;width:42px}}
 @media(max-width:650px){.cohort-chart{height:260px}}
+
+/* ---- Redesign pass ---- */
+.insight-peers>div:last-child.peer-table,.peer-table{display:block;padding:.3rem}
+.peer-row{align-items:center;border-radius:9px;color:var(--text);display:grid;gap:.75rem;grid-template-columns:18px 34px minmax(0,1.6fr) minmax(70px,.7fr) minmax(90px,.9fr) 118px;padding:.45rem .55rem;text-decoration:none}
+.peer-row:hover{background:var(--surface-raised)}
+.peer-rank{color:var(--dim);font-size:.65rem;font-weight:700;text-align:center}
+.peer-row img,.peer-row .peer-cover-fallback{border-radius:5px;height:48px;object-fit:cover;width:34px}
+.peer-name{display:grid;min-width:0}.peer-name strong{font-size:.74rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.peer-name small{color:var(--dim);font-size:.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peer-metric{background:var(--surface-raised);border-radius:6px;height:20px;overflow:hidden;position:relative}
+.peer-metric i{background:color-mix(in srgb,var(--accent) 38%,transparent);bottom:0;left:0;position:absolute;top:0}
+.peer-metric.readers i{background:color-mix(in srgb,var(--green) 38%,transparent)}
+.peer-metric b{font-size:.64rem;left:.4rem;line-height:20px;position:absolute}
+.peer-overlap{color:var(--dim);font-size:.6rem;text-align:right}
+.cohort-chart-wrap{position:relative}
+.cohort-chart-wrap .quad{color:var(--dim);font-size:.58rem;font-weight:700;letter-spacing:.08em;opacity:.55;pointer-events:none;position:absolute;text-transform:uppercase;z-index:1}
+.q-tl{left:48px;top:10px}.q-tr{right:22px;top:10px}.q-bl{bottom:44px;left:48px}.q-br{bottom:44px;right:22px}
+.cohort-current-label{fill:var(--chart-2);font-size:11px;font-weight:700}
+.cohort-data{margin-top:.5rem}.cohort-data summary{color:var(--accent-bright);cursor:pointer;font-size:.68rem;font-weight:600}
+@media(max-width:800px){.peer-row{grid-template-columns:18px 34px minmax(0,1fr) 80px}.peer-metric.readers,.peer-overlap{display:none}}

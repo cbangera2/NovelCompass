@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cell, CartesianGrid, Scatter, ScatterChart, XAxis, YAxis } from 'recharts';
+import { Cell, CartesianGrid, ReferenceLine, Scatter, ScatterChart, XAxis, YAxis } from 'recharts';
 import { NovelDetail, NovelInsights } from './types';
 import { novelPageUrl } from './novelLinks';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from './chart';
@@ -13,16 +13,24 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
   const points = [
     ...insights.peers.slice(0, 10).map((peer) => ({
       id: peer.id, title: peer.title, rating: peer.rating, readers: peer.reading_list_count,
-      readerScale: Math.log10(peer.reading_list_count + 1), current: false
+      readerScale: Math.log10(peer.reading_list_count + 1), shared: peer.shared_tag_count, current: false
     })),
     {
       id: novel.id, title: novel.title, rating: novel.rating, readers: novel.reading_list_count,
-      readerScale: Math.log10(novel.reading_list_count + 1), current: true
+      readerScale: Math.log10(novel.reading_list_count + 1), shared: 0, current: true
     }
   ].filter((point) => Number.isFinite(point.rating) && Number.isFinite(point.readerScale));
   const peerPoints = points.filter((point) => !point.current);
   const currentPoint = points.filter((point) => point.current);
   const [selectedPoint, setSelectedPoint] = useState<(typeof points)[number] | null>(null);
+  const median = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  const medianX = median(points.map((point) => point.readerScale));
+  const medianY = median(points.map((point) => point.rating));
+  const maxShared = Math.max(1, ...peerPoints.map((point) => point.shared));
   const readershipValues = points.map((point) => point.readerScale);
   const ratingValues = points.map((point) => point.rating);
   const xMin = Math.max(0, Math.min(...readershipValues) - .14);
@@ -45,7 +53,10 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
     return readers.toLocaleString();
   };
   return <section className="cohort-chart-card" aria-labelledby={`cohort-chart-${novel.id}`}>
-    <div><h4 id={`cohort-chart-${novel.id}`}>Rating and popularity cohort</h4><p>Current title highlighted against {Math.max(0, points.length - 1)} closest peers. List counts use a logarithmic scale; identical points overlap and appear darker.</p></div>
+    <div><h4 id={`cohort-chart-${novel.id}`}>Rating and popularity cohort</h4><p>This title against its {Math.max(0, points.length - 1)} closest peers. Bubble size is shared tags; dashed lines are the cohort medians. List count uses a log scale.</p></div>
+    <div className="cohort-chart-wrap">
+    <span className="quad q-tl">Hidden gems</span><span className="quad q-tr">Crowd favorites</span>
+    <span className="quad q-bl">Niche</span><span className="quad q-br">Popular, divisive</span>
     <ChartContainer config={cohortChartConfig} className="cohort-chart">
         <ScatterChart accessibilityLayer margin={{ top: 16, right: 18, bottom: 30, left: 4 }}>
           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
@@ -56,6 +67,8 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
           <YAxis type="number" dataKey="rating" domain={ratingDomain} allowDataOverflow tickCount={5}
             width={38} tick={{ fill: 'var(--muted)', fontSize: 11 }} tickFormatter={(value) => Number(value).toFixed(1)}
             tickLine={false} tickMargin={8} axisLine={false} />
+          <ReferenceLine x={medianX} stroke="var(--border-strong)" strokeDasharray="4 4" />
+          <ReferenceLine y={medianY} stroke="var(--border-strong)" strokeDasharray="4 4" />
           <ChartTooltip cursor={{ stroke: 'var(--border-strong)', strokeDasharray: '3 3' }}
             content={<ChartTooltipContent config={cohortChartConfig}
               headingFormatter={(_, payload) => String(payload[0]?.payload?.title || 'Title')}
@@ -66,7 +79,7 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
             shape={(props: any) => {
               const point = props.payload;
               const select = () => setSelectedPoint(point);
-              return <circle cx={props.cx} cy={props.cy} r={5} fill="var(--color-readerScale)" fillOpacity={.7}
+              return <circle cx={props.cx} cy={props.cy} r={4 + (point.shared / maxShared) * 6} fill="var(--color-readerScale)" fillOpacity={.55}
                 stroke="var(--surface)" strokeWidth={2} className="chart-selectable-point cohort-peer-point" role="button" tabIndex={0}
                 aria-label={`${point.title}, rating ${point.rating}, ${point.readers.toLocaleString()} on lists. Show details.`}
                 onClick={select} onKeyDown={(event) => {
@@ -83,7 +96,7 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
             shape={(props: any) => {
               const point = props.payload;
               const select = () => setSelectedPoint(point);
-              return <circle cx={props.cx} cy={props.cy} r={8} fill="var(--color-rating)"
+              return <g><circle cx={props.cx} cy={props.cy} r={15} fill="var(--color-rating)" fillOpacity={.16} /><text x={props.cx} y={props.cy - 20} textAnchor="middle" className="cohort-current-label">This title</text><circle cx={props.cx} cy={props.cy} r={8} fill="var(--color-rating)"
                 stroke="var(--surface)" strokeWidth={3} className="chart-selectable-point cohort-current-point" role="button" tabIndex={0}
                 aria-label={`${point.title}, current title, rating ${point.rating}, ${point.readers.toLocaleString()} on lists. Show details.`}
                 onClick={select} onKeyDown={(event) => {
@@ -91,21 +104,22 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
                     event.preventDefault();
                     select();
                   }
-                }} />;
+                }} /></g>;
             }}>
             {currentPoint.map((point) => <Cell key={point.id} fill="var(--color-rating)"
               stroke="var(--surface)" strokeWidth={3} />)}
           </Scatter>
         </ScatterChart>
     </ChartContainer>
+    </div>
     {selectedPoint && <div className="chart-point-card" role="status">
       <div><strong>{selectedPoint.title}{selectedPoint.current ? ' (current)' : ''}</strong>
         <span>{selectedPoint.rating} rating · {selectedPoint.readers.toLocaleString()} on lists</span>
       </div>
       <a href={novelPageUrl(selectedPoint.id, selectedPoint.current ? undefined : novel.id)}>Open title</a>
     </div>}
-    <table><caption>Rating and popularity cohort data</caption><thead><tr><th>Title</th><th>Rating</th><th>List count</th></tr></thead><tbody>
+    <details className="cohort-data"><summary>View chart data</summary><table><caption>Rating and popularity cohort data</caption><thead><tr><th>Title</th><th>Rating</th><th>List count</th></tr></thead><tbody>
       {points.map((point) => <tr key={point.id}><th><a href={novelPageUrl(point.id, point.current ? undefined : novel.id)}>{point.title}{point.current ? ' (current)' : ''}</a></th><td>{point.rating}</td><td>{point.readers.toLocaleString()}</td></tr>)}
-    </tbody></table>
+    </tbody></table></details>
   </section>;
 }

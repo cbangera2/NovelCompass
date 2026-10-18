@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { BarChart3, BookOpen } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { RecommendationDataSource } from './data';
 import { NovelDetail, NovelInsights } from './types';
 import { browseFacetUrl } from './metadataLinks';
@@ -7,7 +7,6 @@ import { novelPageUrl } from './novelLinks';
 import { Badge, Card } from './design-system';
 import './novel-insights.css';
 
-const LABELS = { rating: 'Rating', rating_votes: 'Rating votes', readers: 'List count' };
 const NovelCohortChart = lazy(() => import('./NovelCohortChart'));
 
 export function NovelInsightsPanel({
@@ -49,28 +48,6 @@ export function NovelInsightsPanel({
     );
   return (
     <section className="novel-insights" aria-labelledby={`insights-${novelId}`}>
-      <div className="insights-heading">
-        <BarChart3 />
-        <div>
-          <h3 id={`insights-${novelId}`}>Catalog insights</h3>
-          <p>Compared with all {insights.catalog_size.toLocaleString()} titles in this snapshot.</p>
-        </div>
-      </div>
-      <div className="insight-metrics">
-        {insights.metrics.map((metric) => (
-          <Card key={metric.key}>
-            <Badge>{LABELS[metric.key]}</Badge>
-            <strong>Top {Math.max(0.1, 100 - metric.percentile).toFixed(1)}%</strong>
-            <span className="percentile-track" aria-hidden="true">
-              <i style={{ width: `${metric.percentile}%` }} />
-            </span>
-            <small>
-              Rank {metric.rank.toLocaleString()} of {metric.population.toLocaleString()} ·{' '}
-              {metric.percentile.toFixed(1)}th percentile
-            </small>
-          </Card>
-        ))}
-      </div>
       {insights.cohorts.length > 0 && (
         <Card className="insight-cohorts">
           <h4>Comparable popularity</h4>
@@ -102,39 +79,34 @@ export function NovelInsightsPanel({
         <div className="insight-peers">
           <div className="insight-section-heading">
             <div>
-              <h4>Top catalog cohort</h4>
-              <p>
-                {insights.cohort_definition} Showing up to 10 closest peers by shared catalog
-                metadata.
-              </p>
+              <h4>Closest peers</h4>
+              <p>{insights.cohort_definition}</p>
             </div>
             <Badge tone="green">{Math.min(10, insights.peers.length)} peers</Badge>
           </div>
-          <div>
-            {insights.peers.slice(0, 10).map((peer) => (
-              <Card key={peer.id} className="insight-peer-card">
-                <PeerCover src={peer.cover_url} />
-                <div>
-                  <a href={novelPageUrl(peer.id, novelId)}>{peer.title}</a>
-                  <small className="insight-peer-meta">
-                    {[peer.author, peer.language, peer.year].filter(Boolean).join(' · ')}
-                  </small>
-                  <span className="insight-peer-stats">
-                    <span>
-                      <b>{peer.rating.toFixed(1)}</b> rating
-                    </span>
-                    <span>
-                      <b>{peer.reading_list_count.toLocaleString()}</b> readers
-                    </span>
+          <Card className="peer-table">
+            {insights.peers.slice(0, 10).map((peer, index) => {
+              const maxReaders = Math.max(1, ...insights.peers.slice(0, 10).map((item) => item.reading_list_count));
+              return (
+                <a key={peer.id} className="peer-row" href={novelPageUrl(peer.id, novelId)}>
+                  <span className="peer-rank">{index + 1}</span>
+                  <PeerCover src={peer.cover_url} />
+                  <span className="peer-name">
+                    <strong>{peer.title}</strong>
+                    <small>{[peer.author, peer.language, peer.year].filter(Boolean).join(' · ')}</small>
                   </span>
-                  <span className="insight-peer-overlap">
-                    <Badge>{peer.shared_tag_count} shared tags</Badge>
-                    <Badge>{peer.shared_genre_count} shared genres</Badge>
+                  <span className="peer-metric" title="Rating">
+                    <i style={{ width: `${(peer.rating / 5) * 100}%` }} /><b>{peer.rating.toFixed(1)}★</b>
                   </span>
-                </div>
-              </Card>
-            ))}
-          </div>
+                  <span className="peer-metric readers" title="On reading lists">
+                    <i style={{ width: `${Math.max(3, (Math.log10(peer.reading_list_count + 1) / Math.log10(maxReaders + 1)) * 100)}%` }} />
+                    <b>{peer.reading_list_count.toLocaleString()}</b>
+                  </span>
+                  <span className="peer-overlap">{peer.shared_tag_count} tags · {peer.shared_genre_count} genres</span>
+                </a>
+              );
+            })}
+          </Card>
         </div>
       )}
       {currentNovel && insights.peers.length > 0 && (
