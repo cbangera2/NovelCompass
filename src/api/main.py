@@ -1035,6 +1035,8 @@ class ForYouRowRequest(BaseModel):
     limit: int = Field(default=20, ge=1, le=60)
     media_type: str = "novel"
     hide_known: bool = False  # drop titles that appear on any of list_ids
+    exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)  # e.g. the user's library
+    list_titles: Dict[int, str] = Field(default_factory=dict)  # display names that override stale DB titles
     channel_weights: Dict[str, float] = Field(default_factory=dict)
 
 
@@ -1116,6 +1118,7 @@ def for_you_row(req: ForYouRowRequest):
                 req.list_ids,
             )
         }
+        lists.update({lid: name for lid, name in req.list_titles.items() if lid in lists and name.strip()})
         members = {lid: _list_members(conn, lid) for lid in req.list_ids if lid in lists}
         members = {lid: m for lid, m in members.items() if m}
         if not members:
@@ -1142,7 +1145,8 @@ def for_you_row(req: ForYouRowRequest):
             own_exclude = {x["id"] for x in members[lid]}
 
         known_ids = {x["id"] for m in members.values() for x in m}
-        exclude = set(own_exclude) | (known_ids if req.hide_known else set())
+        exclude = set(own_exclude) | set(req.exclude_novel_ids) | (known_ids if req.hide_known else set())
+        exclude -= {s.id for s in seeds}  # seeds are always excluded by the engine itself
         fy = ForYouRecommendRequest(
             seeds=seeds,
             limit=req.limit,

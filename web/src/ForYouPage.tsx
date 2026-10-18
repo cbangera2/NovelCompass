@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { Badge, DSButton, Skeleton } from './design-system';
 import { hasUsableCover, novelPageUrl } from './novelLinks';
-import { loadLocalProfile } from './profile/store';
+import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
+import type { LocalUserProfile, ReadingStatus } from './profile/types';
 import './for-you.css';
 
 interface ListSummary {
@@ -35,11 +36,26 @@ interface RowData {
 
 type RowState = { status: 'loading' } | { status: 'error'; message: string } | ({ status: 'ready' } & RowData);
 
-async function fetchRow(listIds: number[], blend: boolean, hideKnown: boolean, signal: AbortSignal): Promise<RowData> {
+const STATUS_LABELS: Record<ReadingStatus, string> = {
+  reading: 'Reading',
+  completed: 'Completed',
+  plan_to_read: 'Plan to read',
+  dropped: 'Dropped',
+  paused: 'Paused',
+};
+
+async function fetchRow(
+  listIds: number[],
+  blend: boolean,
+  hideKnown: boolean,
+  excludeIds: number[],
+  listTitles: Record<number, string>,
+  signal: AbortSignal,
+): Promise<RowData> {
   const response = await fetch('/api/for-you/row', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ list_ids: listIds, blend, hide_known: hideKnown, limit: 24 }),
+    body: JSON.stringify({ list_ids: listIds, blend, hide_known: hideKnown, exclude_novel_ids: excludeIds, list_titles: listTitles, limit: 24 }),
     signal,
   });
   if (!response.ok) {
@@ -49,7 +65,15 @@ async function fetchRow(listIds: number[], blend: boolean, hideKnown: boolean, s
   return response.json();
 }
 
-function Row({ state, fallbackTitle }: { state: RowState; fallbackTitle: string }) {
+function Row({
+  state,
+  fallbackTitle,
+  library,
+}: {
+  state: RowState;
+  fallbackTitle: string;
+  library: Map<number, ReadingStatus>;
+}) {
   const track = useRef<HTMLDivElement>(null);
   const scroll = (direction: number) =>
     track.current?.scrollBy({ left: direction * track.current.clientWidth * 0.85, behavior: 'smooth' });
@@ -86,6 +110,9 @@ function Row({ state, fallbackTitle }: { state: RowState; fallbackTitle: string 
                 ) : (
                   <span>{rec.title.slice(0, 1)}</span>
                 )}
+                {library.has(rec.target_id) && (
+                  <span className={`fy-status status-${library.get(rec.target_id)}`}>{STATUS_LABELS[library.get(rec.target_id)!]}</span>
+                )}
                 {rec.on_lists.length > 0 && (
                   <span className="fy-known" title={`On your list: ${rec.on_lists.join(', ')}`}>On your list</span>
                 )}
@@ -107,6 +134,7 @@ export default function ForYouPage(): JSX.Element {
   const [selected, setSelected] = useState<number[]>([]);
   const [hideKnown, setHideKnown] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [listError, setListError] = useState('');
 
@@ -130,6 +158,28 @@ export default function ForYouPage(): JSX.Element {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    loadLocalProfile().then(setProfile).catch(() => setProfile(null));
+    return subscribeLocalProfile(setProfile);
+  }, []);
+
+  // Library titles by catalog ID. "Seen" excludes plan-to-read, which you haven't read yet.
+  const library = useMemo(() => {
+    const map = new Map<number, ReadingStatus>();
+    for (const entry of profile?.entries ?? []) if (entry.novel_id != null) map.set(entry.novel_id, entry.status);
+    return map;
+  }, [profile]);
+  const seenIds = useMemo(
+    () => [...library].filter(([, status]) => status !== 'plan_to_read').map(([id]) => id).sort((a, b) => a - b),
+    [library],
+  );
+  const seenKey = seenIds.join(',');
+  // The profile knows your lists' real names; the DB may only hold a placeholder for imported ones.
+  const profileTitles = useMemo(
+    () => Object.fromEntries((profile?.curated_lists ?? []).map((list) => [list.id, list.title])),
+    [profile],
+  );
+
   const selectedKey = selected.join(',');
   useEffect(() => {
     if (!selected.length) { setRows({}); return; }
@@ -140,7 +190,7 @@ export default function ForYouPage(): JSX.Element {
     ];
     setRows(Object.fromEntries(jobs.map((j) => [j.key, { status: 'loading' } as RowState])));
     for (const job of jobs) {
-      fetchRow(job.blend ? job.ids : job.ids, job.blend, hideKnown, controller.signal)
+      fetchRow(job.ids, job.blend, hideKnown, hideKnown ? seenIds : [], profileTitles, controller.signal)
         .then((data) => setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } })))
         .catch((error) => {
           if (controller.signal.aborted) return;
@@ -149,9 +199,12 @@ export default function ForYouPage(): JSX.Element {
     }
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey, hideKnown]);
+  }, [selectedKey, hideKnown, seenKey, profileTitles]);
 
-  const titles = useMemo(() => new Map((lists ?? []).map((l) => [l.id, l.title])), [lists]);
+  const titles = useMemo(
+    () => new Map((lists ?? []).map((l) => [l.id, profileTitles[l.id] ?? l.title])),
+    [lists, profileTitles],
+  );
   const toggle = (id: number) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
@@ -161,8 +214,8 @@ export default function ForYouPage(): JSX.Element {
         <p className="eyebrow"><Sparkles size={14} /> For You</p>
         <h1>Picked from the lists you love</h1>
         <p>
-          Each row starts from one of your lists — its top-ranked titles are the seeds. Titles already on your lists are
-          badged so you can sanity-check the picks.
+          Each row starts from one of your lists — its top-ranked titles are the seeds. Titles from your library show their
+          reading status and titles from your lists are badged, so you can sanity-check the picks; the toggle hides what you've read.
         </p>
       </header>
 
@@ -175,7 +228,7 @@ export default function ForYouPage(): JSX.Element {
               onClick={() => toggle(list.id)}
               aria-pressed={selected.includes(list.id)}
             >
-              {list.title}
+              {titles.get(list.id) ?? list.title}
               <Badge>{list.items}</Badge>
             </button>
           ))}
@@ -186,15 +239,15 @@ export default function ForYouPage(): JSX.Element {
           )}
         </div>
         <DSButton variant="outline" onClick={() => setHideKnown((v) => !v)} aria-pressed={hideKnown}>
-          {hideKnown ? <EyeOff size={15} /> : <Eye size={15} />} {hideKnown ? 'Hiding my lists' : 'Showing my lists'}
+          {hideKnown ? <EyeOff size={15} /> : <Eye size={15} />} {hideKnown ? `Hiding ${seenIds.length.toLocaleString()} I've read` : 'Showing titles I\'ve read'}
         </DSButton>
       </div>
 
       {listError && <p className="fy-error">{listError}. For You needs the live API (run the uvicorn server).</p>}
       {lists && !selected.length && <p className="fy-empty">Pick at least one list above to build your rows.</p>}
-      {selected.length > 1 && rows.blend && <Row state={rows.blend} fallbackTitle="Top picks for you" />}
+      {selected.length > 1 && rows.blend && <Row state={rows.blend} fallbackTitle="Top picks for you" library={library} />}
       {selected.map((id) => (
-        <Row key={id} state={rows[`list-${id}`] ?? { status: 'loading' }} fallbackTitle={`Because you love ${titles.get(id) ?? 'this list'}`} />
+        <Row key={id} state={rows[`list-${id}`] ?? { status: 'loading' }} fallbackTitle={`Because you love ${titles.get(id) ?? 'this list'}`} library={library} />
       ))}
     </main>
   );

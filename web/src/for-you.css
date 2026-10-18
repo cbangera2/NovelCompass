@@ -12,3 +12,4 @@
 .fy-error,.fy-empty{color:var(--muted);font-size:.85rem}.fy-error{color:var(--red)}
 @media(max-width:680px){.fy-controls{flex-direction:column}.fy-card,.fy-card-skeleton{flex-basis:140px}}
 .fy-controls .ds-button{flex:0 0 auto;white-space:nowrap}.fy-lists .fy-more{border-style:dashed}
+.fy-status{background:rgba(0,0,0,.72);border-radius:999px;color:#fff;font-size:.62rem;font-weight:700;left:.4rem;padding:.15rem .5rem;position:absolute;top:.4rem}.fy-status.status-completed{background:#2f7d4f}.fy-status.status-dropped{background:#8a3a3a}.fy-status.status-plan_to_read{background:#3a5a8a}
