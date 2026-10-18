@@ -9,12 +9,28 @@ read titles and resolves ids to cards client-side, so no API is needed.
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import src.api.main as api  # noqa: E402
+
+
+def wait_for_ease(timeout: float = 600.0) -> None:
+    """EASE rebuilds in the background after list imports; rows would silently lack that channel until it is ready."""
+    conn = api.get_db()
+    try:
+        gen = api.CandidateGenerator(conn)
+        seed = conn.execute("SELECT novel_id FROM rec_list_items LIMIT 1").fetchone()[0]
+        deadline = time.time() + timeout
+        while not gen.get_candidate_channels(seed, limit_per_channel=5).get("ease"):
+            if time.time() > deadline:
+                raise SystemExit("EASE model did not become ready")
+            time.sleep(5)
+    finally:
+        conn.close()
 
 
 def main() -> None:
@@ -30,6 +46,7 @@ def main() -> None:
     for stale in out.glob("list-*.json"):
         stale.unlink()
 
+    wait_for_ease()
     lists = api.for_you_lists(min_items=args.min_items)["lists"]
     if not args.all_lists:
         # Without a curator name nothing says anyone likes a list, so don't ship it.
