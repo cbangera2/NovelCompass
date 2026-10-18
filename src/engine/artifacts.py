@@ -56,8 +56,9 @@ class CachedArtifact:
         self._decode_fn = decode_fn
         self._db = db_file(conn)
         self._inline_conn = conn if self._db is None else None
-        stem = Path(self._db).stem if self._db else None
-        self._path = CACHE_DIR / f"{stem}-{name}.npz" if stem else None
+        # Keyed by the full path, so two databases that share a file name never share a cache.
+        key = f"{Path(self._db).stem}-{hashlib.sha256(str(Path(self._db).resolve()).encode()).hexdigest()[:8]}" if self._db else None
+        self._path = CACHE_DIR / f"{key}-{name}.npz" if key else None
         self._lock = threading.Lock()
         self._started = False
         self._building = False

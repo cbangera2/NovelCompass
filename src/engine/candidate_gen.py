@@ -83,6 +83,7 @@ class CandidateGenerator:
     _idf_dict = _shared_property("idf")
     _novel_tags_map = _shared_property("tags")
     _ease = _shared_property("ease")
+    _tag_index = _shared_property("tag_index")
 
     def __init__(self, conn: sqlite3.Connection, embedder: SynopsisEmbedder = None):
         self.conn = conn
@@ -94,6 +95,19 @@ class CandidateGenerator:
         if self._idf_dict is None:
             self._idf_dict = calculate_tag_idf(self.conn)
         return self._idf_dict
+
+    def _get_tag_index(self):
+        """Inverted index (tag -> novel ids) and per-novel total IDF weight."""
+        if self._tag_index is None:
+            idf = self._get_idf_dict()
+            postings: Dict[str, List[int]] = {}
+            totals: Dict[int, float] = {}
+            for nid, tags in self._get_novel_tags_map().items():
+                totals[nid] = sum(idf.get(t, 1.0) for t in tags)
+                for t in tags:
+                    postings.setdefault(t, []).append(nid)
+            self._tag_index = (postings, totals)
+        return self._tag_index
 
     def _get_novel_tags_map(self) -> Dict[int, Set[str]]:
         if self._novel_tags_map is None:
@@ -187,19 +201,20 @@ class CandidateGenerator:
         if not seed_tags:
             return []
 
+        postings, totals = self._get_tag_index()
+        seed_weight = totals.get(seed_id, 0.0)
+        overlap: Dict[int, float] = {}
+        for t in seed_tags:
+            w = idf_dict.get(t, 1.0)
+            for nid in postings.get(t, ()):
+                overlap[nid] = overlap.get(nid, 0.0) + w
         scored = []
-        for nid, tags in novel_tags_map.items():
+        for nid, inter in overlap.items():
             if nid == seed_id:
                 continue
-            intersection = seed_tags.intersection(tags)
-            if not intersection:
-                continue
-            union = seed_tags.union(tags)
-            intersection_weight = sum(idf_dict.get(t, 1.0) for t in intersection)
-            union_weight = sum(idf_dict.get(t, 1.0) for t in union)
-            sim = intersection_weight / union_weight if union_weight > 0 else 0.0
-            if sim > 0:
-                scored.append((nid, sim))
+            union = seed_weight + totals[nid] - inter
+            if union > 0 and inter > 0:
+                scored.append((nid, inter / union))
 
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:limit]
