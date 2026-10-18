@@ -5,6 +5,7 @@ user liked. EASE learns a closed-form item-item weight matrix B that, unlike raw
 co-occurrence, discounts items that merely co-occur because they are popular.
 """
 import sqlite3
+import threading
 import time
 from typing import Dict, List, Tuple
 
@@ -19,6 +20,7 @@ class EASEModel:
         self.min_list_items = min_list_items
         self.reg = reg
         self._fitted = False
+        self._lock = threading.Lock()
         self.item_ids: List[int] = []
         self.item_index: Dict[int, int] = {}
         self.B: np.ndarray | None = None
@@ -54,8 +56,9 @@ class EASEModel:
         print(f"[ease] fit {X.shape[0]} lists x {X.shape[1]} items in {time.time() - t0:.0f}s")
 
     def candidates(self, seed_id: int, limit: int) -> List[Tuple[int, float]]:
-        if not self._fitted:
-            self.fit()
+        with self._lock:
+            if not self._fitted:
+                self.fit()
         idx = self.item_index.get(seed_id)
         if idx is None:
             return []

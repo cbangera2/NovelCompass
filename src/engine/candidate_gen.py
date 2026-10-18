@@ -1,19 +1,45 @@
 import math
 import sqlite3
+import threading
 from typing import Dict, List, Set, Tuple
 import numpy as np
 from src.nlp.taxonomy import calculate_tag_idf, weighted_tag_similarity
 from src.nlp.embedder import SynopsisEmbedder
 from src.engine.ease import EASEModel
 
+# Heavy per-catalog state (tag maps, 30k embeddings, the EASE matrix) is shared by
+# every CandidateGenerator on the same database so API requests don't rebuild it.
+# It is keyed by database path and lives until the process restarts, so re-importing
+# lists or novels needs an API restart to be picked up.
+_SHARED_STATE: Dict[object, Dict[str, object]] = {}
+_SHARED_LOCK = threading.RLock()
+
+
+def _state_key(conn: sqlite3.Connection):
+    for _seq, name, path in conn.execute("PRAGMA database_list"):
+        if name == "main" and path:
+            return path
+    return id(conn)  # in-memory database: scope to this connection
+
+
+def _shared_property(name: str):
+    return property(
+        lambda self: self._state.get(name),
+        lambda self, value: self._state.__setitem__(name, value),
+    )
+
+
 class CandidateGenerator:
+    _idf_dict = _shared_property("idf")
+    _novel_tags_map = _shared_property("tags")
+    _vector_cache = _shared_property("vectors")
+    _ease = _shared_property("ease")
+
     def __init__(self, conn: sqlite3.Connection, embedder: SynopsisEmbedder = None):
         self.conn = conn
         self.embedder = embedder or SynopsisEmbedder()
-        self._idf_dict = None
-        self._novel_tags_map = None
-        self._vector_cache = None
-        self._ease = None
+        with _SHARED_LOCK:
+            self._state = _SHARED_STATE.setdefault(_state_key(conn), {})
 
     def _get_idf_dict(self) -> Dict[str, float]:
         if self._idf_dict is None:
@@ -36,6 +62,10 @@ class CandidateGenerator:
         return self._novel_tags_map
 
     def _get_vector_data(self):
+        with _SHARED_LOCK:
+            return self._build_vector_data()
+
+    def _build_vector_data(self):
         if self._vector_cache is None:
             cur = self.conn.cursor()
             # Most titles have no synopsis, so embed title + genres + tags as well;
@@ -95,8 +125,9 @@ class CandidateGenerator:
         channels['structural'] = self._get_structural_candidates(seed_novel_id, limit=limit_per_channel, conn=active_conn)
 
         # 6. EASE item-item model over list membership
-        if self._ease is None:
-            self._ease = EASEModel(self.conn)
+        with _SHARED_LOCK:
+            if self._ease is None:
+                self._ease = EASEModel(self.conn)
         channels['ease'] = self._ease.candidates(seed_novel_id, limit_per_channel)
 
         return channels
