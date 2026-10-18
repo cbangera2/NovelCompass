@@ -4,13 +4,14 @@ import threading
 from typing import Dict, List, Set, Tuple
 import numpy as np
 from src.nlp.taxonomy import calculate_tag_idf, weighted_tag_similarity
-from src.nlp.embedder import SynopsisEmbedder
+from src.nlp.embedder import DEFAULT_MODEL_NAME, SynopsisEmbedder
+from src.engine.artifacts import CachedArtifact, fingerprint
 from src.engine.ease import EASEModel
 
-# Heavy per-catalog state (tag maps, 30k embeddings, the EASE matrix) is shared by
-# every CandidateGenerator on the same database so API requests don't rebuild it.
-# It is keyed by database path and lives until the process restarts, so re-importing
-# lists or novels needs an API restart to be picked up.
+# Heavy per-catalog state (tag maps, embeddings, EASE neighbours) is shared by every
+# CandidateGenerator on the same database so API requests don't rebuild it. The
+# embeddings and EASE neighbours are additionally cached on disk (see artifacts.py).
+# It is keyed by database path and lives until the process restarts.
 _SHARED_STATE: Dict[object, Dict[str, object]] = {}
 _SHARED_LOCK = threading.RLock()
 
@@ -29,10 +30,58 @@ def _shared_property(name: str):
     )
 
 
+def _vector_fingerprint(conn: sqlite3.Connection) -> str:
+    novels, newest = conn.execute("SELECT COUNT(*), COALESCE(MAX(updated_at), '') FROM novels").fetchone()
+    tags = conn.execute("SELECT COUNT(*) FROM novel_tags").fetchone()[0]
+    genres = conn.execute("SELECT COUNT(*) FROM novel_genres").fetchone()[0]
+    return fingerprint("vectors", DEFAULT_MODEL_NAME, novels, newest, tags, genres)
+
+
+def _build_vectors(conn: sqlite3.Connection, embedder: SynopsisEmbedder) -> Dict[str, np.ndarray]:
+    """Embed title + genres + tags + synopsis for every title (most have no synopsis, so
+    without tags/genres the vector channel cannot see ~80% of the catalog)."""
+    cur = conn.cursor()
+    idf = calculate_tag_idf(conn)
+    tags_map: Dict[int, Set[str]] = {}
+    cur.execute("SELECT nt.novel_id, t.name FROM novel_tags nt JOIN tags t ON t.id = nt.tag_id")
+    for nid, tname in cur.fetchall():
+        tags_map.setdefault(nid, set()).add(tname.lower())
+    genres_map: Dict[int, List[str]] = {}
+    cur.execute("SELECT ng.novel_id, g.name FROM novel_genres ng JOIN genres g ON g.id = ng.genre_id")
+    for nid, gname in cur.fetchall():
+        genres_map.setdefault(nid, []).append(gname)
+    candidates = [c for c in cur.execute("SELECT id, title, synopsis FROM novels ORDER BY id").fetchall()
+                  if c[2] or tags_map.get(c[0]) or genres_map.get(c[0])]
+    if not candidates:
+        return {"ids": np.zeros(0, dtype=np.int64), "vectors": np.zeros((0, 1), dtype=np.float16)}
+    texts = [
+        embedder.construct_text(
+            c[1],
+            c[2],
+            # Rarest (most specific) tags first; construct_text keeps the top 10.
+            sorted(tags_map.get(c[0], ()), key=lambda t: -idf.get(t, 1.0)),
+            sorted(genres_map.get(c[0], ())),
+        )
+        for c in candidates
+    ]
+    return {
+        "ids": np.array([c[0] for c in candidates], dtype=np.int64),
+        "vectors": embedder.encode(texts).astype(np.float16),  # unit vectors; fp16 halves the file
+    }
+
+
+def _decode_vectors(arrays: Dict[str, np.ndarray]):
+    ids = arrays["ids"]
+    if len(ids) == 0:
+        return [], {}, None
+    id_list = [int(i) for i in ids]
+    return id_list, {n: i for i, n in enumerate(id_list)}, arrays["vectors"].astype(np.float32)
+
+
 class CandidateGenerator:
+    _vector_artifact = _shared_property("vector_artifact")
     _idf_dict = _shared_property("idf")
     _novel_tags_map = _shared_property("tags")
-    _vector_cache = _shared_property("vectors")
     _ease = _shared_property("ease")
 
     def __init__(self, conn: sqlite3.Connection, embedder: SynopsisEmbedder = None):
@@ -62,44 +111,18 @@ class CandidateGenerator:
         return self._novel_tags_map
 
     def _get_vector_data(self):
+        """(ids, id->row, unit vectors); an empty result while the embeddings are still being built."""
         with _SHARED_LOCK:
-            return self._build_vector_data()
-
-    def _build_vector_data(self):
-        if self._vector_cache is None:
-            cur = self.conn.cursor()
-            # Most titles have no synopsis, so embed title + genres + tags as well;
-            # otherwise the vector channel cannot see ~80% of the catalog.
-            cur.execute("SELECT id, title, synopsis FROM novels ORDER BY id")
-            candidates = cur.fetchall()
-            idf = self._get_idf_dict()
-            tags_map = self._get_novel_tags_map()
-            genres_map: Dict[int, List[str]] = {}
-            cur.execute("SELECT ng.novel_id, g.name FROM novel_genres ng JOIN genres g ON g.id = ng.genre_id")
-            for nid, gname in cur.fetchall():
-                genres_map.setdefault(nid, []).append(gname)
-            candidates = [
-                c for c in candidates
-                if c[2] or tags_map.get(c[0]) or genres_map.get(c[0])
-            ]
-            if not candidates:
-                self._vector_cache = ([], {}, None)
-            else:
-                c_ids = [c[0] for c in candidates]
-                id_to_idx = {cid: i for i, cid in enumerate(c_ids)}
-                c_texts = [
-                    self.embedder.construct_text(
-                        c[1],
-                        c[2],
-                        # Rarest (most specific) tags first; construct_text keeps the top 10.
-                        sorted(tags_map.get(c[0], ()), key=lambda t: -idf.get(t, 1.0)),
-                        sorted(genres_map.get(c[0], ())),
-                    )
-                    for c in candidates
-                ]
-                vectors = self.embedder.encode(c_texts)
-                self._vector_cache = (c_ids, id_to_idx, vectors)
-        return self._vector_cache
+            if self._vector_artifact is None:
+                self._vector_artifact = CachedArtifact(
+                    "vectors",
+                    self.conn,
+                    _vector_fingerprint,
+                    lambda conn: _build_vectors(conn, self.embedder),
+                    _decode_vectors,
+                )
+            artifact = self._vector_artifact
+        return artifact.get() or ([], {}, None)
 
     def get_candidate_channels(self, seed_novel_id: int, limit_per_channel: int = 150, conn: sqlite3.Connection = None) -> Dict[str, List[Tuple[int, float]]]:
         """
