@@ -7,16 +7,17 @@ import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
 import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
+import { isStaticSource, staticLibraryRow, staticListRow, staticLists } from './forYouStatic';
 import './for-you.css';
 
-interface ListSummary {
+export interface ListSummary {
   id: number;
   title: string;
   curator?: string | null;
   items: number;
 }
 
-interface RowRec {
+export interface RowRec {
   target_id: number;
   title: string;
   cover_url?: string;
@@ -30,7 +31,7 @@ interface RowRec {
   on_lists?: string[];
 }
 
-interface RowData {
+export interface RowData {
   title: string;
   subtitle: string;
   seeds: Array<{ id: number; title: string }>;
@@ -57,6 +58,13 @@ const ROW_LIMIT = 24;
 const GRID_LIMIT = 150; // /api/for-you/row's cap; ranking quality falls off well before this
 const GRID_BATCH = 30;
 
+async function loadLists(): Promise<ListSummary[]> {
+  if (await isStaticSource()) return staticLists();
+  const response = await fetch('/api/for-you/lists');
+  if (!response.ok) throw new Error(`Server returned ${response.status}`);
+  return (await response.json()).lists;
+}
+
 async function postJson<T>(url: string, body: unknown, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     method: 'POST',
@@ -71,7 +79,7 @@ async function postJson<T>(url: string, body: unknown, signal: AbortSignal): Pro
   return response.json();
 }
 
-function fetchListRow(
+async function fetchListRow(
   listIds: number[],
   blend: boolean,
   hideKnown: boolean,
@@ -80,6 +88,7 @@ function fetchListRow(
   limit: number,
   signal: AbortSignal,
 ): Promise<RowData> {
+  if (await isStaticSource()) return staticListRow(listIds, blend, hideKnown, excludeIds, listTitles, limit);
   return postJson(
     '/api/for-you/row',
     { list_ids: listIds, blend, hide_known: hideKnown, exclude_novel_ids: excludeIds, list_titles: listTitles, limit },
@@ -95,6 +104,7 @@ async function loadLibraryTaste(
   signal: AbortSignal,
 ): Promise<TasteProfile> {
   const ids = [...new Set([...seeds.slice(0, 10).map((s) => s.id), ...negativeIds])];
+  if (await isStaticSource()) return computeTasteProfile(profile, []); // static rows don't use tag affinity
   const results = await Promise.allSettled(
     ids.map((id) =>
       fetch(`/api/novels/${id}`, { signal }).then((r) => (r.ok ? (r.json() as Promise<NovelDetail>) : Promise.reject(new Error(String(r.status))))),
@@ -115,6 +125,7 @@ async function fetchLibraryRow(
   limit: number,
   signal: AbortSignal,
 ): Promise<RowData> {
+  if (await isStaticSource()) return staticLibraryRow(title, subtitle, seeds, excludeIds, limit);
   const t = await taste.catch(() => null);
   const data = await postJson<{ recommendations: RowRec[] }>(
     '/api/recommend/for-you',
@@ -177,18 +188,33 @@ function Row({
   fallbackTitle,
   library,
   onSeeAll,
+  onVisible,
 }: {
   state: RowState;
   fallbackTitle: string;
   library: Map<number, ReadingStatus>;
   onSeeAll: () => void;
+  onVisible: () => void;
 }) {
   const track = useRef<HTMLDivElement>(null);
+  const section = useRef<HTMLElement>(null);
+  const visibleRef = useRef(onVisible);
+  visibleRef.current = onVisible;
+  useEffect(() => {
+    const node = section.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) { visibleRef.current(); observer.disconnect(); } },
+      { rootMargin: '500px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const scroll = (direction: number) =>
     track.current?.scrollBy({ left: direction * track.current.clientWidth * 0.85, behavior: 'smooth' });
 
   return (
-    <section className="fy-row">
+    <section className="fy-row" ref={section}>
       <header>
         <div>
           <h2>{state.status === 'ready' ? state.title : fallbackTitle}</h2>
@@ -290,9 +316,8 @@ export default function ForYouPage(): JSX.Element {
     let cancelled = false;
     (async () => {
       try {
-        const [response, profile] = await Promise.all([fetch('/api/for-you/lists'), loadLocalProfile().catch(() => null)]);
-        if (!response.ok) throw new Error(`Server returned ${response.status}`);
-        const data: { lists: ListSummary[] } = await response.json();
+        const [response, profile] = await Promise.all([loadLists(), loadLocalProfile().catch(() => null)]);
+        const data = { lists: response };
         if (cancelled) return;
         setLists(data.lists);
         const mine = new Set((profile?.curated_lists ?? []).map((l) => l.id));
@@ -370,19 +395,26 @@ export default function ForYouPage(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedKey, hideKnown, seenKey, profileTitles, planKey]);
 
+  const epoch = useMemo(() => Math.random(), [jobs]); // remounts rows (re-arming their visibility trigger) when jobs change
+  // Rows load when they near the viewport, so a visit only pays for what is actually scrolled to.
+  const loader = useRef<{ controller: AbortController; requested: Set<string> }>({ controller: new AbortController(), requested: new Set() });
   useEffect(() => {
     const controller = new AbortController();
+    loader.current = { controller, requested: new Set() };
     setRows(Object.fromEntries(jobs.map((j) => [j.key, { status: 'loading' } as RowState])));
-    for (const job of jobs) {
-      job.load(ROW_LIMIT, controller.signal)
-        .then((data) => setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } })))
-        .catch((error) => {
-          if (controller.signal.aborted) return;
-          setRows((prev) => ({ ...prev, [job.key]: { status: 'error', message: error.message } }));
-        });
-    }
     return () => controller.abort();
   }, [jobs]);
+  const requestRow = (job: RowJob) => {
+    const { controller, requested } = loader.current;
+    if (requested.has(job.key)) return;
+    requested.add(job.key);
+    job.load(ROW_LIMIT, controller.signal)
+      .then((data) => setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } })))
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setRows((prev) => ({ ...prev, [job.key]: { status: 'error', message: error.message } }));
+      });
+  };
 
   const titles = useMemo(
     () => new Map((lists ?? []).map((l) => [l.id, profileTitles[l.id] ?? l.title])),
@@ -445,7 +477,7 @@ export default function ForYouPage(): JSX.Element {
         </DSButton>
       </div>
 
-      {listError && <p className="fy-error">{listError}. For You needs the live API (run the uvicorn server).</p>}
+      {listError && <p className="fy-error">{listError}. For You needs the live API or a For You snapshot.</p>}
       {profile && !hasLibraryRows && (
         <p className="fy-empty fy-library-empty">
           No library rows yet: none of your matched titles are rated 4★+ or completed. Rate titles or mark them Completed on your{' '}
@@ -460,11 +492,12 @@ export default function ForYouPage(): JSX.Element {
       {lists && !selected.length && <p className="fy-empty">Pick at least one list above to build list rows.</p>}
       {jobs.map((job) => (
         <Row
-          key={job.key}
+          key={`${epoch}-${job.key}`}
           state={rows[job.key] ?? { status: 'loading' }}
           fallbackTitle={fallbackTitle(job)}
           library={library}
           onSeeAll={() => setExpanded(job.key)}
+          onVisible={() => requestRow(job)}
         />
       ))}
     </main>
