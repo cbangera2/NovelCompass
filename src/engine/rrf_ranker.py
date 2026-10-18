@@ -7,7 +7,8 @@ DEFAULT_CHANNEL_WEIGHTS = {
     'tag': 0.8,
     'direct_rec': 1.2,
     'rec_list': 1.0,
-    'structural': 0.6
+    'structural': 0.6,
+    'ease': 1.0,
 }
 
 def calculate_rrf_scores(

@@ -4,6 +4,7 @@ from typing import Dict, List, Set, Tuple
 import numpy as np
 from src.nlp.taxonomy import calculate_tag_idf, weighted_tag_similarity
 from src.nlp.embedder import SynopsisEmbedder
+from src.engine.ease import EASEModel
 
 class CandidateGenerator:
     def __init__(self, conn: sqlite3.Connection, embedder: SynopsisEmbedder = None):
@@ -12,6 +13,7 @@ class CandidateGenerator:
         self._idf_dict = None
         self._novel_tags_map = None
         self._vector_cache = None
+        self._ease = None
 
     def _get_idf_dict(self) -> Dict[str, float]:
         if self._idf_dict is None:
@@ -36,14 +38,35 @@ class CandidateGenerator:
     def _get_vector_data(self):
         if self._vector_cache is None:
             cur = self.conn.cursor()
-            cur.execute("SELECT id, title, synopsis FROM novels WHERE synopsis IS NOT NULL AND synopsis != '' ORDER BY id")
+            # Most titles have no synopsis, so embed title + genres + tags as well;
+            # otherwise the vector channel cannot see ~80% of the catalog.
+            cur.execute("SELECT id, title, synopsis FROM novels ORDER BY id")
             candidates = cur.fetchall()
+            idf = self._get_idf_dict()
+            tags_map = self._get_novel_tags_map()
+            genres_map: Dict[int, List[str]] = {}
+            cur.execute("SELECT ng.novel_id, g.name FROM novel_genres ng JOIN genres g ON g.id = ng.genre_id")
+            for nid, gname in cur.fetchall():
+                genres_map.setdefault(nid, []).append(gname)
+            candidates = [
+                c for c in candidates
+                if c[2] or tags_map.get(c[0]) or genres_map.get(c[0])
+            ]
             if not candidates:
                 self._vector_cache = ([], {}, None)
             else:
                 c_ids = [c[0] for c in candidates]
                 id_to_idx = {cid: i for i, cid in enumerate(c_ids)}
-                c_texts = [self.embedder.construct_text(c[1], c[2]) for c in candidates]
+                c_texts = [
+                    self.embedder.construct_text(
+                        c[1],
+                        c[2],
+                        # Rarest (most specific) tags first; construct_text keeps the top 10.
+                        sorted(tags_map.get(c[0], ()), key=lambda t: -idf.get(t, 1.0)),
+                        sorted(genres_map.get(c[0], ())),
+                    )
+                    for c in candidates
+                ]
                 vectors = self.embedder.encode(c_texts)
                 self._vector_cache = (c_ids, id_to_idx, vectors)
         return self._vector_cache
@@ -70,6 +93,11 @@ class CandidateGenerator:
 
         # 5. Structural Channel (Same Author / Related Series)
         channels['structural'] = self._get_structural_candidates(seed_novel_id, limit=limit_per_channel, conn=active_conn)
+
+        # 6. EASE item-item model over list membership
+        if self._ease is None:
+            self._ease = EASEModel(self.conn)
+        channels['ease'] = self._ease.candidates(seed_novel_id, limit_per_channel)
 
         return channels
 

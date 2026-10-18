@@ -1055,7 +1055,7 @@ def _channel_weights(req: Any) -> Dict[str, float]:
     return {
         key: max(0.0, min(3.0, float(value)))
         for key, value in raw.items()
-        if key in {"vector", "tag", "direct_rec", "rec_list", "structural"}
+        if key in {"vector", "tag", "direct_rec", "rec_list", "structural", "ease"}
     }
 
 
