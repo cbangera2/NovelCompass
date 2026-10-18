@@ -70,13 +70,14 @@ export function RatingDistributionCard({ detail }: { detail: NovelDetail }) {
 const RELATION_LABELS: Record<string, string> = {
   prequel: 'Prequels', sequel: 'Sequels', parent: 'Main story', spin_off: 'Spin-offs',
   side_story: 'Side stories', adaptation: 'Adaptations', alternative: 'Alternative versions',
-  character: 'Character appearances', other: 'Other', related: 'Related'
+  character: 'Character appearances', source: 'Source material', other: 'Other', related: 'Related'
 };
 const RELATION_ORDER = ['parent', 'prequel', 'sequel', 'spin_off', 'side_story', 'adaptation', 'alternative', 'character', 'related', 'other'];
 
 export function SeriesCard({ items, fromId }: { items: RelatedSeriesItem[]; fromId: number }) {
   if (!items.length) return null;
-  const groups = RELATION_ORDER.map((relation) => ({ relation, items: items.filter((item) => item.relation === relation) }))
+  const extra = [...new Set(items.map((item) => item.relation))].filter((relation) => !RELATION_ORDER.includes(relation));
+  const groups = [...RELATION_ORDER, ...extra].map((relation) => ({ relation, items: items.filter((item) => item.relation === relation) }))
     .filter((group) => group.items.length);
   return <section className="series-card" aria-label="Series and adaptations">
     <header><div><span className="eyebrow">Same world</span><h3>Series &amp; adaptations</h3></div><span className="series-count">{items.length}</span></header>

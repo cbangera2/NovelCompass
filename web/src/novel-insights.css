@@ -28,3 +28,4 @@
 .cohort-current-label{fill:var(--chart-2);font-size:11px;font-weight:700}
 .cohort-data{margin-top:.5rem}.cohort-data summary{color:var(--accent-bright);cursor:pointer;font-size:.68rem;font-weight:600}
 @media(max-width:800px){.peer-row{grid-template-columns:18px 34px minmax(0,1fr) 80px}.peer-metric.readers,.peer-overlap{display:none}}
+.cohort-data[open] tbody{display:table-row-group}
