@@ -10,7 +10,8 @@ import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { LocalNovelFeedback, LocalUserProfile, ReadingStatus } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { NovelDetail, NovelInsights, Recommendation } from './types';
+import { CuratedListSummary, NovelDetail, NovelInsights, Recommendation, RelatedSeriesItem } from './types';
+import { catalogVerdicts, CuratedListsCard, RatingDistributionCard, SeriesCard, summarizeRatings } from './NovelReaderSignals';
 import { formatStatusLabel, getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import './novel-page.css';
@@ -44,6 +45,8 @@ export default function NovelPage(): JSX.Element {
   const [error, setError] = useState('');
   const [synopsisOpen, setSynopsisOpen] = useState(false);
   const [hideKnown, setHideKnown] = useState(false);
+  const [series, setSeries] = useState<RelatedSeriesItem[]>([]);
+  const [curatedLists, setCuratedLists] = useState<CuratedListSummary[]>([]);
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || (fromId ? 'relationship' : 'overview'));
 
   useEffect(() => {
@@ -66,6 +69,8 @@ export default function NovelPage(): JSX.Element {
         const insightsRequest = dataSource.getNovelInsights(novelId)
           .then((value) => !cancelled && setInsights(value))
           .catch(() => undefined);
+        dataSource.getRelatedSeries?.(novelId).then((value) => !cancelled && setSeries(value)).catch(() => undefined);
+        dataSource.getCuratedLists?.(novelId).then((value) => !cancelled && setCuratedLists(value)).catch(() => undefined);
         const relationshipRequest = fromId
           ? Promise.all([
               dataSource.getNovel(fromId).catch(() => null),
@@ -85,6 +90,8 @@ export default function NovelPage(): JSX.Element {
   const currentFeedback = profile?.feedback?.find((item) => item.novel_id === novelId)?.signal;
   const libraryEntry = profile?.entries.find((item) => item.novel_id === novelId);
   const currentRating = libraryEntry?.rating;
+  const ratingSummary = useMemo(() => summarizeRatings(detail?.rating_dist), [detail]);
+  const verdictChips = [...(ratingSummary?.verdict ? [ratingSummary.verdict] : []), ...catalogVerdicts(insights)];
   const libraryIds = useMemo(() => {
     const map = new Map<number, LocalUserProfile['entries'][number]>();
     profile?.entries.forEach((entry) => { if (entry.novel_id != null) map.set(entry.novel_id, entry); });
@@ -231,6 +238,7 @@ export default function NovelPage(): JSX.Element {
             </div>;
           })}
         </div>}
+        {verdictChips.length > 0 && <div className="novel-verdicts">{verdictChips.map((label) => <span key={label} className={label === 'Divisive' || label.includes('polarizing') ? 'warn' : ''}>{label}</span>)}</div>}
         <div className="novel-library-state">
           <Library size={15} />
           <label>
@@ -310,6 +318,10 @@ export default function NovelPage(): JSX.Element {
             <CollapsibleFacetList className="tag-facets" items={detail.tags} compactCount={12} noun="tags" hrefFor={(tag) => browseFacetUrl('tag', tag)} />
           </Card>
         </div>
+        {(detail.rating_dist || series.length > 0) && <div className="novel-signals-grid">
+          <RatingDistributionCard detail={detail} />
+          <SeriesCard items={series} fromId={novelId} />
+        </div>}
       </section>
       <section id="relationship" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>02</span><div><h2>Relationships</h2><p>Recommendation evidence and related directions to explore.</p></div></header>
@@ -370,6 +382,7 @@ export default function NovelPage(): JSX.Element {
             </div>;
           })}</div>
         </section>}
+        <CuratedListsCard lists={curatedLists} />
         {!origin && <RelationshipPanel relationship={relationship} origin={origin} current={detail} />}
       </section>
       <section id="insights" data-novel-section className="novel-major-section">

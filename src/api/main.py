@@ -761,6 +761,75 @@ def get_novel_detail(novel_id: int):
         conn.close()
 
 
+_INVERSE_RELATION = {
+    "sequel": "prequel", "prequel": "sequel", "parent": "spin_off",
+    "spin_off": "parent", "side_story": "parent",
+}
+
+
+@app.get("/api/novels/{novel_id}/series")
+def get_novel_series(novel_id: int):
+    """Sequels, prequels, spin-offs and adaptations linked to this title."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT r.relation_type, r.target_novel_id AS other, 0 AS inbound
+               FROM related_series r WHERE r.source_novel_id = ?
+               UNION ALL
+               SELECT r.relation_type, r.source_novel_id, 1
+               FROM related_series r WHERE r.target_novel_id = ?""",
+            (novel_id, novel_id),
+        ).fetchall()
+        picked: Dict[int, str] = {}
+        for relation, other, inbound in sorted(rows, key=lambda r: r[2]):
+            if other in picked:
+                continue  # an explicit outgoing edge wins over an inverted incoming one
+            picked[other] = _INVERSE_RELATION.get(relation, relation) if inbound else relation
+        if not picked:
+            return {"items": []}
+        marks = ",".join("?" * len(picked))
+        cards = conn.execute(
+            f"""SELECT id, title, slug, author, cover_url, rating, rating_votes,
+                       associated_names, COALESCE(media_type, 'novel') AS media_type,
+                       COALESCE(source, 'novelupdates') AS source, external_id, external_url,
+                       year, reading_list_count
+                FROM novels WHERE id IN ({marks})""",
+            list(picked),
+        ).fetchall()
+        items = []
+        for card in cards:
+            item = novel_search_result(card)
+            item["relation"] = picked[card["id"]]
+            item["year"] = card["year"]
+            item["reading_list_count"] = card["reading_list_count"]
+            items.append(item)
+        items.sort(key=lambda item: (item["relation"], -(item["reading_list_count"] or 0)))
+        return {"items": items[:60]}
+    finally:
+        conn.close()
+
+
+@app.get("/api/novels/{novel_id}/lists")
+def get_novel_lists(novel_id: int):
+    """Curated Novel Updates lists that include this title."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT l.id, l.title, l.curator, l.followers, l.item_count, l.description
+               FROM rec_list_items i JOIN rec_lists l ON l.id = i.list_id
+               WHERE i.novel_id = ?
+               ORDER BY l.followers DESC, l.item_count DESC LIMIT 40""",
+            (novel_id,),
+        ).fetchall()
+        return {"lists": [
+            {"id": r[0], "title": r[1], "curator": r[2], "followers": r[3] or 0,
+             "item_count": r[4] or 0, "description": (r[5] or "")[:240]}
+            for r in rows
+        ]}
+    finally:
+        conn.close()
+
+
 @app.get("/api/novels/{novel_id}/insights")
 def get_novel_insights(novel_id: int):
     """Return descriptive catalog statistics with explicit populations."""

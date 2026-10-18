@@ -549,6 +549,10 @@ export class StaticDataSource implements RecommendationDataSource {
       cover_url: card.cover_url,
       genres: genreIds.map((genreId) => this.genres[genreId]).filter(Boolean),
       tags: tagIds.map((tagId) => this.tags[tagId]).filter(Boolean),
+      rating_dist: detail.rating_votes_5 != null ? {
+        '5': Number(detail.rating_votes_5 || 0), '4': Number(detail.rating_votes_4 || 0), '3': Number(detail.rating_votes_3 || 0),
+        '2': Number(detail.rating_votes_2 || 0), '1': Number(detail.rating_votes_1 || 0)
+      } : undefined,
       direct_recommendation_count: Number(detail.direct_recommendation_count || 0),
       related_series_count: Number(detail.related_series_count || 0),
       recommendation_list_count: Number(detail.recommendation_list_count || 0)

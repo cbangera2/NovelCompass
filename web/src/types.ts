@@ -157,6 +157,7 @@ export interface NovelDetail {
   media_type?: string;
   source?: string;
   external_id?: string;
+  rating_dist?: Record<'1' | '2' | '3' | '4' | '5', number>;
   direct_recommendation_count: number;
   related_series_count: number;
   recommendation_list_count: number;
@@ -239,4 +240,19 @@ export interface NovelInsights {
   }>;
   cohort_definition: string;
   capabilities: { relationships: boolean; tags: boolean };
+}
+
+export interface RelatedSeriesItem extends NovelSearchResult {
+  relation: string;
+  year?: number;
+  reading_list_count?: number;
+}
+
+export interface CuratedListSummary {
+  id: number;
+  title: string;
+  curator?: string | null;
+  followers: number;
+  item_count: number;
+  description?: string;
 }
