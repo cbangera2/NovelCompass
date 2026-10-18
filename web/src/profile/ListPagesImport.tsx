@@ -7,9 +7,43 @@ export interface ImportedListStatus {
   items: number;
 }
 
-interface ImportResult {
+export interface ListImportResult {
   lists: Array<{ id: number; title: string; items: number; missing_pages: number[] }>;
   skipped: Array<{ name: string; reason: string }>;
+}
+
+export const LISTS_IMPORTED_EVENT = 'novel-lists-imported';
+
+/** Saved Novel Updates list pages carry their canonical /viewlist/<id>/ URL in og:url. */
+export function isListPageHtml(html: string): boolean {
+  return /property=["']og:url["'][^>]*content=["']https?:\/\/www\.novelupdates\.com\/viewlist\/\d+/i.test(html);
+}
+
+/** Send saved list pages to the local API, which stores their members as taste signals. */
+export async function uploadListPages(files: Array<{ name: string; html: string }>): Promise<ListImportResult> {
+  const response = await fetch('/api/import/lists', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(
+      typeof body?.detail === 'string' ? body.detail : `Server returned ${response.status} (is the live API running?)`,
+    );
+  }
+  const result: ListImportResult = await response.json();
+  window.dispatchEvent(new Event(LISTS_IMPORTED_EVENT));
+  return result;
+}
+
+export function describeListImport(result: ListImportResult): string {
+  const parts = result.lists.map((list) => {
+    const missing = list.missing_pages.length ? ` (missing page${list.missing_pages.length > 1 ? 's' : ''} ${list.missing_pages.join(', ')})` : '';
+    return `${list.title}: ${list.items} titles${missing}`;
+  });
+  const skipped = result.skipped.map((file) => `skipped ${file.name} (${file.reason})`);
+  return [...parts, ...skipped].join('; ');
 }
 
 /** Imported member counts per list ID, from the live API (empty when it isn't running). */
@@ -26,13 +60,17 @@ export function useImportedLists(): { counts: Map<number, number>; refresh: () =
       .catch(() => setAvailable(false));
   }, []);
   useEffect(refresh, [refresh]);
+  useEffect(() => {
+    window.addEventListener(LISTS_IMPORTED_EVENT, refresh);
+    return () => window.removeEventListener(LISTS_IMPORTED_EVENT, refresh);
+  }, [refresh]);
   return { counts, refresh, available };
 }
 
 export function ListPagesImport({ onImported, disabled }: { onImported: () => void; disabled?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<ImportResult | null>(null);
+  const [result, setResult] = useState<ListImportResult | null>(null);
   const [error, setError] = useState('');
 
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -44,16 +82,7 @@ export function ListPagesImport({ onImported, disabled }: { onImported: () => vo
     setResult(null);
     try {
       const files = await Promise.all(chosen.map(async (file) => ({ name: file.name, html: await file.text() })));
-      const response = await fetch('/api/import/lists', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(typeof body?.detail === 'string' ? body.detail : `Server returned ${response.status}`);
-      }
-      setResult(await response.json());
+      setResult(await uploadListPages(files));
       onImported();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
