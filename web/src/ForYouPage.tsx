@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { Badge, DSButton, Skeleton } from './design-system';
 import { hasUsableCover, novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
+import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
+import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
+import type { NovelDetail } from './types';
 import './for-you.css';
 
 interface ListSummary {
@@ -24,7 +27,7 @@ interface RowRec {
   match_score_percent: number;
   evidence_bullets: string[];
   shared_tags: string[];
-  on_lists: string[];
+  on_lists?: string[];
 }
 
 interface RowData {
@@ -36,6 +39,12 @@ interface RowData {
 
 type RowState = { status: 'loading' } | { status: 'error'; message: string } | ({ status: 'ready' } & RowData);
 
+interface RowJob {
+  key: string;
+  fallbackTitle: string;
+  load: (limit: number, signal: AbortSignal) => Promise<RowData>;
+}
+
 const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
   completed: 'Completed',
@@ -44,35 +53,135 @@ const STATUS_LABELS: Record<ReadingStatus, string> = {
   paused: 'Paused',
 };
 
-async function fetchRow(
+const ROW_LIMIT = 24;
+const GRID_LIMIT = 150; // /api/for-you/row's cap; ranking quality falls off well before this
+const GRID_BATCH = 30;
+
+async function postJson<T>(url: string, body: unknown, signal: AbortSignal): Promise<T> {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error(detail?.detail || `Server returned ${response.status}`);
+  }
+  return response.json();
+}
+
+function fetchListRow(
   listIds: number[],
   blend: boolean,
   hideKnown: boolean,
   excludeIds: number[],
   listTitles: Record<number, string>,
+  limit: number,
   signal: AbortSignal,
 ): Promise<RowData> {
-  const response = await fetch('/api/for-you/row', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ list_ids: listIds, blend, hide_known: hideKnown, exclude_novel_ids: excludeIds, list_titles: listTitles, limit: 24 }),
+  return postJson(
+    '/api/for-you/row',
+    { list_ids: listIds, blend, hide_known: hideKnown, exclude_novel_ids: excludeIds, list_titles: listTitles, limit },
     signal,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || `Server returned ${response.status}`);
-  }
-  return response.json();
+  );
+}
+
+/** Like/avoid tags from the library. Detail fetches are best-effort so one failure never blocks the rows. */
+async function loadLibraryTaste(
+  profile: LocalUserProfile,
+  seeds: LibrarySeed[],
+  negativeIds: number[],
+  signal: AbortSignal,
+): Promise<TasteProfile> {
+  const ids = [...new Set([...seeds.slice(0, 10).map((s) => s.id), ...negativeIds])];
+  const results = await Promise.allSettled(
+    ids.map((id) =>
+      fetch(`/api/novels/${id}`, { signal }).then((r) => (r.ok ? (r.json() as Promise<NovelDetail>) : Promise.reject(new Error(String(r.status))))),
+    ),
+  );
+  const details = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  // computeTasteProfile only treats dropped / low-rated as negative; here paused counts too.
+  const entries = profile.entries.map((e) => (e.status === 'paused' ? { ...e, status: 'dropped' as const } : e));
+  return computeTasteProfile({ ...profile, entries }, details);
+}
+
+async function fetchLibraryRow(
+  title: string,
+  subtitle: string,
+  seeds: LibrarySeed[],
+  taste: Promise<TasteProfile>,
+  excludeIds: number[],
+  limit: number,
+  signal: AbortSignal,
+): Promise<RowData> {
+  const t = await taste.catch(() => null);
+  const data = await postJson<{ recommendations: RowRec[] }>(
+    '/api/recommend/for-you',
+    {
+      seeds: seeds.map((s) => ({ id: s.id, weight: s.weight, title: s.title })),
+      exclude_novel_ids: excludeIds,
+      liked_tags: (t?.liked_tags ?? []).map((f) => ({ name: f.name, weight: f.weight })),
+      avoid_tags: (t?.avoid_tags ?? []).map((f) => ({ name: f.name, weight: f.weight })),
+      media_type: 'novel',
+      limit,
+    },
+    signal,
+  );
+  const top = Math.max(1, ...data.recommendations.map((r) => r.match_score_percent));
+  return {
+    title,
+    subtitle,
+    seeds: seeds.map((s) => ({ id: s.id, title: s.title })),
+    // Absolute percents are close together for multi-seed rows; show strength relative to the row's best.
+    recommendations: data.recommendations.map((r) => ({ ...r, match_score_percent: Math.round((100 * r.match_score_percent) / top) })),
+  };
+}
+
+function Cover({ rec, status }: { rec: RowRec; status?: ReadingStatus }) {
+  const [failed, setFailed] = useState(false);
+  const onList = rec.on_lists ?? [];
+  return (
+    <div className="fy-cover">
+      {hasUsableCover(rec.cover_url) && !failed ? (
+        <img src={rec.cover_url} alt="" loading="lazy" decoding="async" width={168} height={252} onError={() => setFailed(true)} />
+      ) : (
+        <span aria-hidden="true">{rec.title.slice(0, 1)}</span>
+      )}
+      {status && <span className={`fy-status status-${status}`}>{STATUS_LABELS[status]}</span>}
+      {onList.length > 0 && <span className="fy-known" title={`On your list: ${onList.join(', ')}`}>On your list</span>}
+    </div>
+  );
+}
+
+function RecCard({ rec, library }: { rec: RowRec; library: Map<number, ReadingStatus> }) {
+  return (
+    <a className="fy-card" href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
+      <Cover rec={rec} status={library.get(rec.target_id)} />
+      <strong title={rec.title}>{rec.title}</strong>
+      <div className="fy-strength" title={`${rec.match_score_percent}% of this row's strongest match`}>
+        <i style={{ width: `${Math.max(6, rec.match_score_percent)}%` }} />
+      </div>
+      <small>{rec.evidence_bullets[0]}</small>
+    </a>
+  );
+}
+
+function seedLine(data: RowData) {
+  const names = data.seeds.slice(0, 3).map((s) => s.title).join(', ');
+  return `${data.subtitle}: ${names}${data.seeds.length > 3 ? ` +${data.seeds.length - 3} more` : ''}`;
 }
 
 function Row({
   state,
   fallbackTitle,
   library,
+  onSeeAll,
 }: {
   state: RowState;
   fallbackTitle: string;
   library: Map<number, ReadingStatus>;
+  onSeeAll: () => void;
 }) {
   const track = useRef<HTMLDivElement>(null);
   const scroll = (direction: number) =>
@@ -83,17 +192,13 @@ function Row({
       <header>
         <div>
           <h2>{state.status === 'ready' ? state.title : fallbackTitle}</h2>
-          {state.status === 'ready' && (
-            <p title={state.seeds.map((s) => s.title).join(', ')}>
-              {state.subtitle}: {state.seeds.slice(0, 3).map((s) => s.title).join(', ')}
-              {state.seeds.length > 3 ? ` +${state.seeds.length - 3} more` : ''}
-            </p>
-          )}
+          {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{seedLine(state)}</p>}
         </div>
         {state.status === 'ready' && (
           <div className="fy-row-nav">
-            <DSButton variant="ghost" aria-label="Scroll left" onClick={() => scroll(-1)}><ChevronLeft size={18} /></DSButton>
-            <DSButton variant="ghost" aria-label="Scroll right" onClick={() => scroll(1)}><ChevronRight size={18} /></DSButton>
+            <DSButton variant="ghost" onClick={onSeeAll}>See all</DSButton>
+            <DSButton variant="ghost" className="fy-scroll-btn" aria-label="Scroll left" onClick={() => scroll(-1)}><ChevronLeft size={18} /></DSButton>
+            <DSButton variant="ghost" className="fy-scroll-btn" aria-label="Scroll right" onClick={() => scroll(1)}><ChevronRight size={18} /></DSButton>
           </div>
         )}
       </header>
@@ -101,30 +206,72 @@ function Row({
       <div className="fy-track" ref={track}>
         {state.status === 'loading' &&
           Array.from({ length: 7 }, (_, i) => <Skeleton key={i} className="fy-card-skeleton" />)}
-        {state.status === 'ready' &&
-          state.recommendations.map((rec) => (
-            <a className="fy-card" key={rec.target_id} href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
-              <div className="fy-cover">
-                {hasUsableCover(rec.cover_url) ? (
-                  <img src={rec.cover_url} alt="" loading="lazy" />
-                ) : (
-                  <span>{rec.title.slice(0, 1)}</span>
-                )}
-                {library.has(rec.target_id) && (
-                  <span className={`fy-status status-${library.get(rec.target_id)}`}>{STATUS_LABELS[library.get(rec.target_id)!]}</span>
-                )}
-                {rec.on_lists.length > 0 && (
-                  <span className="fy-known" title={`On your list: ${rec.on_lists.join(', ')}`}>On your list</span>
-                )}
-              </div>
-              <strong title={rec.title}>{rec.title}</strong>
-              <div className="fy-strength" title={`${rec.match_score_percent}% of this row's strongest match`}>
-                <i style={{ width: `${Math.max(6, rec.match_score_percent)}%` }} />
-              </div>
-              <small>{rec.evidence_bullets[0]}</small>
-            </a>
-          ))}
+        {state.status === 'ready' && state.recommendations.map((rec) => <RecCard key={rec.target_id} rec={rec} library={library} />)}
+        {state.status === 'ready' && state.recommendations.length === 0 && <p className="fy-empty">Nothing left to show after filtering.</p>}
       </div>
+    </section>
+  );
+}
+
+/** One row's picks as a grid. Fetches the full capped set, then reveals it in batches as you scroll. */
+function RowGrid({
+  job,
+  preview,
+  library,
+  onBack,
+}: {
+  job: RowJob;
+  preview: RowState;
+  library: Map<number, ReadingStatus>;
+  onBack: () => void;
+}) {
+  const [state, setState] = useState<RowState>(preview);
+  const [fullyLoaded, setFullyLoaded] = useState(false);
+  const [shown, setShown] = useState(GRID_BATCH);
+  const sentinel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    const controller = new AbortController();
+    job.load(GRID_LIMIT, controller.signal)
+      .then((data) => { setState({ status: 'ready', ...data }); setFullyLoaded(true); })
+      .catch((error) => { if (!controller.signal.aborted) setState({ status: 'error', message: error.message }); });
+    return () => controller.abort();
+  }, [job]);
+
+  const total = state.status === 'ready' ? state.recommendations.length : 0;
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || shown >= total) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) setShown((n) => n + GRID_BATCH); },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [shown, total]);
+
+  return (
+    <section className="fy-row fy-grid-view">
+      <header>
+        <div>
+          <DSButton variant="ghost" className="fy-back" onClick={onBack}><ArrowLeft size={16} /> Back to rows</DSButton>
+          <h2>{state.status === 'ready' ? state.title : job.fallbackTitle}</h2>
+          {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{seedLine(state)}</p>}
+        </div>
+      </header>
+      {state.status === 'error' && <p className="fy-error">Couldn't load this row: {state.message}</p>}
+      <div className="fy-grid">
+        {state.status === 'loading' && Array.from({ length: 12 }, (_, i) => <Skeleton key={i} className="fy-card-skeleton" />)}
+        {state.status === 'ready' && state.recommendations.slice(0, shown).map((rec) => <RecCard key={rec.target_id} rec={rec} library={library} />)}
+      </div>
+      {state.status === 'ready' && shown < total && <div ref={sentinel} className="fy-sentinel" aria-hidden="true" />}
+      {state.status === 'ready' && !fullyLoaded && <p className="fy-end">Loading more picks…</p>}
+      {state.status === 'ready' && fullyLoaded && shown >= total && (
+        <p className="fy-end">
+          {total >= GRID_LIMIT ? `That's the top ${GRID_LIMIT}.` : `That's all ${total} picks.`} Quality drops past this point.
+        </p>
+      )}
     </section>
   );
 }
@@ -137,6 +284,7 @@ export default function ForYouPage(): JSX.Element {
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [listError, setListError] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,18 +327,54 @@ export default function ForYouPage(): JSX.Element {
     () => Object.fromEntries((profile?.curated_lists ?? []).map((list) => [list.id, list.title])),
     [profile],
   );
+  const plan = useMemo(() => planLibraryRows(profile), [profile]);
+  const planKey = JSON.stringify(plan);
 
   const selectedKey = selected.join(',');
-  useEffect(() => {
-    if (!selected.length) { setRows({}); return; }
-    const controller = new AbortController();
-    const jobs: Array<{ key: string; ids: number[]; blend: boolean }> = [
-      ...(selected.length > 1 ? [{ key: 'blend', ids: selected, blend: true }] : []),
-      ...selected.map((id) => ({ key: `list-${id}`, ids: [id], blend: false })),
+  const jobs = useMemo<RowJob[]>(() => {
+    const out: RowJob[] = [];
+    const exclude = hideKnown ? seenIds : [];
+    const libraryJobs: Array<{ key: string; title: string; subtitle: string; seeds: LibrarySeed[] }> = [
+      { key: 'lib-rated', title: 'Because you rated highly', subtitle: 'Seeded by your top-rated titles', seeds: plan.rated },
+      { key: 'lib-finished', title: 'From what you finished', subtitle: 'Seeded by titles you completed', seeds: plan.finished },
     ];
+    if (profile) {
+      // One shared taste lookup per job set; created lazily so it only runs if a library row loads.
+      let taste: Promise<TasteProfile> | null = null;
+      const getTaste = (signal: AbortSignal) =>
+        (taste ??= loadLibraryTaste(profile, [...plan.rated, ...plan.finished], plan.negativeIds, signal));
+      for (const lj of libraryJobs.filter((j) => j.seeds.length)) {
+        out.push({
+          key: lj.key,
+          fallbackTitle: lj.title,
+          load: (limit, signal) => fetchLibraryRow(lj.title, lj.subtitle, lj.seeds, getTaste(signal), exclude, limit, signal),
+        });
+      }
+    }
+    if (selected.length > 1) {
+      out.push({
+        key: 'blend',
+        fallbackTitle: 'Top picks for you',
+        load: (limit, signal) => fetchListRow(selected, true, hideKnown, exclude, profileTitles, limit, signal),
+      });
+    }
+    for (const id of selected) {
+      out.push({
+        key: `list-${id}`,
+        fallbackTitle: 'Because you love this list',
+        load: (limit, signal) => fetchListRow([id], false, hideKnown, exclude, profileTitles, limit, signal),
+      });
+    }
+    return out;
+    // plan/profile are covered by planKey; seenIds by seenKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
     setRows(Object.fromEntries(jobs.map((j) => [j.key, { status: 'loading' } as RowState])));
     for (const job of jobs) {
-      fetchRow(job.ids, job.blend, hideKnown, hideKnown ? seenIds : [], profileTitles, controller.signal)
+      job.load(ROW_LIMIT, controller.signal)
         .then((data) => setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } })))
         .catch((error) => {
           if (controller.signal.aborted) return;
@@ -198,8 +382,7 @@ export default function ForYouPage(): JSX.Element {
         });
     }
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey, hideKnown, seenKey, profileTitles]);
+  }, [jobs]);
 
   const titles = useMemo(
     () => new Map((lists ?? []).map((l) => [l.id, profileTitles[l.id] ?? l.title])),
@@ -208,14 +391,33 @@ export default function ForYouPage(): JSX.Element {
   const toggle = (id: number) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  const expandedJob = expanded ? jobs.find((j) => j.key === expanded) : undefined;
+  const hasLibraryRows = plan.rated.length > 0 || plan.finished.length > 0;
+  const fallbackTitle = (job: RowJob) =>
+    job.key.startsWith('list-') ? `Because you love ${titles.get(Number(job.key.slice(5))) ?? 'this list'}` : job.fallbackTitle;
+
+  if (expandedJob) {
+    return (
+      <main className="fy-shell">
+        <RowGrid
+          job={{ ...expandedJob, fallbackTitle: fallbackTitle(expandedJob) }}
+          preview={rows[expandedJob.key] ?? { status: 'loading' }}
+          library={library}
+          onBack={() => setExpanded(null)}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="fy-shell">
       <header className="fy-hero">
         <p className="eyebrow"><Sparkles size={14} /> For You</p>
-        <h1>Picked from the lists you love</h1>
+        <h1>Picked from what you love</h1>
         <p>
-          Each row starts from one of your lists — its top-ranked titles are the seeds. Titles from your library show their
-          reading status and titles from your lists are badged, so you can sanity-check the picks; the toggle hides what you've read.
+          Rows start from your library (what you rated highly or finished) and from your lists, using their top titles as seeds.
+          Titles from your library show their reading status and titles from your lists are badged, so you can sanity-check
+          the picks; the toggle hides what you've read.
         </p>
       </header>
 
@@ -244,10 +446,26 @@ export default function ForYouPage(): JSX.Element {
       </div>
 
       {listError && <p className="fy-error">{listError}. For You needs the live API (run the uvicorn server).</p>}
-      {lists && !selected.length && <p className="fy-empty">Pick at least one list above to build your rows.</p>}
-      {selected.length > 1 && rows.blend && <Row state={rows.blend} fallbackTitle="Top picks for you" library={library} />}
-      {selected.map((id) => (
-        <Row key={id} state={rows[`list-${id}`] ?? { status: 'loading' }} fallbackTitle={`Because you love ${titles.get(id) ?? 'this list'}`} library={library} />
+      {profile && !hasLibraryRows && (
+        <p className="fy-empty fy-library-empty">
+          No library rows yet: none of your matched titles are rated 4★+ or completed. Rate titles or mark them Completed on your{' '}
+          <a href="?view=profile">profile</a> and rows seeded from your library will appear here.
+        </p>
+      )}
+      {!profile && (
+        <p className="fy-empty fy-library-empty">
+          Import your library on your <a href="?view=profile">profile</a> to get rows seeded from what you rated highly or finished.
+        </p>
+      )}
+      {lists && !selected.length && <p className="fy-empty">Pick at least one list above to build list rows.</p>}
+      {jobs.map((job) => (
+        <Row
+          key={job.key}
+          state={rows[job.key] ?? { status: 'loading' }}
+          fallbackTitle={fallbackTitle(job)}
+          library={library}
+          onSeeAll={() => setExpanded(job.key)}
+        />
       ))}
     </main>
   );

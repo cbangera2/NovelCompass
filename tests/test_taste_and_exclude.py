@@ -220,3 +220,13 @@ def test_recommend_excludes_library_ids(tmp_path, monkeypatch):
     assert closed.status_code == 200
     closed_ids = {item["target_id"] for item in closed.json()["recommendations"]}
     assert 3 not in closed_ids
+
+
+def test_for_you_row_limit_cap_supports_see_all_grid():
+    import pytest
+    from pydantic import ValidationError
+    from src.api.main import ForYouRowRequest
+
+    assert ForYouRowRequest(list_ids=[1], limit=150).limit == 150
+    with pytest.raises(ValidationError):
+        ForYouRowRequest(list_ids=[1], limit=151)
