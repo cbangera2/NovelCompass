@@ -12,7 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.db.schema import init_db
-from src.engine.candidate_gen import CandidateGenerator
+from src.engine.candidate_gen import CandidateGenerator, _SHARED_LOCK as _engine_lock_obj
+from src.scraper.list_import import import_list_pages
 from src.engine.filters import HardFilterEngine
 from src.engine.rrf_ranker import (
     DEFAULT_CHANNEL_WEIGHTS,
@@ -1045,6 +1046,44 @@ def _list_members(conn: sqlite3.Connection, list_id: int) -> List[Dict[str, Any]
         (list_id,),
     ).fetchall()
     return [{"id": r[0], "title": r[1], "position": r[2]} for r in rows]
+
+
+class ListPageFile(BaseModel):
+    name: str = ""
+    html: str = Field(max_length=8 * 1024 * 1024)
+
+
+class ListImportRequest(BaseModel):
+    files: List[ListPageFile] = Field(min_length=1, max_length=60)
+
+
+@app.post("/api/import/lists")
+def import_lists(req: ListImportRequest):
+    """Import saved Novel Updates list pages; refreshes the EASE model afterwards."""
+    conn = get_db()
+    try:
+        result = import_list_pages(conn, [(f.name, f.html) for f in req.files])
+    finally:
+        conn.close()
+    if result["lists"]:
+        threading.Thread(target=_refresh_ease, daemon=True).start()
+    return result
+
+
+def _refresh_ease():
+    """Drop the cached EASE model (it was fit on the old memberships) and rebuild it."""
+    conn = get_db()
+    try:
+        gen = CandidateGenerator(conn)
+        with _engine_lock_obj:
+            gen._ease = None
+        seed = conn.execute("SELECT novel_id FROM rec_list_items LIMIT 1").fetchone()
+        if seed:
+            gen.get_candidate_channels(seed[0], limit_per_channel=1)
+    except Exception as exc:
+        print(f"[ease] refresh failed: {exc}")
+    finally:
+        conn.close()
 
 
 @app.get("/api/for-you/lists")
