@@ -22,6 +22,8 @@ def main() -> None:
     ap.add_argument("--out", default=str(ROOT / "web" / "public" / "for-you-data"))
     ap.add_argument("--limit", type=int, default=150)
     ap.add_argument("--min-items", type=int, default=10)
+    ap.add_argument("--all-lists", action="store_true",
+                    help="also include lists with no curator name (just the largest ones; low signal)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -29,6 +31,9 @@ def main() -> None:
         stale.unlink()
 
     lists = api.for_you_lists(min_items=args.min_items)["lists"]
+    if not args.all_lists:
+        # Without a curator name nothing says anyone likes a list, so don't ship it.
+        lists = [l for l in lists if l["curator"]]
     kept = []
     for entry in lists:
         lid = entry["id"]
