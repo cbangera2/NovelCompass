@@ -1,4 +1,4 @@
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, ReactNode, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { FileUp, Loader2, X } from 'lucide-react';
 import { createDataSource } from '../data';
@@ -24,9 +24,14 @@ const STATUS_LABELS: Record<ReadingStatus, string> = {
 export function ProfileImportDialog({
   profile,
   onImported,
+  triggerClassName = 'shell-import-trigger',
+  trigger,
 }: {
   profile: LocalUserProfile | null;
   onImported?: (message: string) => void;
+  /** Override the trigger look (the account menu uses the default row). */
+  triggerClassName?: string;
+  trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<ParsedProfileFile[]>([]);
@@ -191,9 +196,13 @@ export function ProfileImportDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="shell-import-trigger">
-        <FileUp size={16} />
-        <span>Import profile<small>MyAnimeList, AniList, NovelUpdates, or a backup</small></span>
+      <Dialog.Trigger className={triggerClassName}>
+        {trigger ?? (
+          <>
+            <FileUp size={16} />
+            <span>Import profile<small>MyAnimeList, AniList, NovelUpdates, or a backup</small></span>
+          </>
+        )}
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="profile-backdrop" />
