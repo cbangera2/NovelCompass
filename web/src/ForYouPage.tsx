@@ -70,6 +70,7 @@ async function loadLists(): Promise<ListSummary[]> {
   const lists: ListSummary[] = (await response.json()).lists;
   // Theme tags come from the precomputed snapshot; the live API doesn't compute them.
   const themes = new Map((await staticLists().catch(() => [] as ListSummary[])).map((l) => [l.id, l.theme]));
+  liveListSizes = new Map(lists.map((l) => [l.id, l.items]));
   return lists.map((l) => ({ ...l, theme: themes.get(l.id) }));
 }
 
@@ -87,6 +88,8 @@ async function postJson<T>(url: string, body: unknown, signal: AbortSignal): Pro
   return response.json();
 }
 
+let liveListSizes = new Map<number, number>();
+
 async function fetchListRow(
   listIds: number[],
   blend: boolean,
@@ -97,6 +100,11 @@ async function fetchListRow(
   signal: AbortSignal,
 ): Promise<RowData> {
   if (await isStaticSource()) return staticListRow(listIds, blend, hideKnown, excludeIds, listTitles, limit);
+  // Fast path: list rows are precomputed, so serve them from the snapshot (files + one id lookup) and only
+  // fall back to the engine when a list isn't in it or has changed since it was built.
+  try {
+    return await staticListRow(listIds, blend, hideKnown, excludeIds, listTitles, limit, liveListSizes);
+  } catch { /* not in the snapshot or stale: compute live */ }
   return postJson(
     '/api/for-you/row',
     { list_ids: listIds, blend, hide_known: hideKnown, exclude_novel_ids: excludeIds, list_titles: listTitles, limit },
@@ -157,13 +165,13 @@ async function fetchLibraryRow(
   };
 }
 
-function Cover({ rec, status }: { rec: RowRec; status?: ReadingStatus }) {
+function Cover({ rec, status, eager }: { rec: RowRec; status?: ReadingStatus; eager?: boolean }) {
   const [failed, setFailed] = useState(false);
   const onList = rec.on_lists ?? [];
   return (
     <div className="fy-cover">
       {hasUsableCover(rec.cover_url) && !failed ? (
-        <img src={rec.cover_url} alt="" loading="lazy" decoding="async" width={168} height={252} onError={() => setFailed(true)} />
+        <img src={rec.cover_url} alt="" loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} decoding="async" width={168} height={252} onError={() => setFailed(true)} />
       ) : (
         <span aria-hidden="true">{rec.title.slice(0, 1)}</span>
       )}
@@ -173,10 +181,10 @@ function Cover({ rec, status }: { rec: RowRec; status?: ReadingStatus }) {
   );
 }
 
-function RecCard({ rec, library }: { rec: RowRec; library: Map<number, ReadingStatus> }) {
+function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean }) {
   return (
     <a className="fy-card" href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
-      <Cover rec={rec} status={library.get(rec.target_id)} />
+      <Cover rec={rec} status={library.get(rec.target_id)} eager={eager} />
       <strong title={rec.title}>{rec.title}</strong>
       <div className="fy-strength" title={`${rec.match_score_percent}% of this row's strongest match`}>
         <i style={{ width: `${Math.max(6, rec.match_score_percent)}%` }} />
@@ -244,7 +252,7 @@ function Row({
       <div className="fy-track" ref={track}>
         {state.status === 'loading' &&
           Array.from({ length: 7 }, (_, i) => <Skeleton key={i} className="fy-card-skeleton" />)}
-        {state.status === 'ready' && state.recommendations.map((rec) => <RecCard key={rec.target_id} rec={rec} library={library} />)}
+        {state.status === 'ready' && state.recommendations.map((rec, i) => <RecCard key={rec.target_id} rec={rec} library={library} eager={i < 7} />)}
         {state.status === 'ready' && state.recommendations.length === 0 && <p className="fy-empty">Nothing left to show after filtering.</p>}
       </div>
     </section>

@@ -59,8 +59,14 @@ export async function staticListRow(
   excludeIds: number[],
   listTitles: Record<number, string>,
   limit: number,
+  expectedSizes?: Map<number, number>,
 ): Promise<RowData> {
   const files = await Promise.all(listIds.map(loadListFile));
+  // Against a live DB the snapshot can lag behind imports; a size mismatch means "recompute it".
+  for (const f of files) {
+    const expected = expectedSizes?.get(f.id);
+    if (expected != null && expected !== f.members.length) throw new Error(`Snapshot for list ${f.id} is out of date`);
+  }
   const names = new Map(files.map((f) => [f.id, listTitles[f.id] ?? f.title]));
   const onLists = new Map<number, string[]>();
   for (const f of files) for (const m of f.members) onLists.set(m, [...(onLists.get(m) ?? []), names.get(f.id)!]);
