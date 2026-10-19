@@ -1,0 +1,37 @@
+.fy-onboarding { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 16px; display: grid; gap: .9rem; margin: 0 0 2rem; padding: 1.2rem; }
+.fy-onboarding > header { align-items: flex-start; display: flex; gap: 1rem; justify-content: space-between; }
+.fy-onboarding h2 { font-size: 1.35rem; letter-spacing: -.02em; margin: .2rem 0; }
+.fy-onboarding header p:not(.eyebrow) { color: var(--muted); font-size: .85rem; margin: 0; max-width: 560px; }
+.fy-onboarding-skip { background: transparent; border: 0; color: var(--muted); cursor: pointer; flex: 0 0 auto; font: inherit; font-size: .78rem; padding: .3rem .5rem; text-decoration: underline; }
+.fy-onboarding-search { align-items: center; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 10px; color: var(--dim); display: flex; gap: .55rem; padding: .65rem .8rem; }
+.fy-onboarding-search:focus-within { border-color: var(--accent); }
+.fy-onboarding-search input { background: transparent; border: 0; color: var(--text); font: inherit; outline: none; width: 100%; }
+.fy-onboarding-results { display: grid; gap: .35rem; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
+.fy-onboarding-results button { align-items: center; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; display: flex; font: inherit; gap: .6rem; padding: .4rem .6rem .4rem .4rem; text-align: left; width: 100%; }
+.fy-onboarding-results button:hover { border-color: var(--accent); }
+.fy-onboarding-results button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); }
+.fy-onboarding-results button:disabled { cursor: not-allowed; opacity: .5; }
+.fy-onboarding-results img, .fy-onboarding-nocover { background: var(--surface-raised); border-radius: 5px; flex: 0 0 36px; height: 54px; object-fit: cover; width: 36px; }
+.fy-onboarding-nocover { align-items: center; display: flex; justify-content: center; }
+.fy-onboarding-results span:not(.fy-onboarding-nocover) { display: grid; flex: 1; min-width: 0; }
+.fy-onboarding-results strong { font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fy-onboarding-results small { color: var(--dim); font-size: .68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fy-onboarding-results svg { color: var(--accent-bright); flex: 0 0 auto; }
+.fy-onboarding-none { color: var(--muted); font-size: .8rem; grid-column: 1 / -1; }
+.fy-onboarding-picked { display: flex; flex-wrap: wrap; gap: .4rem; min-height: 1.8rem; }
+.fy-onboarding-picked small { color: var(--dim); }
+.fy-onboarding-picked button { align-items: center; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 999px; color: var(--accent-bright); cursor: pointer; display: inline-flex; font: inherit; font-size: .76rem; gap: .35rem; max-width: 100%; padding: .3rem .7rem; }
+.fy-onboarding footer { align-items: center; display: flex; flex-wrap: wrap; gap: .8rem 1rem; }
+.fy-onboarding footer > span { color: var(--muted); font-size: .78rem; }
+.fy-onboarding footer a, .fy-onboarding-prompt a { color: var(--accent-bright); }
+.fy-onboarding-save { background: var(--accent); border: 0; border-radius: 10px; color: #fff; cursor: pointer; font: inherit; font-size: .9rem; font-weight: 750; min-height: 44px; padding: .65rem 1.3rem; }
+.fy-onboarding-save:disabled { cursor: not-allowed; opacity: .55; }
+.fy-onboarding-prompt { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: .85rem; gap: .5rem; margin: 0 0 1rem; }
+.fy-onboarding-prompt button { align-items: center; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text); cursor: pointer; display: inline-flex; font: inherit; font-size: .8rem; font-weight: 650; gap: .35rem; padding: .4rem .8rem; }
+.fy-onboarding-prompt button:hover { border-color: var(--accent); }
+@media (max-width: 640px) {
+  .fy-onboarding { padding: 1rem; }
+  .fy-onboarding > header { flex-direction: column; gap: .3rem; }
+  .fy-onboarding-results { grid-template-columns: 1fr; }
+  .fy-onboarding-save { width: 100%; }
+}
