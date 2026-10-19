@@ -54,6 +54,7 @@ const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((modul
 import { parseMediaTypesFromUrl, useMediaFilterState } from './mediaFilterState';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 import { discoverSearchParams, parseDiscoverRoute, stableRouteUrl } from './routeState';
+import { FormatScopeChip } from './components/FormatScopeChip';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 6780,
@@ -812,6 +813,7 @@ export default function App(): JSX.Element {
         <div>
           <div className="eyebrow">Relationship-first discovery</div>
           <h1>Find your next obsession.</h1>
+          <FormatScopeChip />
           <p>
             Start with a title you loved. We trace shared tropes, recommendations, and related works
             {isAllSelected
