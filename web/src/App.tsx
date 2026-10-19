@@ -1203,7 +1203,7 @@ export default function App(): JSX.Element {
                           <div className="card-summary">
                             <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
                             <h3 className="novel-title">
-                              <a href={novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type)}>
+                              <a href={novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type)} data-preview-id={rec.target_id}>
                                 {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
                               </a>
                               <Tooltip content={`Open on ${sourceDisplayName(rec.source, rec.target_id)}`}>

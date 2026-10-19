@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { createDataSource } from './data';
+import { configuredDataMode, createDataSource, DataMode } from './data';
+import { useDataModePreference } from './dataModePreference';
 import { formatStatusLabel } from './novelLinks';
 import { NovelDetail, Recommendation } from './types';
 import './cover-preview.css';
@@ -36,12 +37,18 @@ export const CHANNEL_LABELS: Record<string, string> = {
 };
 export const signalStrength = (rank: number) => Math.max(0.12, 1 - Math.log10(Math.max(1, rank)) / 2);
 
-const registry = new Map<number, PreviewData>();
-const detailCache = new Map<number, Promise<PreviewData | null>>();
+// Keyed by data mode so switching between API and static data never reuses the other mode's preview.
+const previewKey = (mode: DataMode, id: number) => `${mode}:${id}`;
+const registry = new Map<string, PreviewData>();
+const detailCache = new Map<string, Promise<PreviewData | null>>();
 
 /** Make already-loaded data available to the card so it opens instantly without a fetch. */
 export function registerPreviews(items: PreviewData[]) {
-  for (const item of items) registry.set(item.id, { ...registry.get(item.id), ...item });
+  const mode = configuredDataMode();
+  for (const item of items) {
+    const key = previewKey(mode, item.id);
+    registry.set(key, { ...registry.get(key), ...item });
+  }
 }
 
 export function previewFromRecommendation(item: Recommendation): PreviewData {
@@ -67,12 +74,13 @@ function fromDetail(detail: NovelDetail): PreviewData {
   };
 }
 
-function loadDetail(id: number): Promise<PreviewData | null> {
-  let pending = detailCache.get(id);
+function loadDetail(id: number, mode: DataMode): Promise<PreviewData | null> {
+  const key = previewKey(mode, id);
+  let pending = detailCache.get(key);
   if (!pending) {
-    pending = createDataSource().then((source) => source.getNovel(id)).then(fromDetail).catch(() => null);
-    detailCache.set(id, pending);
-    void pending.then((value) => { if (!value) detailCache.delete(id); });
+    pending = createDataSource(mode).then((source) => source.getNovel(id)).then(fromDetail).catch(() => null);
+    detailCache.set(key, pending);
+    void pending.then((value) => { if (!value && detailCache.get(key) === pending) detailCache.delete(key); });
   }
   return pending;
 }
@@ -101,6 +109,7 @@ function place(anchor: DOMRect, card: { width: number; height: number }) {
 const triggerOf = (target: EventTarget | null) => target instanceof Element ? target.closest<HTMLElement>('[data-preview-id]') : null;
 
 export function CoverPreviewHost() {
+  const { mode } = useDataModePreference();
   const [active, setActive] = useState<{ id: number; trigger: HTMLElement } | null>(null);
   const [data, setData] = useState<PreviewData | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -155,16 +164,16 @@ export function CoverPreviewHost() {
   useEffect(() => {
     if (!active) { setData(null); return undefined; }
     let cancelled = false;
-    const known = registry.get(active.id) || null;
+    const known = registry.get(previewKey(mode, active.id)) || null;
     setData(known);
     if (!known?.tags?.length && !known?.sharedTags?.length) {
-      void loadDetail(active.id).then((detail) => {
+      void loadDetail(active.id, mode).then((detail) => {
         if (cancelled || !detail) return;
         setData({ ...detail, ...Object.fromEntries(Object.entries(known || {}).filter(([, value]) => value !== undefined)) } as PreviewData);
       });
     }
     return () => { cancelled = true; };
-  }, [active]);
+  }, [active, mode]);
 
   useLayoutEffect(() => {
     if (!active || !data || !cardRef.current) return;
