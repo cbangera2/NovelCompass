@@ -41,7 +41,7 @@ import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
 import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
-import { previewFromRecommendation, registerPreviews } from './CoverPreview';
+import { CHANNEL_LABELS, previewFromRecommendation, registerPreviews } from './CoverPreview';
 
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
@@ -1180,8 +1180,14 @@ export default function App(): JSX.Element {
           <div className="results-grid">
             {filteredRecommendations.slice(0, visibleCount).map((rec, index) => {
               const badge = getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type, source: rec.source });
-              const evidenceBullets = rec.evidence_bullets.filter(Boolean);
-              const compactEvidence = evidenceBullets.length < 3;
+              // The shared-tropes bullet just restates the chips below it, so only show the other evidence.
+              const evidenceBullets = rec.evidence_bullets.filter((bullet) => bullet && !/^shared key tropes/i.test(bullet));
+              const compactEvidence = true;
+              const signals = Object.entries(CHANNEL_LABELS)
+                .map(([channel, label]) => ({ label, rank: rec.channel_ranks?.[channel] }))
+                .filter((signal): signal is { label: string; rank: number } => Number.isFinite(signal.rank))
+                .sort((a, b) => a.rank - b.rank)
+                .slice(0, 3);
               return (
                 <Card
                   key={rec.target_id || index}
@@ -1223,16 +1229,20 @@ export default function App(): JSX.Element {
                               : 'Unknown author'}</div>
 
                             <div className="novel-meta">
-                              <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
+                              <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating ? rec.rating.toFixed(1) : '—'} <small>({rec.rating_votes.toLocaleString()})</small></span>
                               <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
                             </div>
                             <div className="card-badges">
-                              <span className={`search-badge source-badge ${badge.sourceKey}`}>
-                                {badge.sourceLabel}
-                              </span>
-                              <span className={`search-badge format-badge ${badge.formatKey}`}>
-                                {badge.formatLabel}
-                              </span>
+                              {badge.sourceKey !== 'novelupdates' && (
+                                <span className={`search-badge source-badge ${badge.sourceKey}`}>
+                                  {badge.sourceLabel}
+                                </span>
+                              )}
+                              {badge.formatKey !== 'novel' && (
+                                <span className={`search-badge format-badge ${badge.formatKey}`}>
+                                  {badge.formatLabel}
+                                </span>
+                              )}
                               {profileEntries.get(rec.target_id) && (
                                 <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
                                   {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
@@ -1242,6 +1252,13 @@ export default function App(): JSX.Element {
                               {rec.language && <a className="language-badge" href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
                               {rec.status_trans && <span>{rec.status_trans}</span>}
                             </div>
+                            {signals.length > 0 && (
+                              <div className="card-signals" aria-label="Strongest recommendation signals">
+                                {signals.map((signal) => (
+                                  <span key={signal.label} title={`${signal.label} signal, rank #${signal.rank}`}>{signal.label}</span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1262,17 +1279,16 @@ export default function App(): JSX.Element {
 
                     {rec.shared_tags.length > 0 && (
                       <aside className="card-tag-rail" aria-label="Shared tropes">
-                        <span className="card-tag-label">Shared tropes</span>
                         <div className="detail-chips card-tag-links">
-                          {rec.shared_tags.slice(0, 3).map((tag) => (
+                          {rec.shared_tags.slice(0, 4).map((tag) => (
                             <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
                           ))}
                         </div>
-                        {rec.shared_tags.length > 3 && (
+                        {rec.shared_tags.length > 4 && (
                           <details className="card-tag-more">
-                            <summary>+{rec.shared_tags.length - 3} more</summary>
+                            <summary>+{rec.shared_tags.length - 4} more shared</summary>
                             <div className="detail-chips">
-                              {rec.shared_tags.slice(3).map((tag) => (
+                              {rec.shared_tags.slice(4).map((tag) => (
                                 <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
                               ))}
                             </div>
