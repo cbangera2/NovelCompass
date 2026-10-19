@@ -47,3 +47,8 @@
 .sidebar-provider[data-collapsible="icon"] .sidebar-external-icon{display:none}
 .profile-import-drop{align-items:center;border:1px dashed var(--border-strong);border-radius:12px;display:flex;flex-wrap:wrap;gap:.75rem;padding:1.1rem}.profile-import-drop[data-dragging]{background:var(--accent-soft);border-color:var(--accent)}.profile-import-drop>span{color:var(--muted);font-size:.72rem}.profile-import-sources{display:grid;gap:.5rem;list-style:none;margin:1rem 0 0;padding:0}.profile-import-sources li{color:var(--muted);font-size:.7rem;line-height:1.5}.profile-import-sources strong{color:var(--text);display:block;font-size:.74rem}
 .profile-import-progress{display:grid;gap:.5rem}.profile-import-progress progress{accent-color:var(--accent);height:.4rem;width:100%}.profile-import-spinner{animation:profile-import-spin .9s linear infinite;vertical-align:-.2em}@keyframes profile-import-spin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.profile-import-spinner{animation-duration:3s}}
+.settings-link-card{align-items:center;background:var(--surface-soft);border:1px solid var(--border);border-radius:10px;color:var(--text);display:flex;gap:.55rem;padding:.75rem;text-decoration:none}
+.settings-link-card:hover{border-color:var(--accent)}
+.settings-link-card>span{display:flex;flex:1;flex-direction:column;min-width:0}
+.settings-link-card small{color:var(--muted);font-size:.65rem}
+.settings-link-card>svg:last-child{color:var(--dim);flex:none}

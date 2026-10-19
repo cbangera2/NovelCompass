@@ -2,12 +2,9 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
-  Bug,
   Clock3,
-  Code2,
   Database,
   Download,
-  ExternalLink,
   LogOut,
   Search,
   Settings,
@@ -172,59 +169,6 @@ export default function AppShell({
             </SidebarMenu>
           </SidebarGroup>
           <SidebarMediaGroup />
-          <SidebarGroup className="sidebar-group-compact">
-            <SidebarGroupLabel>Project</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="GitHub Repository">
-                  <a
-                    href="https://github.com/cbangera2/NovelCompass"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Code2 size={18} />
-                    <span>
-                      <strong>GitHub Repo</strong>
-                      <small>Source code & project</small>
-                    </span>
-                    <ExternalLink size={13} className="sidebar-external-icon" />
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Report an Issue">
-                  <a
-                    href="https://github.com/cbangera2/NovelCompass/issues"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Bug size={18} />
-                    <span>
-                      <strong>Report Issue</strong>
-                      <small>GitHub issue tracker</small>
-                    </span>
-                    <ExternalLink size={13} className="sidebar-external-icon" />
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Data Repository">
-                  <a
-                    href="https://github.com/cbangera2/novelcompass-data"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Database size={18} />
-                    <span>
-                      <strong>Data Repo</strong>
-                      <small>Catalog dataset</small>
-                    </span>
-                    <ExternalLink size={13} className="sidebar-external-icon" />
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
