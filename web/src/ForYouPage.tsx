@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles, Star } from 'lucide-react';
 import { DSButton, Skeleton } from './design-system';
-import { hasUsableCover, novelPageUrl } from './novelLinks';
+import { formatStatusLabel, hasUsableCover, novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
@@ -178,6 +178,11 @@ function Cover({ rec, status, eager }: { rec: RowRec; status?: ReadingStatus; ea
       )}
       {status && <span className={`fy-status status-${status}`}>{STATUS_LABELS[status]}</span>}
       {onList.length > 0 && <span className="fy-known" title={`On your list: ${onList.join(', ')}`}>On your list</span>}
+      <div className="fy-stats">
+        <span className="fy-rating" title={`${rec.rating_votes.toLocaleString()} votes`}><Star size={12} />{rec.rating ? rec.rating.toFixed(1) : '—'}</span>
+        {rec.status_trans && <span>{formatStatusLabel(rec.status_trans)}</span>}
+        <span className="fy-match">{Math.round(rec.match_score_percent)}%</span>
+      </div>
     </div>
   );
 }
@@ -191,6 +196,7 @@ function previewFor(rec: RowRec): PreviewData {
     rating_votes: rec.rating_votes,
     media_type: rec.media_type,
     status_trans: rec.status_trans,
+    statsOnCover: true,
     matchPercent: rec.match_score_percent,
     sharedTags: rec.shared_tags,
     bullets: rec.evidence_bullets,

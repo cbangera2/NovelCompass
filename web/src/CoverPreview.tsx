@@ -30,6 +30,8 @@ export interface PreviewData {
   sharedTags?: string[];
   bullets?: string[];
   curatedListCount?: number;
+  /** Rating/status already show on the cover, so the card leads with the synopsis instead. */
+  statsOnCover?: boolean;
 }
 
 export const CHANNEL_LABELS: Record<string, string> = {
@@ -166,7 +168,7 @@ export function CoverPreviewHost() {
     let cancelled = false;
     const known = registry.get(previewKey(mode, active.id)) || null;
     setData(known);
-    if (!known?.tags?.length && !known?.sharedTags?.length) {
+    if (known?.statsOnCover ? !known.synopsis : !known?.tags?.length && !known?.sharedTags?.length) {
       void loadDetail(active.id, mode).then((detail) => {
         if (cancelled || !detail) return;
         setData({ ...detail, ...Object.fromEntries(Object.entries(known || {}).filter(([, value]) => value !== undefined)) } as PreviewData);
@@ -189,11 +191,12 @@ export function CoverPreviewHost() {
     <div className="cover-preview" ref={cardRef} role="tooltip" style={pos ? { left: pos.left, top: pos.top, opacity: 1 } : { left: 0, top: 0, opacity: 0 }}>
       <strong>{data.title}</strong>
       <p>{[data.author, data.language, data.media_type, data.year].filter(Boolean).join(' · ')}</p>
-      <div className="pop-facts">
+      {data.statsOnCover && data.synopsis && <p className="pop-synopsis">{compact(data.synopsis, 320)}</p>}
+      {!data.statsOnCover && <div className="pop-facts">
         <span><b>{data.rating ? data.rating.toFixed(1) : '—'}</b>rating{data.rating_votes != null ? ` · ${data.rating_votes.toLocaleString()} votes` : ''}</span>
         {data.reading_list_count != null && <span><b>{data.reading_list_count.toLocaleString()}</b>{audienceLabel(data.id, data.media_type)}</span>}
         {data.chapters_trans != null && <span><b>{data.chapters_trans > 0 ? data.chapters_trans.toLocaleString() : '—'}</b>{progressUnitLabel(data.id, data.media_type)}{data.status_trans ? ` · ${formatStatusLabel(data.status_trans)}` : ''}</span>}
-      </div>
+      </div>}
       {data.signals && data.signals.length > 0 && <div className="pop-signals">
         <h5>Why it surfaced{data.matchPercent != null ? ` · ${data.matchPercent.toFixed(0)}% match` : ''}</h5>
         {data.signals.map((signal) => <div key={signal.label}>
@@ -206,7 +209,7 @@ export function CoverPreviewHost() {
         <h5>{data.sharedTags?.length ? `Shared tags · ${data.sharedTags.length}` : 'Top tags'}</h5>
         <span>{tags.slice(0, 8).map((tag) => <em key={tag}>{tag}</em>)}{tags.length > 8 && <em>+{tags.length - 8}</em>}</span>
       </div>}
-      {!data.signals?.length && data.synopsis && <p className="pop-synopsis">{compact(data.synopsis)}</p>}
+      {!data.statsOnCover && !data.signals?.length && data.synopsis && <p className="pop-synopsis">{compact(data.synopsis)}</p>}
       {data.bullets && data.bullets.length > 0 && <ul>{data.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
       {(data.curatedListCount || 0) > 0 && <p className="pop-lists">On {data.curatedListCount} curated list{data.curatedListCount === 1 ? '' : 's'}</p>}
     </div>,
