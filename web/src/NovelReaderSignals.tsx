@@ -3,7 +3,7 @@ import { BookOpen, ExternalLink, Users } from 'lucide-react';
 import { CuratedListSummary, NovelDetail, NovelInsights, RelatedSeriesItem } from './types';
 import { novelPageUrl } from './novelLinks';
 import { staticListIds } from './forYouStatic';
-import { listPageUrl } from './routeState';
+import { listPageUrl } from './listPageUrl';
 
 type Star = '5' | '4' | '3' | '2' | '1';
 const STARS: Star[] = ['5', '4', '3', '2', '1'];
