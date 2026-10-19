@@ -33,6 +33,7 @@ import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
 import { parseMediaTypesFromUrl, useMediaFilterState, MediaTypeChoice } from './mediaFilterState';
 import { Palette, Film } from 'lucide-react';
+import { FormatScopeChip } from './components/FormatScopeChip';
 
 const PAGE_SIZE = 24;
 
@@ -656,6 +657,7 @@ export default function BrowsePage({
           {eyebrow || (isAllSelected ? 'The complete catalog' : `Browsing ${scopeSentence}`)}
         </p>
         <h1>{heading}</h1>
+        <FormatScopeChip />
         <p>
           {description ||
             (isAllSelected
