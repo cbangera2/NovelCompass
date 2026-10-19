@@ -8,6 +8,12 @@ import { useDataModePreference } from './dataModePreference';
 
 import { Select } from './ui';
 
+const HOME_COPY = {
+  foryou: { title: 'For You home', note: 'Start from shelves picked from your lists' },
+  discover: { title: 'Discover home', note: 'Start from a title relationship search' },
+  browse: { title: 'Browse home', note: 'Start from the full catalog' },
+} as const;
+
 export default function SettingsPage(): JSX.Element {
   const { settings, updateSettings } = useDisplaySettings();
   const [homeView, setHomeView] = useState(() => loadNavigationPreferences().homeView);
@@ -38,9 +44,9 @@ export default function SettingsPage(): JSX.Element {
       <Card className="settings-card">
         <CardHeader title="Home & filters" description="Choose where the logo opens and whether filter controls return as you left them." action={<Compass size={19} />} />
         <div className="settings-choice-grid title-choices">
-          {(['discover', 'browse'] as const).map((value) => <button key={value} className={homeView === value ? 'selected' : ''}
+          {(['foryou', 'discover', 'browse'] as const).map((value) => <button key={value} className={homeView === value ? 'selected' : ''}
             aria-pressed={homeView === value} onClick={() => { setHomeView(value); saveNavigationPreferences(value); }}>
-            <span><strong>{value === 'discover' ? 'Discover home' : 'Browse home'}</strong><small>{value === 'discover' ? 'Start from a title relationship search' : 'Start from the full catalog'}</small></span>
+            <span><strong>{HOME_COPY[value].title}</strong><small>{HOME_COPY[value].note}</small></span>
           </button>)}
         </div>
         <label className="settings-toggle"><input type="checkbox" checked={rememberFilters}
