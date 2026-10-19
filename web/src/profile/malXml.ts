@@ -17,7 +17,13 @@ export function malSlug(kind: 'anime' | 'manga', malId: number): string {
   return `mal-${kind}-${malId}`;
 }
 
-export function mapMalStatus(status: string): ReadingStatus {
+/** The saved list page uses numeric statuses: 1 reading/watching, 2 completed, 3 on hold, 4 dropped, 6 plan. */
+const MAL_NUMERIC_STATUS: Record<number, ReadingStatus> = {
+  1: 'reading', 2: 'completed', 3: 'paused', 4: 'dropped', 6: 'plan_to_read',
+};
+
+export function mapMalStatus(status: string | number): ReadingStatus {
+  if (typeof status === 'number') return MAL_NUMERIC_STATUS[status] ?? 'reading';
   const value = status.toLowerCase();
   if (value.includes('complete')) return 'completed';
   if (value.includes('plan')) return 'plan_to_read';
@@ -109,6 +115,89 @@ export async function parseMalXml(text: string, filename: string): Promise<Parse
   };
 }
 
+/** True for a saved myanimelist.net/animelist|mangalist page (its rows live in a `data-items` attribute). */
+export function isMalListHtml(html: string): boolean {
+  return /myanimelist\.net\/(?:anime|manga)list\//i.test(html.slice(0, 20000)) && /\sdata-items="\[/.test(html);
+}
+
+/** MAL's list page writes dates as MM-DD-YY. */
+function malPageDate(value: unknown): string | undefined {
+  const match = typeof value === 'string' ? value.match(/^(\d{2})-(\d{2})-(\d{2})$/) : null;
+  return match && match[1] !== '00' && match[2] !== '00' ? `20${match[3]}-${match[1]}-${match[2]}` : undefined;
+}
+
+const HTML_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" };
+
+type MalPageRow = Record<string, unknown>;
+
+/**
+ * Parse a saved MAL list page. MAL loads 300 rows at a time while scrolling, so a saved page
+ * only holds what had loaded; the export XML is the complete source.
+ */
+export async function parseMalHtml(html: string, filename: string): Promise<ParsedProfileFile> {
+  const raw = html.match(/\sdata-items="(\[[^"]*\])"/)?.[1];
+  if (!raw) throw new Error(`${filename} is not a saved MyAnimeList list page.`);
+  let rows: MalPageRow[];
+  try {
+    rows = JSON.parse(raw.replace(/&(#39|[a-z]+);/gi, (whole, code: string) => HTML_ENTITIES[code.toLowerCase()] ?? whole));
+  } catch {
+    throw new Error(`${filename} has list data this importer could not read.`);
+  }
+  const kind: 'anime' | 'manga' = /\/animelist\//i.test(html.slice(0, 20000)) ? 'anime' : 'manga';
+  const entries: ProfileEntry[] = [];
+  const duplicateSlugs: string[] = [];
+  const seen = new Set<string>();
+  let malformed = 0;
+  for (const row of rows) {
+    const malId = Number(row[`${kind}_id`]);
+    const title = String(row[`${kind}_title`] ?? '').trim();
+    if (!Number.isInteger(malId) || malId <= 0 || !title) {
+      malformed += 1;
+      continue;
+    }
+    const slug = malSlug(kind, malId);
+    if (seen.has(slug)) {
+      duplicateSlugs.push(slug);
+      continue;
+    }
+    seen.add(slug);
+    const units = Number(row[kind === 'anime' ? 'num_watched_episodes' : 'num_read_chapters']) || 0;
+    const volumes = kind === 'manga' ? Number(row.num_read_volumes) || 0 : 0;
+    const progress = [units ? `${kind === 'anime' ? 'ep' : 'ch'} ${units}` : '', volumes ? `vol ${volumes}` : '']
+      .filter(Boolean).join(' · ');
+    entries.push({
+      slug,
+      imported_title: title,
+      status: mapMalStatus(Number(row.status)),
+      rating: mapAniListScore(Number(row.score), 2),
+      progress: progress || undefined,
+      progress_units: units || undefined,
+      media_kind: kind,
+      started_on: malPageDate(row.start_date_string),
+      finished_on: malPageDate(row.finish_date_string),
+      source_file: filename,
+    });
+  }
+  if (!entries.length) throw new Error(`${filename} has no MyAnimeList entries to import.`);
+  const warnings = malformed ? [`${malformed} malformed row${malformed === 1 ? '' : 's'} skipped.`] : [];
+  if (rows.length >= 300) {
+    warnings.push(`${filename} holds ${rows.length} rows; MAL only loads 300 at a time, so the saved page may be incomplete. The XML export has every row.`);
+  }
+  return {
+    filename,
+    fingerprint: await sha256(html),
+    source: 'myanimelist',
+    detected_status: 'reading',
+    selected_status: 'reading',
+    username: html.match(/myanimelist\.net\/(?:anime|manga)list\/([\w-]+)/i)?.[1],
+    entries,
+    curated_lists: [],
+    malformed_rows: malformed,
+    duplicate_slugs: duplicateSlugs,
+    warnings,
+  };
+}
+
 type MalLookupNode = { id: number; idMal: number | null };
 
 /**
@@ -162,6 +251,8 @@ export async function resolveMalIds(
 
 export async function parseMalFile(file: File, text: string): Promise<ParsedProfileFile> {
   if (file.size > MAX_PROFILE_FILE_BYTES) throw new Error(`${file.name} is larger than 15 MB.`);
-  const parsed = await parseMalXml(text, file.name.replace(/\.gz$/i, ''));
+  const parsed = isMalXml(text)
+    ? await parseMalXml(text, file.name.replace(/\.gz$/i, ''))
+    : await parseMalHtml(text, file.name);
   return { ...parsed, entries: await resolveMalIds(parsed.entries) };
 }

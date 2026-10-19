@@ -190,7 +190,7 @@ export function ProfileImportDialog({
               <input ref={fileInput} type="file" accept={IMPORT_FILE_ACCEPT} multiple onChange={onPick} hidden />
             </div>
             <ul className="profile-import-sources">
-              <li><strong>MyAnimeList</strong> <span>Open <a href="https://myanimelist.net/panel.php?go=export" target="_blank" rel="noreferrer">myanimelist.net/panel.php?go=export</a>, export your anime and/or manga list, and choose the downloaded <code>.xml.gz</code> as is.</span></li>
+              <li><strong>MyAnimeList</strong> <span>Open <a href="https://myanimelist.net/panel.php?go=export" target="_blank" rel="noreferrer">myanimelist.net/panel.php?go=export</a>, export your anime and/or manga list, and choose the downloaded <code>.xml.gz</code> as is. A saved list page also works, but MAL only loads 300 rows at a time.</span></li>
               <li><strong>AniList</strong> <span>Settings → Account → Download Data, then choose <code>anilist_gdpr_data.json</code>.</span></li>
               <li><strong>NovelUpdates</strong> <span>Open each Reading, Completed, or Plan to Read category, wait for the table to load, and save the page as HTML. Select as many as you like.</span></li>
               <li><strong>Novel Compass backup</strong> <span>A <code>.json</code> profile backup restores your whole profile (import it on its own).</span></li>
@@ -219,8 +219,14 @@ export function ProfileImportDialog({
                 {' '}(unmatched titles are still saved)
               </p>
               <div>
-                {profile && <button type="button" onClick={() => commitImport('merge')} disabled={busy}>Merge with profile</button>}
-                <button type="button" className="profile-import-primary" onClick={() => commitImport('replace')} disabled={busy}>Replace and save</button>
+                {profile ? (
+                  <>
+                    <button type="button" onClick={() => commitImport('replace')} disabled={busy}>Replace profile</button>
+                    <button type="button" className="profile-import-primary" onClick={() => commitImport('merge')} disabled={busy}>Merge into profile</button>
+                  </>
+                ) : (
+                  <button type="button" className="profile-import-primary" onClick={() => commitImport('replace')} disabled={busy}>Save profile</button>
+                )}
               </div>
             </div>
           )}

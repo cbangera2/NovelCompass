@@ -3,7 +3,7 @@
  * Handles gzip (MyAnimeList exports ship as .xml.gz) by sniffing the magic bytes, not the extension.
  */
 import { isAniListGdprExport } from './anilistGdpr';
-import { isMalXml } from './malXml';
+import { isMalListHtml, isMalXml } from './malXml';
 
 export type ImportKind = 'backup' | 'anilist' | 'myanimelist' | 'novelupdates' | 'unknown';
 
@@ -39,7 +39,7 @@ export function classifyText(text: string): ImportKind {
     }
     return 'unknown';
   }
-  if (isMalXml(trimmed)) return 'myanimelist';
+  if (isMalXml(trimmed) || isMalListHtml(trimmed)) return 'myanimelist';
   if (trimmed.includes('profile_content3')) return 'novelupdates';
   return 'unknown';
 }

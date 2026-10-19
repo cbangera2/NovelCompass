@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import { classifyText } from '../../../web/src/profile/detectImport';
-import { mapMalStatus, parseMalXml, resolveMalIds } from '../../../web/src/profile/malXml';
+import { mergeProfiles } from '../../../web/src/profile/store';
+import type { LocalUserProfile } from '../../../web/src/profile/types';
+import { isMalListHtml, mapMalStatus, parseMalHtml, parseMalXml, resolveMalIds } from '../../../web/src/profile/malXml';
 
 const MANGA_XML = `<?xml version="1.0" encoding="UTF-8" ?>
 <myanimelist>
@@ -86,5 +88,46 @@ describe('import file detection', () => {
     expect(classifyText('<html><div id="profile_content3"></div></html>')).toBe('novelupdates');
     expect(classifyText('hello')).toBe('unknown');
     expect(classifyText('{not json')).toBe('unknown');
+  });
+});
+
+const rows = [
+  { status: 1, score: 9, num_read_chapters: 50, num_read_volumes: 0, manga_title: '+99 "Wooden" Stick', manga_id: 147204, start_date_string: '04-05-22', finish_date_string: null },
+  { status: 6, score: 0, num_read_chapters: 0, num_read_volumes: 0, manga_title: 'Plan One', manga_id: 5, start_date_string: null, finish_date_string: null },
+];
+const PAGE = `<html><head><meta property="og:url" content="https://myanimelist.net/mangalist/tester"></head><body>
+<table class="list-table" data-items="${JSON.stringify(rows).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"></table></body></html>`;
+
+describe('saved MAL list page', () => {
+  it('is recognised and parsed', async () => {
+    expect(isMalListHtml(PAGE)).toBe(true);
+    expect(classifyText(PAGE)).toBe('myanimelist');
+    const parsed = await parseMalHtml(PAGE, 'list.html');
+    expect(parsed.username).toBe('tester');
+    expect(parsed.entries[0]).toMatchObject({
+      slug: 'mal-manga-147204', imported_title: '+99 "Wooden" Stick', status: 'reading', rating: 4.5,
+      progress: 'ch 50', started_on: '2022-04-05',
+    });
+    expect(parsed.entries[1].status).toBe('plan_to_read');
+    expect(parsed.warnings).toEqual([]);
+  });
+});
+
+describe('profile merge', () => {
+  const profile = (entries: LocalUserProfile['entries']): LocalUserProfile => ({
+    profile_id: 'p', parser_version: 1, dataset_version: 'v', imported_at: 't',
+    source_fingerprints: [], entries, curated_lists: [],
+  });
+  const base = { imported_title: 'T', source_file: 'f' };
+
+  it('adds new titles and keeps what an earlier import knew', () => {
+    const current = profile([{ ...base, slug: 'a', status: 'reading', rating: 4, novel_id: 7 }]);
+    const incoming = profile([
+      { ...base, slug: 'a', status: 'completed', rating: undefined, novel_id: undefined },
+      { ...base, slug: 'b', status: 'reading' },
+    ]);
+    const merged = mergeProfiles(current, incoming);
+    expect(merged.entries).toHaveLength(2);
+    expect(merged.entries.find((entry) => entry.slug === 'a')).toMatchObject({ status: 'completed', rating: 4, novel_id: 7 });
   });
 });
