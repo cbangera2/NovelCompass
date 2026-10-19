@@ -9,7 +9,6 @@ import {
   Shuffle,
   SlidersHorizontal,
   Sparkles,
-  X,
 } from 'lucide-react';
 import {
   createDataSource,
@@ -21,6 +20,8 @@ import { useDataModePreference } from './dataModePreference';
 import { stableRouteUrl } from './routeState';
 import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './types';
 import { browseFacetUrl } from './metadataLinks';
+import { ActiveFilterChips, CoreFilters } from './components/CoreFilters';
+import { formatMinRating, readCoreFilterParams, writeCoreFilterParams } from './components/coreFilterParams';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
@@ -125,11 +126,15 @@ export default function BrowsePage({
         : 'desc'
       : savedDirection,
   );
-  const [language, setLanguage] = useState(initialString('language', 'language'));
+  const initialCore = readCoreFilterParams(initialParams, {
+    language: String(saved.language || ''),
+    minRating: Number(saved.minRating || 0),
+  });
+  const [language, setLanguage] = useState(initialCore.language);
   const [author, setAuthor] = useState(initialString('author', 'author'));
   const [genre, setGenre] = useState(initialString('genre', 'genre'));
   const [tag, setTag] = useState(initialString('tag', 'tag'));
-  const [minRating, setMinRating] = useState(initialNumber('min_rating', 'minRating'));
+  const [minRating, setMinRating] = useState(initialCore.minRating);
   const [maxRating, setMaxRating] = useState(initialNumber('max_rating', 'maxRating'));
   const [minVotes, setMinVotes] = useState(initialNumber('min_votes', 'minVotes'));
   const [minYear, setMinYear] = useState(initialNumber('min_year', 'minYear'));
@@ -420,11 +425,9 @@ export default function BrowsePage({
       q: query,
       sort,
       direction,
-      language,
       author,
       genre,
       tag,
-      min_rating: minRating,
       max_rating: maxRating,
       min_votes: minVotes,
       min_year: minYear,
@@ -441,6 +444,7 @@ export default function BrowsePage({
       exclude_library: excludeLibrary,
       density,
     };
+    writeCoreFilterParams(params, { language, minRating });
     Object.entries(values).forEach(([key, value]) => {
       if (value && value !== 'desc' && value !== 'grid')
         params.set(key, value === true ? '1' : String(value));
@@ -488,7 +492,8 @@ export default function BrowsePage({
         return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : 0;
       };
       setQuery(text('q'));
-      setLanguage(text('language'));
+      const core = readCoreFilterParams(params, { language: '', minRating: 0 });
+      setLanguage(core.language);
       setAuthor(text('author'));
       setGenre(text('genre'));
       setTag(text('tag'));
@@ -499,7 +504,7 @@ export default function BrowsePage({
       );
       setDirection(text('direction') === 'asc' ? 'asc' : 'desc');
       setDensity(text('density') === 'list' ? 'list' : 'grid');
-      setMinRating(number('min_rating', 5));
+      setMinRating(core.minRating);
       setMaxRating(number('max_rating', 5));
       setMinVotes(number('min_votes'));
       setMinYear(number('min_year'));
@@ -618,7 +623,7 @@ export default function BrowsePage({
     genre && { label: `Genre: ${genre}`, clear: () => setGenre('') },
     tag && { label: `Tag: ${tag}`, clear: () => setTag('') },
     language && { label: `Language: ${language}`, clear: () => setLanguage('') },
-    minRating > 0 && { label: `Rating: ${minRating}★+`, clear: () => setMinRating(0) },
+    minRating > 0 && { label: `Rating: ${formatMinRating(minRating)}`, clear: () => setMinRating(0) },
     maxRating > 0 && { label: `Rating ≤ ${maxRating}★`, clear: () => setMaxRating(0) },
     minVotes > 0 && { label: `Votes: ${minVotes.toLocaleString()}+`, clear: () => setMinVotes(0) },
     minYear > 0 && { label: `From ${minYear}`, clear: () => setMinYear(0) },
@@ -732,6 +737,14 @@ export default function BrowsePage({
           <option value="newest">Newest year</option>
           <option value="title">Title A–Z</option>
         </BrowseSelect>
+        <CoreFilters
+          native={nativeControls}
+          language={language}
+          minRating={minRating}
+          languages={options.languages}
+          onLanguageChange={(value) => resetPage(() => setLanguage(value))}
+          onMinRatingChange={(value) => resetPage(() => setMinRating(value))}
+        />
         <DSButton
           variant="ghost"
           className="browse-direction"
@@ -777,28 +790,6 @@ export default function BrowsePage({
               {options.tags?.map((item) => (
                 <option key={item}>{item}</option>
               ))}
-            </BrowseSelect>
-            <BrowseSelect
-              native={nativeControls}
-              label="Language"
-              value={language}
-              onChange={(value) => resetPage(() => setLanguage(value))}
-            >
-              <option value="">All languages</option>
-              {options.languages?.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </BrowseSelect>
-            <BrowseSelect
-              native={nativeControls}
-              label="Minimum rating"
-              value={minRating}
-              onChange={(value) => resetPage(() => setMinRating(Number(value)))}
-            >
-              <option value="0">Any rating</option>
-              <option value="3">3★ and up</option>
-              <option value="4">4★ and up</option>
-              <option value="4.5">4.5★ and up</option>
             </BrowseSelect>
             <BrowseSelect
               native={nativeControls}
@@ -905,19 +896,11 @@ export default function BrowsePage({
           </FieldGroup>
         </details>
       </Card>
-      {activeFilters.length > 0 && (
-        <div className="browse-active-filters" aria-label="Active filters">
-          {activeFilters.map((filter) => (
-            <DSButton variant="ghost" key={filter.label} onClick={() => resetPage(filter.clear)}>
-              {filter.label}
-              <X size={12} />
-            </DSButton>
-          ))}
-          <DSButton variant="ghost" className="clear-all" onClick={clearAll}>
-            Clear all
-          </DSButton>
-        </div>
-      )}
+      <ActiveFilterChips
+        className="browse-active-filters"
+        filters={activeFilters.map((filter) => ({ label: filter.label, clear: () => resetPage(filter.clear) }))}
+        onClearAll={clearAll}
+      />
 
       {!tagSupported && (
         <p className="browse-notice">

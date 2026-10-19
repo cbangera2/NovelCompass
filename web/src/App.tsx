@@ -44,6 +44,8 @@ import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { previewFromRecommendation, registerPreviews } from './CoverPreview';
 import { MediaBadges, NovelCard } from './components/NovelCard';
 import { RatingChip } from './components/RatingChip';
+import { ActiveFilterChips, CoreFilters, type ActiveFilter } from './components/CoreFilters';
+import { formatMinRating } from './components/coreFilterParams';
 
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
@@ -165,6 +167,7 @@ export default function App(): JSX.Element {
   const [maxResults, setMaxResults] = useState(savedNumber(initialRoute.maxResults, 60));
   const [routeRevision, setRouteRevision] = useState(0);
   const [genres, setGenres] = useState<string[]>([]);
+  const [languageChoices, setLanguageChoices] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,7 +245,7 @@ export default function App(): JSX.Element {
         setDataSource(source);
         setDataset(manifest);
         source.getOptions()
-          .then((options) => { if (!cancelled) setGenres(options.genres || []); })
+          .then((options) => { if (!cancelled) { setGenres(options.genres || []); setLanguageChoices(options.languages || []); } })
           .catch(() => { /* Advanced facets can remain unavailable without blocking discovery. */ });
       })
       .catch((initializationError: any) => {
@@ -737,6 +740,22 @@ export default function App(): JSX.Element {
     setHiddenGemStrength(0.3);
   };
 
+  const stopForYou = () => {
+    setForYouMode(false);
+    setForYouMeta(null);
+    const seed = selectedNovel || getDefaultSeed(selectedTypes);
+    chooseNovel(seed);
+    void fetchRecommendations(seed, Math.min(8, maxResults), false, { forYou: false });
+  };
+
+  const resetAdvancedWeights = () => {
+    setTagWeight(0.8);
+    setDirectRecWeight(1.2);
+    setListWeight(1);
+    setStructuralWeight(0.6);
+    setHiddenGemStrength(0.3);
+  };
+
   const resetFilters = () => {
     setHideLibraryTitles(false);
     setHiddenGemMode(false);
@@ -749,28 +768,33 @@ export default function App(): JSX.Element {
     resetAdvanced();
   };
 
-  const activeFilters = useMemo(() => {
-    const active: string[] = [];
-    if (hideLibraryTitles && profile) active.push('Exclude library IDs');
-    if (forYouMode) active.push('For You multi-seed');
-    if (hiddenGemMode) active.push('Hidden gems');
-    if (requireCompleted) active.push('Completed');
-    if (excludeHarem) active.push('No harem');
-    if (excludeBL) active.push('No BL');
-    if (excludeYuri) active.push('No yuri');
-    if (!isAllSelected && !includeOtherFormats) active.push(`Formats: ${scopeSentence}`);
-    if (!isAllSelected && includeOtherFormats) active.push('Cross-format recs');
-    if (language) active.push(language);
-    if (minRating) active.push(`${minRating}+ rating`);
-    if (minRatingVotes) active.push(`${minRatingVotes}+ votes`);
-    if (maxReaders) active.push(`≤${maxReaders} readers`);
-    if (minYear || maxYear) active.push('Year range');
-    if (includeTagsText.trim()) active.push('Required tags');
-    if (excludeTagsText.trim()) active.push('Excluded tags');
-    active.push(...Object.entries(genreStates).map(([genre, state]) => `${state === 'include' ? '+' : '−'}${genre}`));
-    if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) active.push('Custom ranking');
+  const activeFilters = (() => {
+    const active: ActiveFilter[] = [];
+    const add = (label: string, clear: () => void) => active.push({ label, clear });
+    if (hideLibraryTitles && profile) add('Exclude library IDs', () => setHideLibraryTitles(false));
+    if (forYouMode) add('For You multi-seed', stopForYou);
+    if (hiddenGemMode) add('Hidden gems', () => setHiddenGemMode(false));
+    if (requireCompleted) add('Completed', () => setRequireCompleted(false));
+    if (excludeHarem) add('No harem', () => setExcludeHarem(false));
+    if (excludeBL) add('No BL', () => setExcludeBL(false));
+    if (excludeYuri) add('No yuri', () => setExcludeYuri(false));
+    if (!isAllSelected && !includeOtherFormats) add(`Formats: ${scopeSentence}`, () => setIncludeOtherFormats(true));
+    if (!isAllSelected && includeOtherFormats) add('Cross-format recs', () => setIncludeOtherFormats(false));
+    if (language) add(`Language: ${language}`, () => setLanguage(''));
+    if (minRating) add(`Rating: ${formatMinRating(minRating)}`, () => setMinRating(0));
+    if (minRatingVotes) add(`${minRatingVotes}+ votes`, () => setMinRatingVotes(0));
+    if (maxReaders) add(`≤${maxReaders} readers`, () => setMaxReaders(0));
+    if (minYear || maxYear) add('Year range', () => { setMinYear(0); setMaxYear(0); });
+    if (includeTagsText.trim()) add('Required tags', () => setIncludeTagsText(''));
+    if (excludeTagsText.trim()) add('Excluded tags', () => setExcludeTagsText(''));
+    Object.entries(genreStates).forEach(([genre, state]) =>
+      add(`${state === 'include' ? '+' : '−'}${genre}`, () => setGenreStates((current) => {
+        const { [genre]: _removed, ...rest } = current;
+        return rest;
+      })));
+    if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) add('Custom ranking', resetAdvancedWeights);
     return active;
-  }, [hideLibraryTitles, forYouMode, profile, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, isAllSelected, includeOtherFormats, scopeSentence, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
+  })();
 
   // Ranking already excludes library IDs when hideLibraryTitles is on; keep client filters for not_for_me edge cases.
   const filteredRecommendations = useMemo(() => (data?.recommendations || [])
@@ -941,13 +965,7 @@ export default function App(): JSX.Element {
                 disabled={!profile}
                 onChange={(e) => {
                   if (e.currentTarget.checked) runForYou();
-                  else {
-                    setForYouMode(false);
-                    setForYouMeta(null);
-                    const seed = selectedNovel || getDefaultSeed(selectedTypes);
-                    chooseNovel(seed);
-                    void fetchRecommendations(seed, Math.min(8, maxResults), false, { forYou: false });
-                  }
+                  else stopForYou();
                 }}
               />
             </Tooltip>
@@ -992,29 +1010,21 @@ export default function App(): JSX.Element {
               <Checkbox label="Yuri" checked={excludeYuri} onChange={(e) => setExcludeYuri(e.currentTarget.checked)} />
             </Tooltip>
           </FieldGroup>
-          <div className="filter-selects">
-            <Select label="Language" value={language} onChange={(e) => setLanguage(e.currentTarget.value)}>
-              <option value="">Any</option>
-              <option value="korean">Korean</option>
-              <option value="chinese">Chinese</option>
-              <option value="japanese">Japanese</option>
-            </Select>
-            <Select label="Rating" value={minRating} onChange={(e) => setMinRating(Number(e.currentTarget.value))}>
-              <option value="0">Any</option>
-              <option value="3.5">3.5+</option>
-              <option value="4">4.0+</option>
-              <option value="4.3">4.3+</option>
-            </Select>
+          <CoreFilters
+            language={language}
+            minRating={minRating}
+            languages={languageChoices}
+            onLanguageChange={setLanguage}
+            onMinRatingChange={setMinRating}
+          >
             <Select label="Results" value={maxResults} onChange={(e) => { setMaxResults(Number(e.currentTarget.value)); setAvailableExhausted(false); }}>
               <option value="30">Up to 30</option>
               <option value="60">Up to 60</option>
               <option value="100">Up to 100 (pool limit)</option>
             </Select>
-          </div>
+          </CoreFilters>
         </div>
-        {activeFilters.length > 0 && <div className="active-filter-chips" aria-label="Active filters">
-          {activeFilters.map((filter) => <Badge tone="violet" key={filter}>{filter}</Badge>)}
-        </div>}
+        <ActiveFilterChips filters={activeFilters} onClearAll={resetFilters} />
       </Card>
 
       <details className="advanced-panel">
