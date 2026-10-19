@@ -10,9 +10,10 @@
   --accent: #9b87f5;
   --accent-bright: #b8a8ff;
   --accent-soft: rgba(155, 135, 245, 0.13);
+  --accent-solid: #6d55d9;
   --text: #f5f3ff;
   --muted: #aaa9b6;
-  --dim: #747482;
+  --dim: #8b8b99;
   --green: #73d4ae;
   --red: #ff9caa;
   --chart-1: #9b87f5;
@@ -35,9 +36,10 @@
   --accent: #6648c8;
   --accent-bright: #5737bb;
   --accent-soft: rgba(102, 72, 200, .1);
+  --accent-solid: #6648c8;
   --text: #201a2e;
   --muted: #625d6d;
-  --dim: #77717f;
+  --dim: #6a6474;
   --green: #177a59;
   --red: #b52d47;
   --chart-1: #6648c8;
@@ -241,7 +243,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .chart-point-card > div { display: flex; flex-direction: column; gap: .12rem; min-width: min-content; }
 .chart-point-card strong { font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chart-point-card span { color: var(--muted); font-size: .66rem; }
-.chart-point-card a { background: var(--accent); border-radius: 7px; color: #fff; flex: 0 0 auto; font-size: .7rem; font-weight: 700; padding: .45rem .65rem; text-decoration: none; }
+.chart-point-card a { background: var(--accent-solid); border-radius: 7px; color: #fff; flex: 0 0 auto; font-size: .7rem; font-weight: 700; padding: .45rem .65rem; text-decoration: none; }
 .chart-point-card a:hover { background: var(--accent-bright); }
 .language-bars { display: grid; gap: .45rem; }
 .language-bars > div { align-items: center; display: grid; gap: .5rem; grid-template-columns: 90px 1fr 28px; }
@@ -279,7 +281,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .taste-caveats { color: var(--muted); font-size: .72rem; margin: .4rem 0 .75rem 1rem; }
 .taste-caveats li { margin: .25rem 0; }
 .taste-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .65rem; margin: .55rem 0 .9rem; }
-.taste-for-you { align-items: center; background: var(--accent); border-radius: 999px; color: #fff; display: inline-flex; font-size: .78rem; font-weight: 700; gap: .35rem; padding: .45rem .75rem; text-decoration: none; }
+.taste-for-you { align-items: center; background: var(--accent-solid); border-radius: 999px; color: #fff; display: inline-flex; font-size: .78rem; font-weight: 700; gap: .35rem; padding: .45rem .75rem; text-decoration: none; }
 .taste-for-you:hover { background: var(--accent-bright); }
 .taste-actions small { color: var(--dim); font-size: .68rem; max-width: 36rem; }
 .taste-sample { margin-top: .8rem; }
@@ -666,7 +668,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .ui-button { border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: .7rem; font-weight: 700; padding: .4rem .6rem; }
 .ui-button-ghost { background: transparent; color: var(--muted); }
 .ui-button-ghost:hover { background: var(--surface-raised); color: var(--text); }
-.ui-button-primary { background: var(--accent); border-color: transparent; color: white; }
+.ui-button-primary { background: var(--accent-solid); border-color: transparent; color: white; }
 .ui-tooltip { display: inline-flex; position: relative; }
 .ui-tooltip-content { background: #111522; border: 1px solid var(--border-strong); border-radius: 8px; bottom: calc(100% + 7px); box-shadow: 0 10px 30px rgba(0,0,0,.5); color: #e5e1f8; font-size: .66rem; font-weight: 500; left: 50%; line-height: 1.35; max-width: 220px; opacity: 0; padding: .4rem .55rem; pointer-events: none; position: absolute; text-align: center; transform: translate(-50%,4px); transition: opacity .15s,transform .15s; visibility: hidden; white-space: normal; width: max-content; z-index: 100; }
 .ui-tooltip-bottom .ui-tooltip-content { bottom: auto; top: calc(100% + 7px); transform: translate(-50%,-4px); }
@@ -986,3 +988,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 :root[data-theme="light"] .taste-chips span { color: #4c4657; }
 
 .profile-list-import{align-items:center;display:flex;flex-wrap:wrap;gap:.75rem;margin:.5rem 0 1rem}.profile-list-import>span{color:var(--muted);flex:1 1 280px;font-size:.78rem;line-height:1.45}.profile-list-import-error{color:var(--red);flex-basis:100%;font-size:.8rem;margin:0}.profile-list-import-result{flex-basis:100%;font-size:.8rem;margin:0;padding-left:1.1rem}.profile-list-import-result .skipped{color:var(--muted)}
+
+/* Light theme: the dark-theme neon badge colors fail contrast on pale backgrounds. */
+:root[data-theme="light"] .source-badge.novelupdates { background: rgba(22,163,74,.12); border-color: rgba(22,163,74,.35); color: #166534; }
+:root[data-theme="light"] .source-badge.anilist { background: rgba(2,132,199,.12); border-color: rgba(2,132,199,.35); color: #075985; }
+:root[data-theme="light"] .source-badge.novelphoenix { background: rgba(234,88,12,.12); border-color: rgba(234,88,12,.35); color: #9a3412; }
+:root[data-theme="light"] .format-badge.novel { background: rgba(37,99,235,.1); border-color: rgba(37,99,235,.3); color: #1e40af; }
+:root[data-theme="light"] .format-badge.manga { background: rgba(219,39,119,.1); border-color: rgba(219,39,119,.3); color: #9d174d; }
+:root[data-theme="light"] .format-badge.anime { background: rgba(147,51,234,.1); border-color: rgba(147,51,234,.3); color: #6b21a8; }
+:root[data-theme="light"] .ds-badge-amber { color: #8a5300; }

@@ -27,6 +27,6 @@
 .fy-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(hover:none){.fy-scroll-btn{display:none}}
-.fy-stats{align-items:center;background:linear-gradient(transparent,rgba(0,0,0,.82));bottom:0;color:#fff;display:flex;font-size:.64rem;font-weight:700;gap:.4rem;left:0;padding:1.4rem .5rem .45rem;position:absolute;right:0}.fy-stats .fy-match{background:var(--accent);border-radius:999px;margin-left:auto;padding:.1rem .4rem}.fy-stats span:nth-child(2){color:rgba(255,255,255,.75);font-weight:500}
+.fy-stats{align-items:center;background:linear-gradient(transparent,rgba(0,0,0,.82));bottom:0;color:#fff;display:flex;font-size:.64rem;font-weight:700;gap:.4rem;left:0;padding:1.4rem .5rem .45rem;position:absolute;right:0}.fy-stats .fy-match{background:var(--accent-solid);border-radius:999px;margin-left:auto;padding:.1rem .4rem}.fy-stats span:nth-child(2){color:rgba(255,255,255,.75);font-weight:500}.fy-stats span.fy-match{color:#fff;font-weight:700}
 .fy-known{bottom:2rem}
 .fy-stats .fy-rating{align-items:center;color:var(--chart-3);display:inline-flex;gap:.2rem}
