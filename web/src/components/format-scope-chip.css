@@ -1,0 +1,9 @@
+.format-chip-root{display:inline-block;margin:.15rem 0 .5rem;position:relative}
+.format-chip{align-items:center;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;color:var(--accent-bright);cursor:pointer;display:inline-flex;font:inherit;font-size:.72rem;font-weight:700;gap:.35rem;padding:.28rem .7rem}
+.format-chip:hover{border-color:var(--accent)}
+.format-chip-popover{background:var(--surface-raised);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.35);display:grid;gap:.2rem;left:0;min-width:210px;padding:.4rem;position:absolute;top:calc(100% + .35rem);z-index:30}
+.format-chip-option,.format-chip-reset{align-items:center;background:transparent;border:0;border-radius:8px;color:var(--text);cursor:pointer;display:flex;font:inherit;font-size:.78rem;gap:.55rem;padding:.5rem .55rem;text-align:left}
+.format-chip-option:hover,.format-chip-reset:hover{background:var(--surface-soft)}
+.format-chip-check{align-items:center;background:var(--surface-soft);border:1px solid var(--border);border-radius:5px;color:#fff;display:inline-flex;flex:0 0 18px;height:18px;justify-content:center}
+.format-chip-option.on .format-chip-check{background:var(--accent);border-color:var(--accent)}
+.format-chip-reset{border-top:1px solid var(--border);border-radius:0 0 8px 8px;color:var(--accent-bright);font-weight:600;margin-top:.15rem}
