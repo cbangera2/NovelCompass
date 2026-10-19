@@ -56,12 +56,18 @@ export function subscribeLocalProfile(listener: (profile: LocalUserProfile | nul
 export function mergeProfiles(current: LocalUserProfile | null, incoming: LocalUserProfile): LocalUserProfile {
   if (!current) return incoming;
   const entries = new Map(current.entries.map((entry) => [entry.slug, entry]));
-  for (const entry of incoming.entries) entries.set(entry.slug, entry);
+  for (const entry of incoming.entries) {
+    const existing = entries.get(entry.slug);
+    // Re-importing must not wipe what an earlier import knew (rating, matched id, dates).
+    const defined = Object.fromEntries(Object.entries(entry).filter(([, value]) => value !== undefined));
+    entries.set(entry.slug, existing ? { ...existing, ...defined } : entry);
+  }
   const lists = new Map(current.curated_lists.map((list) => [list.id, list]));
   for (const list of incoming.curated_lists) lists.set(list.id, list);
   return {
     ...incoming,
     profile_id: current.profile_id,
+    username: incoming.username ?? current.username,
     source_fingerprints: [...new Set([...(current.source_fingerprints || []), ...incoming.source_fingerprints])],
     entries: [...entries.values()],
     curated_lists: [...lists.values()],

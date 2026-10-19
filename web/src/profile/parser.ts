@@ -109,6 +109,7 @@ export async function parseProfileFile(file: File): Promise<ParsedProfileFile> {
   return {
     filename: file.name,
     fingerprint: await sha256(html),
+    source: 'novelupdates',
     detected_status: detected,
     selected_status: detected,
     username: profileUsername(doc),

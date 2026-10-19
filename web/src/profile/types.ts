@@ -53,6 +53,8 @@ export interface LocalNovelFeedback {
 export interface ParsedProfileFile {
   filename: string;
   fingerprint: string;
+  /** Where the file came from; only NovelUpdates pages need a user-chosen status. */
+  source?: 'novelupdates' | 'anilist' | 'myanimelist';
   detected_status: ReadingStatus;
   selected_status: ReadingStatus;
   username?: string;
