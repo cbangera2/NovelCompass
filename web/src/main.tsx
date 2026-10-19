@@ -8,6 +8,7 @@ import { loadNavigationPreferences } from './preferences';
 
 const BrowsePage = lazy(() => import('./BrowsePage'));
 const NovelPage = lazy(() => import('./NovelPage'));
+const ForYouPage = lazy(() => import('./ForYouPage'));
 const ProfilePage = lazy(() => import('./profile/ProfilePage'));
 const ScraperDashboard = lazy(() => import('./ScraperDashboard'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
@@ -18,7 +19,7 @@ const isDetailView = requestedView === 'novel' || requestedView === 'manga' || r
 const hasExplicitDiscoverSeed = locationParams.has('seed');
 const activeView: AppView = isDetailView
   ? 'novel'
-  : requestedView === 'discover' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings'
+  : requestedView === 'discover' || requestedView === 'foryou' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings'
     ? requestedView
     : hasExplicitDiscoverSeed ? 'discover' : loadNavigationPreferences().homeView;
 
@@ -28,6 +29,8 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       <Suspense fallback={<main className="route-loading" aria-busy="true"><span>Loading workspace…</span></main>}>
         {activeView === 'scraper'
           ? <ScraperDashboard />
+          : activeView === 'foryou'
+            ? <ForYouPage />
           : activeView === 'browse'
             ? <BrowsePage />
             : activeView === 'profile'

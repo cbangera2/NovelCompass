@@ -5,6 +5,7 @@ import { createDataSource } from '../data';
 import { enrichAniListTitles, parseAniListGdprFile } from './anilistGdpr';
 import { IMPORT_FILE_ACCEPT, IMPORT_KIND_LABELS, sniffFile } from './detectImport';
 import type { SniffedFile } from './detectImport';
+import { describeListImport, isListPageHtml, uploadListPages } from './ListPagesImport';
 import { parseMalFile } from './malXml';
 import { parseProfileFile, PROFILE_PARSER_VERSION, withStatus } from './parser';
 import { resolveEntries } from './resolve';
@@ -80,7 +81,29 @@ export function ProfileImportDialog({
     setBusy(true);
     setMessage('Detecting file types…');
     try {
-      const sniffed: SniffedFile[] = await Promise.all(selected.map(sniffFile));
+      // Saved recommendation-list pages (/viewlist/…) feed taste signals on the local server; everything else is a library export.
+      const htmlFiles = await Promise.all(
+        selected.filter((file) => /\.html?$/i.test(file.name)).map(async (file) => ({ file, html: await file.text() })),
+      );
+      const listPages = htmlFiles.filter(({ html }) => isListPageHtml(html));
+      const listFiles = new Set(listPages.map(({ file }) => file));
+      const rest = selected.filter((file) => !listFiles.has(file));
+      let listSummary = '';
+      if (listPages.length) {
+        setMessage(`Importing ${listPages.length} list page${listPages.length === 1 ? '' : 's'}…`);
+        listSummary = `Imported lists — ${describeListImport(
+          await uploadListPages(listPages.map(({ file, html }) => ({ name: file.name, html }))),
+        )}.`;
+        if (!rest.length) {
+          setFiles([]);
+          setEntries([]);
+          setMessage(listSummary);
+          setBusy(false);
+          return;
+        }
+      }
+
+      const sniffed: SniffedFile[] = await Promise.all(rest.map(sniffFile));
       const unknown = sniffed.filter(({ kind }) => kind === 'unknown');
       const usable = sniffed.filter(({ kind }) => kind !== 'unknown');
       const notes = unknown.map(({ file }) => `Skipped ${file.name}: not a supported export.`);
@@ -110,7 +133,8 @@ export function ProfileImportDialog({
       }));
       setProgress(null);
       await prepareParsed(parsed, 'Matching titles against the catalog…');
-      if (notes.length) setMessage(notes.join(' '));
+      const finalNotes = [listSummary, ...notes].filter(Boolean);
+      if (finalNotes.length) setMessage(finalNotes.join(' '));
     } catch (error) {
       setFiles([]);
       setEntries([]);
@@ -177,7 +201,7 @@ export function ProfileImportDialog({
           <Dialog.Close className="detail-close" aria-label="Close import dialog"><X size={20} /></Dialog.Close>
           <span className="eyebrow">Local import</span>
           <Dialog.Title>Bring in your library</Dialog.Title>
-          <Dialog.Description>Drop in your exports from MyAnimeList, AniList, or NovelUpdates. Files are read in this browser and are never uploaded.</Dialog.Description>
+          <Dialog.Description>Drop in your exports from MyAnimeList, AniList, or NovelUpdates. Files are read in this browser and are never uploaded, except saved list pages (/viewlist/…), which are sent to your own local Novel Compass server so their titles can seed recommendations.</Dialog.Description>
 
           <section className="profile-import-pane" role="group" aria-label="Choose files">
             <div

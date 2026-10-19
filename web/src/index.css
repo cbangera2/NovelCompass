@@ -984,3 +984,5 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 :root[data-theme="light"] .evidence-item,
 :root[data-theme="light"] .detail-section > p,
 :root[data-theme="light"] .taste-chips span { color: #4c4657; }
+
+.profile-list-import{align-items:center;display:flex;flex-wrap:wrap;gap:.75rem;margin:.5rem 0 1rem}.profile-list-import>span{color:var(--muted);flex:1 1 280px;font-size:.78rem;line-height:1.45}.profile-list-import-error{color:var(--red);flex-basis:100%;font-size:.8rem;margin:0}.profile-list-import-result{flex-basis:100%;font-size:.8rem;margin:0;padding-left:1.1rem}.profile-list-import-result .skipped{color:var(--muted)}

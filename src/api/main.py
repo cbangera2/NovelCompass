@@ -1,4 +1,5 @@
 import os
+import threading
 import json
 import hashlib
 import re
@@ -11,7 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.db.schema import init_db
-from src.engine.candidate_gen import CandidateGenerator
+from src.engine.candidate_gen import CandidateGenerator, _SHARED_LOCK as _engine_lock_obj
+from src.scraper.list_import import import_list_pages
 from src.engine.filters import HardFilterEngine
 from src.engine.rrf_ranker import (
     DEFAULT_CHANNEL_WEIGHTS,
@@ -163,6 +165,25 @@ def bootstrap_catalog():
         count = conn.execute("SELECT COUNT(*) FROM novels").fetchone()[0]
         if count == 0:
             seed_database_from_dataset(conn)
+    finally:
+        conn.close()
+    threading.Thread(target=_warm_engine, daemon=True).start()
+
+
+def _warm_engine():
+    """Build the shared embeddings and EASE model in the background so the first
+    recommendation request doesn't pay for them."""
+    conn = get_db()
+    try:
+        gen = CandidateGenerator(conn)
+        gen._get_vector_data()
+        gen._get_idf_dict()
+        gen._get_novel_tags_map()
+        seed = conn.execute("SELECT novel_id FROM rec_list_items LIMIT 1").fetchone()
+        if seed:
+            gen.get_candidate_channels(seed[0], limit_per_channel=1)
+    except Exception as exc:  # warming is best effort
+        print(f"[warm] engine warm-up failed: {exc}")
     finally:
         conn.close()
 
@@ -1006,6 +1027,155 @@ def get_recommendations(req: RecommendRequest):
         conn.close()
 
 
+class ForYouRowRequest(BaseModel):
+    """One Netflix-style row: seeded by a single list, or blended across several."""
+    list_ids: List[int] = Field(min_length=1, max_length=40)
+    blend: bool = False  # True = "Top picks" row mixing all list_ids
+    seeds_per_list: int = Field(default=12, ge=1, le=20)
+    limit: int = Field(default=20, ge=1, le=150)  # 150 backs the "See all" grid
+    media_type: str = "novel"
+    hide_known: bool = False  # drop titles that appear on any of list_ids
+    exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)  # e.g. the user's library
+    list_titles: Dict[int, str] = Field(default_factory=dict)  # display names that override stale DB titles
+    channel_weights: Dict[str, float] = Field(default_factory=dict)
+
+
+def _list_members(conn: sqlite3.Connection, list_id: int) -> List[Dict[str, Any]]:
+    rows = conn.execute(
+        """SELECT i.novel_id, n.title, i.position FROM rec_list_items i
+           JOIN novels n ON n.id = i.novel_id
+           WHERE i.list_id = ? ORDER BY i.position""",
+        (list_id,),
+    ).fetchall()
+    return [{"id": r[0], "title": r[1], "position": r[2]} for r in rows]
+
+
+class ListPageFile(BaseModel):
+    name: str = ""
+    html: str = Field(max_length=8 * 1024 * 1024)
+
+
+class ListImportRequest(BaseModel):
+    files: List[ListPageFile] = Field(min_length=1, max_length=60)
+
+
+@app.post("/api/import/lists")
+def import_lists(req: ListImportRequest):
+    """Import saved Novel Updates list pages; refreshes the EASE model afterwards."""
+    conn = get_db()
+    try:
+        result = import_list_pages(conn, [(f.name, f.html) for f in req.files])
+    finally:
+        conn.close()
+    if result["lists"]:
+        threading.Thread(target=_refresh_ease, daemon=True).start()
+    return result
+
+
+def _refresh_ease():
+    """Drop the cached EASE model (it was fit on the old memberships) and rebuild it."""
+    conn = get_db()
+    try:
+        gen = CandidateGenerator(conn)
+        with _engine_lock_obj:
+            gen._ease = None
+        seed = conn.execute("SELECT novel_id FROM rec_list_items LIMIT 1").fetchone()
+        if seed:
+            gen.get_candidate_channels(seed[0], limit_per_channel=1)
+    except Exception as exc:
+        print(f"[ease] refresh failed: {exc}")
+    finally:
+        conn.close()
+
+
+@app.get("/api/for-you/lists")
+def for_you_lists(min_items: int = Query(10, ge=1)):
+    """Recommendation lists with enough imported members to seed a row."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT l.id, l.title, l.curator, COUNT(n.id) AS items
+               FROM rec_lists l
+               JOIN rec_list_items i ON i.list_id = l.id
+               JOIN novels n ON n.id = i.novel_id
+               GROUP BY l.id HAVING items >= ?
+               ORDER BY (l.curator IS NOT NULL AND l.curator != '') DESC, l.followers DESC, items DESC LIMIT 200""",
+            (min_items,),
+        ).fetchall()
+        return {"lists": [{"id": r[0], "title": r[1], "curator": r[2], "items": r[3]} for r in rows]}
+    finally:
+        conn.close()
+
+
+@app.post("/api/for-you/row")
+def for_you_row(req: ForYouRowRequest):
+    conn = get_db()
+    try:
+        lists = {
+            r[0]: r[1]
+            for r in conn.execute(
+                f"SELECT id, title FROM rec_lists WHERE id IN ({','.join('?' * len(req.list_ids))})",
+                req.list_ids,
+            )
+        }
+        lists.update({lid: name for lid, name in req.list_titles.items() if lid in lists and name.strip()})
+        members = {lid: _list_members(conn, lid) for lid in req.list_ids if lid in lists}
+        members = {lid: m for lid, m in members.items() if m}
+        if not members:
+            raise HTTPException(status_code=404, detail="None of those lists have imported members.")
+
+        # Seeds: a list's highest-ranked members. Rank 1 counts most; weight decays down the list.
+        def seed_weight(rank: int, size: int) -> float:
+            return round(1.5 - 1.0 * (rank - 1) / max(size, 1), 3)
+
+        seeds: List[ForYouSeed] = []
+        if req.blend:
+            per_list = max(1, min(req.seeds_per_list, 20 // len(members)))
+            for lid, m in members.items():
+                top = m[:per_list]
+                seeds.extend(ForYouSeed(id=x["id"], title=x["title"], weight=seed_weight(i, len(top))) for i, x in enumerate(top, 1))
+            seeds = seeds[:20]
+            title, subtitle = "Top picks for you", "Blended from your favorite lists"
+            own_exclude: set = set()
+        else:
+            lid = next(iter(members))
+            top = members[lid][: req.seeds_per_list]
+            seeds = [ForYouSeed(id=x["id"], title=x["title"], weight=seed_weight(i, len(top))) for i, x in enumerate(top, 1)]
+            title, subtitle = f"Because you love {lists[lid]}", f"Seeded by the top {len(seeds)} titles on this list"
+            own_exclude = {x["id"] for x in members[lid]}
+
+        known_ids = {x["id"] for m in members.values() for x in m}
+        exclude = set(own_exclude) | set(req.exclude_novel_ids) | (known_ids if req.hide_known else set())
+        exclude -= {s.id for s in seeds}  # seeds are always excluded by the engine itself
+        fy = ForYouRecommendRequest(
+            seeds=seeds,
+            limit=req.limit,
+            media_type=req.media_type,
+            channel_weights=req.channel_weights,
+            exclude_novel_ids=sorted(exclude)[:5000],
+        )
+        result = _get_for_you_recommendations(conn, fy)
+
+        by_novel: Dict[int, List[str]] = {}
+        for lid, m in members.items():
+            for x in m:
+                by_novel.setdefault(x["id"], []).append(lists[lid])
+        top_score = max((r.get("rrf_score") or 0 for r in result["recommendations"]), default=0) or 1.0
+        for rec in result["recommendations"]:
+            rec["on_lists"] = by_novel.get(rec["target_id"], [])
+            # Multi-seed scores are sums, so the single-seed percent saturates; report strength relative to the row's best.
+            rec["match_score_percent"] = round(100 * (rec.get("rrf_score") or 0) / top_score)
+        return {
+            "title": title,
+            "subtitle": subtitle,
+            "seeds": [{"id": s.id, "title": s.title} for s in seeds],
+            "count": len(result["recommendations"]),
+            "recommendations": result["recommendations"],
+        }
+    finally:
+        conn.close()
+
+
 @app.post("/api/recommend/for-you")
 def get_for_you_recommendations(req: ForYouRecommendRequest):
     """Multi-seed RRF fusion for profile For You (live mode only)."""
@@ -1055,7 +1225,7 @@ def _channel_weights(req: Any) -> Dict[str, float]:
     return {
         key: max(0.0, min(3.0, float(value)))
         for key, value in raw.items()
-        if key in {"vector", "tag", "direct_rec", "rec_list", "structural"}
+        if key in {"vector", "tag", "direct_rec", "rec_list", "structural", "ease"}
     }
 
 

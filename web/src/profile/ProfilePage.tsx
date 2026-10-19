@@ -11,6 +11,7 @@ import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { novelPageUrl } from '../novelLinks';
 import { browseFacetUrl } from '../metadataLinks';
 import { Card } from '../design-system';
+import { ListPagesImport, useImportedLists } from './ListPagesImport';
 const ProfileAnalytics = lazy(() => import('./ProfileAnalytics'));
 
 const STATUS_LABELS: Record<ReadingStatus, string> = {
@@ -26,6 +27,7 @@ function appUrl(params = ''): string {
 }
 
 export default function ProfilePage(): JSX.Element {
+  const importedLists = useImportedLists();
   const { mode: dataMode } = useDataModePreference();
   const { settings } = useDisplaySettings();
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
@@ -387,14 +389,20 @@ export default function ProfilePage(): JSX.Element {
               <div><span className="eyebrow">Saved metadata</span><h2>Created lists</h2></div>
               <span>{profile.curated_lists.length} summaries</span>
             </div>
-            <p className="profile-list-note">Saved profile pages include list summaries, not the novels inside each list. Membership badges and personalization are omitted until membership data is available.</p>
+            <p className="profile-list-note">Your saved profile page only lists each list's title. Add the saved pages of the lists themselves to use their titles as taste signals on the For You page.</p>
+            <ListPagesImport onImported={importedLists.refresh} disabled={!importedLists.available} />
+            {!importedLists.available && <p className="profile-list-note">Importing needs the live API (the uvicorn server) to be running.</p>}
             <div className="profile-list-grid">
               {profile.curated_lists.map((list) => (
                 <article key={list.id}>
                   <div><h3>{list.title}</h3>{list.is_private && <span>Private</span>}</div>
                   {list.description && <p>{list.description}</p>}
                   <footer>
-                    <span>{list.series_count != null ? `${list.series_count} series` : 'Series count unavailable'}</span>
+                    <span>
+                      {importedLists.counts.has(list.id)
+                        ? `${importedLists.counts.get(list.id)} titles imported`
+                        : list.series_count != null ? `${list.series_count} series · not imported` : 'Not imported'}
+                    </span>
                     {!list.is_private && <a href={`https://www.novelupdates.com/viewlist/${list.id}/`} target="_blank" rel="noopener noreferrer">View summary source <ExternalLink size={13} /></a>}
                   </footer>
                 </article>

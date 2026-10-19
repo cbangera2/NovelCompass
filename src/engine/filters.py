@@ -4,58 +4,46 @@ from typing import Dict, Any, List, Set
 class HardFilterEngine:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
+        self._traits: Dict[int, Dict[str, Any]] = {}
+
+    def prefetch_traits(self, novel_ids: List[int]) -> None:
+        """Load traits for many novels in a handful of queries instead of 3 per novel."""
+        missing = [n for n in dict.fromkeys(novel_ids) if n not in self._traits]
+        for i in range(0, len(missing), 500):
+            chunk = missing[i:i + 500]
+            marks = ",".join("?" * len(chunk))
+            tags: Dict[int, Set[str]] = {}
+            genres: Dict[int, Set[str]] = {}
+            for nid, name in self.conn.execute(
+                f"SELECT nt.novel_id, LOWER(t.name) FROM novel_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.novel_id IN ({marks})", chunk):
+                tags.setdefault(nid, set()).add(name)
+            for nid, name in self.conn.execute(
+                f"SELECT ng.novel_id, LOWER(g.name) FROM novel_genres ng JOIN genres g ON g.id = ng.genre_id WHERE ng.novel_id IN ({marks})", chunk):
+                genres.setdefault(nid, set()).add(name)
+            rows = {r[0]: r for r in self.conn.execute(
+                f"""SELECT id, status_trans, chapters_trans, language, rating, rating_votes,
+                           reading_list_count, year, COALESCE(media_type, 'novel'), COALESCE(source, 'novelupdates')
+                    FROM novels WHERE id IN ({marks})""", chunk)}
+            for nid in chunk:
+                r = rows.get(nid)
+                self._traits[nid] = {
+                    'tags': tags.get(nid, set()),
+                    'genres': genres.get(nid, set()),
+                    'status_trans': (r[1] if r else "") or "",
+                    'chapters_trans': (r[2] if r else 0) or 0,
+                    'language': (r[3] if r else "") or "",
+                    'rating': (r[4] if r else 0.0) or 0.0,
+                    'rating_votes': (r[5] if r else 0) or 0,
+                    'reading_list_count': (r[6] if r else 0) or 0,
+                    'year': (r[7] if r else 0) or 0,
+                    'media_type': (r[8] if r else "novel") or "novel",
+                    'source': (r[9] if r else "novelupdates") or "novelupdates",
+                }
 
     def get_novel_filter_traits(self, novel_id: int) -> Dict[str, Any]:
-        cur = self.conn.cursor()
-
-        # Tags
-        cur.execute("""
-            SELECT LOWER(t.name) FROM tags t
-            JOIN novel_tags nt ON t.id = nt.tag_id
-            WHERE nt.novel_id = ?
-        """, (novel_id,))
-        tags = {row[0] for row in cur.fetchall()}
-
-        # Genres
-        cur.execute("""
-            SELECT LOWER(g.name) FROM genres g
-            JOIN novel_genres ng ON g.id = ng.genre_id
-            WHERE ng.novel_id = ?
-        """, (novel_id,))
-        genres = {row[0] for row in cur.fetchall()}
-
-        # Novel info
-        cur.execute(
-            """SELECT status_trans, chapters_trans, language, rating,
-                      rating_votes, reading_list_count, year,
-                      COALESCE(media_type, 'novel'), COALESCE(source, 'novelupdates')
-               FROM novels WHERE id = ?""",
-            (novel_id,),
-        )
-        row = cur.fetchone()
-        status_trans = row[0] if row else ""
-        chapters_trans = row[1] if row else 0
-        language = row[2] if row else ""
-        rating = row[3] if row else 0.0
-        rating_votes = row[4] if row else 0
-        reading_list_count = row[5] if row else 0
-        year = row[6] if row else 0
-        media_type = row[7] if row else "novel"
-        source = row[8] if row else "novelupdates"
-
-        return {
-            'tags': tags,
-            'genres': genres,
-            'status_trans': status_trans or "",
-            'chapters_trans': chapters_trans or 0,
-            'language': language or "",
-            'rating': rating or 0.0,
-            'rating_votes': rating_votes or 0,
-            'reading_list_count': reading_list_count or 0,
-            'year': year or 0,
-            'media_type': media_type or "novel",
-            'source': source or "novelupdates",
-        }
+        if novel_id not in self._traits:
+            self.prefetch_traits([novel_id])
+        return self._traits[novel_id]
 
     def filter_candidates(self, candidate_ids: List[int], preferences: Dict[str, Any]) -> List[int]:
         """
@@ -90,6 +78,7 @@ class HardFilterEngine:
         source = preferences.get('source', '').strip().lower()
 
         valid_candidates = []
+        self.prefetch_traits([n for n in candidate_ids if n not in exclude_ids])
 
         for nid in candidate_ids:
             if nid in exclude_ids:

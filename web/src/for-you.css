@@ -1,0 +1,29 @@
+.fy-shell{margin:0 auto;max-width:1280px;padding:2rem clamp(1rem,4vw,3rem) 5rem}
+.fy-hero{margin:1.5rem 0 1.5rem;max-width:720px}.fy-hero h1{font-size:clamp(2rem,5vw,3.4rem);letter-spacing:-.05em;line-height:1;margin:.4rem 0 .8rem}.fy-hero p:last-child{color:var(--muted);line-height:1.6}.fy-hero .eyebrow{align-items:center;color:var(--accent);display:flex;font-size:.72rem;font-weight:750;gap:.35rem;letter-spacing:.08em;margin:0;text-transform:uppercase}
+.fy-controls{align-items:center;display:flex;gap:.6rem;margin-bottom:1rem}.fy-controls+.fy-lists{margin:-.2rem 0 1.4rem}
+.fy-lists{display:flex;flex-wrap:wrap;gap:.4rem}.fy-lists button{align-items:center;background:var(--surface-soft);border:1px solid var(--border);border-radius:999px;color:var(--muted);cursor:pointer;display:inline-flex;font-size:.78rem;gap:.45rem;padding:.35rem .7rem}.fy-lists button.active{border-color:var(--accent);color:var(--text)}
+.fy-row{margin:0 0 2.2rem}.fy-row>header{align-items:flex-end;display:flex;gap:.75rem;justify-content:space-between;margin-bottom:.7rem}.fy-row h2{font-size:1.25rem;letter-spacing:-.02em;margin:0}.fy-row header p{color:var(--muted);font-size:.78rem;margin:.25rem 0 0;max-width:70ch}.fy-row-nav{align-items:center;display:flex;flex:0 0 auto;gap:.25rem}
+.fy-track{display:flex;gap:.85rem;overflow-x:auto;padding-bottom:.6rem;scroll-snap-type:x proximity;scrollbar-width:thin}
+.fy-card,.fy-card-skeleton{flex:0 0 168px;scroll-snap-align:start}.fy-card-skeleton{height:290px}
+.fy-card{color:var(--text);display:flex;flex-direction:column;gap:.35rem;text-decoration:none}.fy-card strong{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;font-size:.85rem;line-height:1.25;overflow:hidden}.fy-card small{-webkit-box-orient:vertical;-webkit-line-clamp:3;color:var(--muted);display:-webkit-box;font-size:.7rem;line-height:1.35;overflow:hidden}
+.fy-cover{aspect-ratio:2/3;background:var(--surface-soft);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative;transition:transform .15s,border-color .15s}.fy-card:hover .fy-cover{border-color:var(--accent);transform:translateY(-2px)}.fy-cover img{display:block;height:100%;object-fit:cover;width:100%}.fy-cover>span:first-child{align-items:center;color:var(--dim);display:flex;font-size:2rem;height:100%;justify-content:center}
+.fy-known{background:rgba(0,0,0,.72);border-radius:999px;bottom:.4rem;color:#fff;font-size:.62rem;left:.4rem;padding:.15rem .5rem;position:absolute}
+.fy-strength{background:var(--surface-soft);border-radius:2px;height:3px;overflow:hidden}.fy-strength i{background:var(--accent);display:block;height:100%}
+.fy-error,.fy-empty{color:var(--muted);font-size:.85rem}.fy-error{color:var(--red)}
+.fy-controls .ds-button{flex:0 0 auto;white-space:nowrap}.fy-lists .fy-more{border-style:dashed}
+.fy-status{background:rgba(0,0,0,.72);border-radius:999px;color:#fff;font-size:.62rem;font-weight:700;left:.4rem;padding:.15rem .5rem;position:absolute;top:.4rem}.fy-status.status-completed{background:#2f7d4f}.fy-status.status-dropped{background:#8a3a3a}.fy-status.status-plan_to_read{background:#3a5a8a}
+.fy-grid{display:grid;gap:1.1rem .85rem;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.fy-grid .fy-card-skeleton{height:290px}
+.fy-grid-view>header{align-items:flex-start}.fy-back{margin-bottom:.4rem;margin-left:-.6rem}.fy-sentinel{height:1px}
+.fy-end{color:var(--muted);font-size:.85rem;margin:2rem 0 0;text-align:center}
+.fy-library-empty a{color:var(--accent)}
+@media(max-width:680px){
+.fy-shell{padding-top:1rem}
+.fy-controls{align-items:stretch;flex-direction:column;gap:.7rem}
+.fy-lists{flex-wrap:nowrap;margin:0 calc(-1*clamp(1rem,4vw,3rem));overflow-x:auto;padding:0 clamp(1rem,4vw,3rem) .3rem;scrollbar-width:none}.fy-lists button{flex:0 0 auto;white-space:nowrap}
+.fy-controls .ds-button{justify-content:center}
+.fy-row>header{align-items:flex-start;flex-direction:column;gap:.3rem}
+.fy-scroll-btn{display:none}
+.fy-card,.fy-card-skeleton{flex-basis:132px}.fy-card-skeleton{height:250px}
+.fy-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(hover:none){.fy-scroll-btn{display:none}}
