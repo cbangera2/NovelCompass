@@ -20,6 +20,11 @@ function loadModule(filePath) {
   const m = { exports: {} };
   const customRequire = (specifier) => {
     if (specifier === 'react') return require(path.resolve('./web/node_modules/react'));
+    if (specifier.startsWith('.')) {
+      const base = path.resolve(path.dirname(filePath), specifier);
+      const file = ['.ts', '.tsx', '/index.ts'].map((ext) => base + ext).find((candidate) => fs.existsSync(candidate));
+      if (file) return loadModule(file);
+    }
     return require(specifier);
   };
   const evalFunc = new Function('module', 'exports', 'require', compiled);
@@ -71,6 +76,11 @@ function loadModule(filePath) {
   const m = { exports: {} };
   const customRequire = (specifier) => {
     if (specifier === 'react') return require(path.resolve('./web/node_modules/react'));
+    if (specifier.startsWith('.')) {
+      const base = path.resolve(path.dirname(filePath), specifier);
+      const file = ['.ts', '.tsx', '/index.ts'].map((ext) => base + ext).find((candidate) => fs.existsSync(candidate));
+      if (file) return loadModule(file);
+    }
     return require(specifier);
   };
   const evalFunc = new Function('module', 'exports', 'require', compiled);
@@ -89,7 +99,8 @@ process.stdout.write(JSON.stringify({
   parsedMinRating: parsed.minRating,
   parsedHiddenGem: parsed.hiddenGemMode,
   reserializedTypes: reserialized.get('types'),
-  reserializedRating: reserialized.get('r')
+  reserializedRating: reserialized.get('min_rating'),
+  legacyRatingDropped: reserialized.get('r')
 }));
 """
     result = subprocess.run(
@@ -105,4 +116,5 @@ process.stdout.write(JSON.stringify({
     assert data["parsedMinRating"] == 4
     assert data["parsedHiddenGem"] is True
     assert data["reserializedTypes"] == "anime,manga"
-    assert data["reserializedRating"] == "4"
+    assert data["reserializedRating"] == "4"  # shared Discover/Browse param name
+    assert data["legacyRatingDropped"] is None  # legacy `r` links still parse, but are rewritten

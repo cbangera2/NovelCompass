@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, FormEvent, useMemo, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import {
   BookOpen,
   Check,
@@ -42,6 +42,11 @@ import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
 import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { previewFromRecommendation, registerPreviews } from './CoverPreview';
+import { MediaBadges, NovelCard } from './components/NovelCard';
+import { RatingChip } from './components/RatingChip';
+import { openGlobalSearch, SEED_SELECTED_EVENT } from './components/searchEvents';
+import { ActiveFilterChips, CoreFilters, type ActiveFilter } from './components/CoreFilters';
+import { formatMinRating } from './components/coreFilterParams';
 
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
@@ -49,6 +54,7 @@ const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((modul
 import { parseMediaTypesFromUrl, useMediaFilterState } from './mediaFilterState';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 import { discoverSearchParams, parseDiscoverRoute, stableRouteUrl } from './routeState';
+import { FormatScopeChip } from './components/FormatScopeChip';
 
 const DEFAULT_NOVEL: NovelSearchResult = {
   id: 6780,
@@ -105,7 +111,6 @@ export default function App(): JSX.Element {
     selectedTypes,
     mediaParam,
     scopeSentence,
-    searchPlaceholder: seedSearchPlaceholder,
     includeOtherFormats,
     setIncludeOtherFormats,
     isAllSelected,
@@ -136,8 +141,6 @@ export default function App(): JSX.Element {
   const [dataset, setDataset] = useState<DatasetManifest | null>(null);
   const [query, setQuery] = useState(DEFAULT_NOVEL.title);
   const [selectedNovel, setSelectedNovel] = useState<NovelSearchResult | null>(DEFAULT_NOVEL);
-  const [suggestions, setSuggestions] = useState<NovelSearchResult[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [hiddenGemMode, setHiddenGemMode] = useState(Boolean(initialRoute.hiddenGemMode));
   const [excludeHarem, setExcludeHarem] = useState(Boolean(initialRoute.excludeHarem));
@@ -163,6 +166,7 @@ export default function App(): JSX.Element {
   const [maxResults, setMaxResults] = useState(savedNumber(initialRoute.maxResults, 60));
   const [routeRevision, setRouteRevision] = useState(0);
   const [genres, setGenres] = useState<string[]>([]);
+  const [languageChoices, setLanguageChoices] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -240,7 +244,7 @@ export default function App(): JSX.Element {
         setDataSource(source);
         setDataset(manifest);
         source.getOptions()
-          .then((options) => { if (!cancelled) setGenres(options.genres || []); })
+          .then((options) => { if (!cancelled) { setGenres(options.genres || []); setLanguageChoices(options.languages || []); } })
           .catch(() => { /* Advanced facets can remain unavailable without blocking discovery. */ });
       })
       .catch((initializationError: any) => {
@@ -248,34 +252,6 @@ export default function App(): JSX.Element {
       });
     return () => { cancelled = true; };
   }, [dataMode]);
-
-  useEffect(() => {
-    if (!dataSource) return;
-    const trimmed = query.trim();
-    if (
-      trimmed.length < 2 ||
-      (selectedNovel && trimmed === selectedNovel.title)
-    ) {
-      setSuggestions([]);
-      return;
-    }
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      try {
-        const results = await dataSource.searchNovels(trimmed, 8, controller.signal);
-        setSuggestions(results);
-        setShowSuggestions(true);
-      } catch (searchError: any) {
-        if (searchError.name !== 'AbortError') setSuggestions([]);
-      }
-    }, 180);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query, selectedNovel, dataSource]);
 
   const libraryExcludeIds = useMemo(() => {
     if (!profile) return [] as number[];
@@ -301,7 +277,6 @@ export default function App(): JSX.Element {
     setLoading(true);
     if (!expanding) setIncrementalError(null);
     setError(null);
-    setShowSuggestions(false);
 
     const basePayload: Omit<RecommendRequest, 'query'> = {
       limit: requestedLimit,
@@ -553,8 +528,6 @@ export default function App(): JSX.Element {
     setForYouMeta(null);
     setSelectedNovel(novel);
     setQuery(novel.title);
-    setSuggestions([]);
-    setShowSuggestions(false);
   };
   const pushSeedRoute = (novel: NovelSearchResult) => {
     const params = new URLSearchParams(window.location.search);
@@ -563,6 +536,20 @@ export default function App(): JSX.Element {
     params.delete('for_you');
     window.history.pushState(null, '', stableRouteUrl(params));
   };
+  // The header search picks the seed; it reports the choice here.
+  const seedSelectedRef = useRef<(novel: NovelSearchResult) => void>(() => undefined);
+  seedSelectedRef.current = (novel) => {
+    chooseNovel(novel);
+    pushSeedRoute(novel);
+    window.requestAnimationFrame(() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    void fetchRecommendations(novel);
+  };
+  useEffect(() => {
+    const onSeed = (event: Event) => seedSelectedRef.current((event as CustomEvent<NovelSearchResult>).detail);
+    window.addEventListener(SEED_SELECTED_EVENT, onSeed);
+    return () => window.removeEventListener(SEED_SELECTED_EVENT, onSeed);
+  }, []);
+
   const runForYou = () => {
     setForYouMode(true);
     setHideLibraryTitles(true);
@@ -704,12 +691,6 @@ export default function App(): JSX.Element {
     };
   }, [activeDetailId]);
 
-  const handleSearch = (e: FormEvent) => {
-    e.preventDefault();
-    if (selectedNovel) pushSeedRoute(selectedNovel);
-    fetchRecommendations();
-  };
-
   const cycleGenre = (genre: string) => {
     setGenreStates((current) => {
       const next = { ...current };
@@ -735,6 +716,22 @@ export default function App(): JSX.Element {
     setHiddenGemStrength(0.3);
   };
 
+  const stopForYou = () => {
+    setForYouMode(false);
+    setForYouMeta(null);
+    const seed = selectedNovel || getDefaultSeed(selectedTypes);
+    chooseNovel(seed);
+    void fetchRecommendations(seed, Math.min(8, maxResults), false, { forYou: false });
+  };
+
+  const resetAdvancedWeights = () => {
+    setTagWeight(0.8);
+    setDirectRecWeight(1.2);
+    setListWeight(1);
+    setStructuralWeight(0.6);
+    setHiddenGemStrength(0.3);
+  };
+
   const resetFilters = () => {
     setHideLibraryTitles(false);
     setHiddenGemMode(false);
@@ -747,28 +744,33 @@ export default function App(): JSX.Element {
     resetAdvanced();
   };
 
-  const activeFilters = useMemo(() => {
-    const active: string[] = [];
-    if (hideLibraryTitles && profile) active.push('Exclude library IDs');
-    if (forYouMode) active.push('For You multi-seed');
-    if (hiddenGemMode) active.push('Hidden gems');
-    if (requireCompleted) active.push('Completed');
-    if (excludeHarem) active.push('No harem');
-    if (excludeBL) active.push('No BL');
-    if (excludeYuri) active.push('No yuri');
-    if (!isAllSelected && !includeOtherFormats) active.push(`Formats: ${scopeSentence}`);
-    if (!isAllSelected && includeOtherFormats) active.push('Cross-format recs');
-    if (language) active.push(language);
-    if (minRating) active.push(`${minRating}+ rating`);
-    if (minRatingVotes) active.push(`${minRatingVotes}+ votes`);
-    if (maxReaders) active.push(`≤${maxReaders} readers`);
-    if (minYear || maxYear) active.push('Year range');
-    if (includeTagsText.trim()) active.push('Required tags');
-    if (excludeTagsText.trim()) active.push('Excluded tags');
-    active.push(...Object.entries(genreStates).map(([genre, state]) => `${state === 'include' ? '+' : '−'}${genre}`));
-    if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) active.push('Custom ranking');
+  const activeFilters = (() => {
+    const active: ActiveFilter[] = [];
+    const add = (label: string, clear: () => void) => active.push({ label, clear });
+    if (hideLibraryTitles && profile) add('Exclude library IDs', () => setHideLibraryTitles(false));
+    if (forYouMode) add('For You multi-seed', stopForYou);
+    if (hiddenGemMode) add('Hidden gems', () => setHiddenGemMode(false));
+    if (requireCompleted) add('Completed', () => setRequireCompleted(false));
+    if (excludeHarem) add('No harem', () => setExcludeHarem(false));
+    if (excludeBL) add('No BL', () => setExcludeBL(false));
+    if (excludeYuri) add('No yuri', () => setExcludeYuri(false));
+    if (!isAllSelected && !includeOtherFormats) add(`Formats: ${scopeSentence}`, () => setIncludeOtherFormats(true));
+    if (!isAllSelected && includeOtherFormats) add('Cross-format recs', () => setIncludeOtherFormats(false));
+    if (language) add(`Language: ${language}`, () => setLanguage(''));
+    if (minRating) add(`Rating: ${formatMinRating(minRating)}`, () => setMinRating(0));
+    if (minRatingVotes) add(`${minRatingVotes}+ votes`, () => setMinRatingVotes(0));
+    if (maxReaders) add(`≤${maxReaders} readers`, () => setMaxReaders(0));
+    if (minYear || maxYear) add('Year range', () => { setMinYear(0); setMaxYear(0); });
+    if (includeTagsText.trim()) add('Required tags', () => setIncludeTagsText(''));
+    if (excludeTagsText.trim()) add('Excluded tags', () => setExcludeTagsText(''));
+    Object.entries(genreStates).forEach(([genre, state]) =>
+      add(`${state === 'include' ? '+' : '−'}${genre}`, () => setGenreStates((current) => {
+        const { [genre]: _removed, ...rest } = current;
+        return rest;
+      })));
+    if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) add('Custom ranking', resetAdvancedWeights);
     return active;
-  }, [hideLibraryTitles, forYouMode, profile, hiddenGemMode, requireCompleted, excludeHarem, excludeBL, excludeYuri, isAllSelected, includeOtherFormats, scopeSentence, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, includeTagsText, excludeTagsText, genreStates, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength]);
+  })();
 
   // Ranking already excludes library IDs when hideLibraryTitles is on; keep client filters for not_for_me edge cases.
   const filteredRecommendations = useMemo(() => (data?.recommendations || [])
@@ -811,6 +813,7 @@ export default function App(): JSX.Element {
         <div>
           <div className="eyebrow">Relationship-first discovery</div>
           <h1>Find your next obsession.</h1>
+          <FormatScopeChip />
           <p>
             Start with a title you loved. We trace shared tropes, recommendations, and related works
             {isAllSelected
@@ -844,84 +847,20 @@ export default function App(): JSX.Element {
         </div>
       </header>
 
-      <section className="search-section ds-card" ref={searchSectionRef}>
-        <form onSubmit={handleSearch} className="search-input-wrapper">
+      <section className="search-section ds-card seed-section" ref={searchSectionRef}>
+        <div className="search-input-wrapper seed-display">
           <Search className="search-icon" size={20} aria-hidden="true" />
-          <div className="search-field">
-            <label htmlFor="novel-search">Starting title</label>
-            <input
-              id="novel-search"
-              type="text"
-              autoComplete="off"
-              placeholder={seedSearchPlaceholder}
-              value={query}
-              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelectedNovel(null);
-              }}
-            />
+          <div className="search-field seed-copy">
+            <label>Starting title</label>
+            <strong>{forYouMode ? 'For You (your library)' : selectedNovel ? displayNovelTitle(selectedNovel.title, undefined, settings.titlePreference) : 'No title selected'}</strong>
+            {selectedNovel && !forYouMode && (
+              <small><span className="seed-author">{selectedNovel.author || 'Unknown author'}</span><RatingChip rating={selectedNovel.rating} votes={selectedNovel.rating_votes} size={11} /><MediaBadges id={selectedNovel.id} mediaType={selectedNovel.media_type} source={selectedNovel.source} /></small>
+            )}
           </div>
-          <Button type="submit" variant="primary" className="search-button" disabled={loading || !dataSource}>
-            {!dataSource ? 'Loading dataset…' : loading ? 'Finding matches…' : <><Sparkles size={16} aria-hidden="true" /> Find related</>}
+          <Button type="button" variant="primary" className="search-button" disabled={!dataSource} onClick={() => openGlobalSearch({ mode: 'seed' })}>
+            {!dataSource ? 'Loading dataset…' : loading ? 'Finding matches…' : 'Change title'}
           </Button>
-        </form>
-
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="suggestions" role="listbox" aria-label="Title matches">
-            {suggestions.map((novel) => {
-              const badge = getMediaBadgeInfo(novel);
-              return (
-                <div className="suggestion-row" key={novel.id} data-preview-id={novel.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={selectedNovel?.id === novel.id}
-                    className="suggestion"
-                    onClick={() => {
-                      chooseNovel(novel);
-                      pushSeedRoute(novel);
-                      window.requestAnimationFrame(() => {
-                        searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      });
-                      void fetchRecommendations(novel);
-                    }}
-                  >
-                    <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
-                    <span className="suggestion-copy">
-                      <span className="suggestion-title-line">
-                        <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
-                        <span className="suggestion-badges">
-                          <span className={`search-badge format-badge ${badge.formatKey}`}>
-                            {badge.formatLabel}
-                          </span>
-                          <span className={`search-badge source-badge ${badge.sourceKey}`}>
-                            {badge.sourceLabel}
-                          </span>
-                        </span>
-                      </span>
-                      <small>{novel.author || 'Unknown author'} · ★ {novel.rating || '—'} ({novel.rating_votes} votes)</small>
-                    </span>
-                    <span className="select-label">Select</span>
-                  </button>
-                  <div className="suggestion-links">
-                    <Tooltip content="View details">
-                      <a href={novelPageUrl(novel.id)} aria-label={`View details for ${novel.title}`}>
-                        <BookOpen size={16} aria-hidden="true" />
-                      </a>
-                    </Tooltip>
-                    <Tooltip content={`Open on ${badge.sourceLabel}`}>
-                      <a href={novel.external_url || novel.novelupdates_url} target="_blank" rel="noopener noreferrer"
-                        aria-label={`Open ${novel.title} on ${badge.sourceLabel}`}>
-                        <ExternalLink size={16} aria-hidden="true" />
-                      </a>
-                    </Tooltip>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        </div>
       </section>
 
       <Card className="filter-panel" aria-label="Recommendation filters">
@@ -944,13 +883,7 @@ export default function App(): JSX.Element {
                 disabled={!profile}
                 onChange={(e) => {
                   if (e.currentTarget.checked) runForYou();
-                  else {
-                    setForYouMode(false);
-                    setForYouMeta(null);
-                    const seed = selectedNovel || getDefaultSeed(selectedTypes);
-                    chooseNovel(seed);
-                    void fetchRecommendations(seed, Math.min(8, maxResults), false, { forYou: false });
-                  }
+                  else stopForYou();
                 }}
               />
             </Tooltip>
@@ -995,29 +928,21 @@ export default function App(): JSX.Element {
               <Checkbox label="Yuri" checked={excludeYuri} onChange={(e) => setExcludeYuri(e.currentTarget.checked)} />
             </Tooltip>
           </FieldGroup>
-          <div className="filter-selects">
-            <Select label="Language" value={language} onChange={(e) => setLanguage(e.currentTarget.value)}>
-              <option value="">Any</option>
-              <option value="korean">Korean</option>
-              <option value="chinese">Chinese</option>
-              <option value="japanese">Japanese</option>
-            </Select>
-            <Select label="Rating" value={minRating} onChange={(e) => setMinRating(Number(e.currentTarget.value))}>
-              <option value="0">Any</option>
-              <option value="3.5">3.5+</option>
-              <option value="4">4.0+</option>
-              <option value="4.3">4.3+</option>
-            </Select>
+          <CoreFilters
+            language={language}
+            minRating={minRating}
+            languages={languageChoices}
+            onLanguageChange={setLanguage}
+            onMinRatingChange={setMinRating}
+          >
             <Select label="Results" value={maxResults} onChange={(e) => { setMaxResults(Number(e.currentTarget.value)); setAvailableExhausted(false); }}>
               <option value="30">Up to 30</option>
               <option value="60">Up to 60</option>
               <option value="100">Up to 100 (pool limit)</option>
             </Select>
-          </div>
+          </CoreFilters>
         </div>
-        {activeFilters.length > 0 && <div className="active-filter-chips" aria-label="Active filters">
-          {activeFilters.map((filter) => <Badge tone="violet" key={filter}>{filter}</Badge>)}
-        </div>}
+        <ActiveFilterChips filters={activeFilters} onClearAll={resetFilters} />
       </Card>
 
       <details className="advanced-panel">
@@ -1125,25 +1050,14 @@ export default function App(): JSX.Element {
                     <h2><a href={novelPageUrl(data.seed_novel.id, undefined, data.seed_novel.media_type)}>
                       {displayNovelTitle(data.seed_novel.title, undefined, settings.titlePreference)}
                     </a></h2>
-                    {(() => {
-                      const seedBadge = getMediaBadgeInfo(data.seed_novel);
-                      return (
-                        <span className="suggestion-badges" style={{ marginLeft: '0.35rem' }}>
-                          <span className={`search-badge source-badge ${seedBadge.sourceKey}`}>
-                            {seedBadge.sourceLabel}
-                          </span>
-                          <span className={`search-badge format-badge ${seedBadge.formatKey}`}>
-                            {seedBadge.formatLabel}
-                          </span>
-                        </span>
-                      );
-                    })()}
-                    <Tooltip content={`Open on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
-                      <a className="seed-external-link" href={data.seed_novel.external_url || externalMediaUrl(data.seed_novel.id, data.seed_novel.source, data.seed_novel.external_id, data.seed_novel.media_type) || data.seed_novel.novelupdates_url} target="_blank"
-                        rel="noopener noreferrer" aria-label={`Open ${data.seed_novel.title} on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
-                        <ExternalLink size={15} aria-hidden="true" />
-                      </a>
-                    </Tooltip>
+                    <span className="suggestion-badges">
+                      <MediaBadges id={data.seed_novel.id} mediaType={data.seed_novel.media_type} source={data.seed_novel.source} />
+                    </span>
+                    <a className="seed-external-link" href={data.seed_novel.external_url || externalMediaUrl(data.seed_novel.id, data.seed_novel.source, data.seed_novel.external_id, data.seed_novel.media_type) || data.seed_novel.novelupdates_url} target="_blank"
+                      rel="noopener noreferrer" title={`Open on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}
+                      aria-label={`Open ${data.seed_novel.title} on ${sourceDisplayName(data.seed_novel.source, data.seed_novel.id)}`}>
+                      <ExternalLink size={15} aria-hidden="true" />
+                    </a>
                   </>
                 )}
               </div>
@@ -1179,110 +1093,41 @@ export default function App(): JSX.Element {
 
           <div className="results-grid">
             {filteredRecommendations.slice(0, visibleCount).map((rec, index) => {
-              const badge = getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type, source: rec.source });
-              const evidenceBullets = rec.evidence_bullets.filter(Boolean);
-              const compactEvidence = evidenceBullets.length < 3;
+              const entry = profileEntries.get(rec.target_id);
+              const sourceName = sourceDisplayName(rec.source, rec.target_id);
               return (
-                <Card
+                <NovelCard
                   key={rec.target_id || index}
-                  className="novel-card"
-                  data-preview-card
-                  onClick={(event) => {
-                    if (!(event.target as HTMLElement).closest('button, a, summary, select, label')) void openNovelDetail(rec);
+                  variant="detailed"
+                  className="discover-card"
+                  item={{
+                    id: rec.target_id,
+                    title: displayNovelTitle(rec.title, undefined, settings.titlePreference),
+                    href: novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type),
+                    coverUrl: rec.cover_url,
+                    mediaType: rec.media_type,
+                    source: rec.source,
+                    author: rec.author,
+                    authorHref: rec.author ? browseFacetUrl('author', rec.author) : undefined,
+                    rating: rec.rating,
+                    ratingVotes: rec.rating_votes,
+                    readers: rec.reading_list_count,
+                    language: rec.language,
+                    languageHref: rec.language ? browseFacetUrl('language', rec.language) : undefined,
+                    statusTrans: rec.status_trans,
+                    externalUrl: rec.external_url || externalMediaUrl(rec.target_id, rec.source, rec.external_id, rec.media_type) || rec.novelupdates_url,
+                    externalLabel: sourceName,
                   }}
-                >
-                  <div className="card-content">
-                    <div className="card-main">
-                      <div className={`card-primary${compactEvidence ? ' card-primary-compact-evidence' : ''}`}>
-                        <div className="card-top">
-                          <div className="card-cover" data-preview-id={rec.target_id}>
-                            <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
-                            <span className="card-rank">#{index + 1}</span>
-                          </div>
-
-                          <div className="card-summary">
-                            <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
-                            <h3 className="novel-title">
-                              <a href={novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type)} data-preview-id={rec.target_id}>
-                                {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
-                              </a>
-                              <Tooltip content={`Open on ${sourceDisplayName(rec.source, rec.target_id)}`}>
-                              <a
-                                className="card-external-link"
-                                href={rec.external_url || externalMediaUrl(rec.target_id, rec.source, rec.external_id, rec.media_type) || rec.novelupdates_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Open ${rec.title} on ${sourceDisplayName(rec.source, rec.target_id)}`}
-                              >
-                                <ExternalLink size={14} aria-hidden="true" />
-                              </a>
-                              </Tooltip>
-                            </h3>
-                            <div className="novel-author">{rec.author
-                              ? <a href={browseFacetUrl('author', rec.author)}>{rec.author}</a>
-                              : 'Unknown author'}</div>
-
-                            <div className="novel-meta">
-                              <span title={`${rec.rating_votes} rating votes`}><Star size={13} fill="currentColor" aria-hidden="true" /> {rec.rating || '—'} <small>({rec.rating_votes})</small></span>
-                              <span><Users size={13} aria-hidden="true" /> {rec.reading_list_count.toLocaleString()}</span>
-                            </div>
-                            <div className="card-badges">
-                              <span className={`search-badge source-badge ${badge.sourceKey}`}>
-                                {badge.sourceLabel}
-                              </span>
-                              <span className={`search-badge format-badge ${badge.formatKey}`}>
-                                {badge.formatLabel}
-                              </span>
-                              {profileEntries.get(rec.target_id) && (
-                                <span className={`library-badge status-${profileEntries.get(rec.target_id)?.status}`}>
-                                  {profileEntries.get(rec.target_id)?.status.replace(/_/g, ' ')}
-                                  {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
-                                </span>
-                              )}
-                              {rec.language && <a className="language-badge" href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
-                              {rec.status_trans && <span>{rec.status_trans}</span>}
-                            </div>
-                          </div>
-                        </div>
-
-                      {evidenceBullets.length > 0 && (
-                        <>
-                          <div className="evidence-label">Why it matches</div>
-                          <ul className={`evidence-list${compactEvidence ? ' evidence-list-compact' : ''}`}>
-                            {evidenceBullets.map((bullet, i) => (
-                              <li key={i} className="evidence-item">
-                                <span className="evidence-bullet" aria-hidden="true">✓</span>
-                                <span>{bullet}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-                    </div>
-
-                    {rec.shared_tags.length > 0 && (
-                      <aside className="card-tag-rail" aria-label="Shared tropes">
-                        <span className="card-tag-label">Shared tropes</span>
-                        <div className="detail-chips card-tag-links">
-                          {rec.shared_tags.slice(0, 3).map((tag) => (
-                            <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
-                          ))}
-                        </div>
-                        {rec.shared_tags.length > 3 && (
-                          <details className="card-tag-more">
-                            <summary>+{rec.shared_tags.length - 3} more</summary>
-                            <div className="detail-chips">
-                              {rec.shared_tags.slice(3).map((tag) => (
-                                <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
-                              ))}
-                            </div>
-                          </details>
-                        )}
-                      </aside>
-                    )}
-                  </div>
-
-                  <div className="feedback-actions">
+                  rank={index + 1}
+                  matchPercent={rec.match_score_percent}
+                  libraryStatus={entry?.status}
+                  libraryRating={entry?.rating}
+                  evidence={rec.evidence_bullets}
+                  sharedTags={rec.shared_tags}
+                  tagHref={(tag: string) => browseFacetUrl('tag', tag)}
+                  onActivate={() => void openNovelDetail(rec)}
+                  actions={
+                    <>
                     <Button variant="primary" className="card-primary-action" onClick={() => useProfileEntryAsSeed({
                       novel_id: rec.target_id,
                       slug: rec.slug,
@@ -1331,11 +1176,11 @@ export default function App(): JSX.Element {
                           onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={16} aria-hidden="true" /></Button>
                       </Tooltip>
                     </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+                    </>
+                  }
+                />
+              );
+            })}
         </div>
 
           <div className="results-sentinel" ref={resultsSentinelRef}>

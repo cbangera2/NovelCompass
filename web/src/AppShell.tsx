@@ -2,16 +2,14 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
-  Bug,
   Clock3,
-  Code2,
   Database,
   Download,
-  ExternalLink,
   LogOut,
   Search,
   Settings,
   Heart,
+  Library,
   Sparkles,
   User,
   X,
@@ -30,7 +28,9 @@ import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
 import type { NovelSearchResult } from './types';
-import { getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
+import { displayNovelTitle, useDisplaySettings } from './settings';
+import { SearchResultRow } from './components/SearchResultRow';
+import { emitSeedSelected, OPEN_SEARCH_EVENT, type OpenSearchDetail } from './components/searchEvents';
 import { NovelCompassMark } from './NovelCompassMark';
 import {
   Sidebar,
@@ -54,12 +54,31 @@ import { useDataModePreference } from './dataModePreference';
 export type AppView = 'discover' | 'foryou' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
 
 const NAV_ITEMS = [
-  { view: 'foryou' as const, label: 'For You', note: 'Picked from your lists', icon: Heart },
-  { view: 'discover' as const, label: 'Discover', note: 'Find related titles', icon: Sparkles },
-  { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen },
-  { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings },
-  { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database },
+  { view: 'foryou' as const, label: 'For You', note: 'Picked from your lists', icon: Heart, tab: true },
+  { view: 'discover' as const, label: 'Discover', note: 'Find related titles', icon: Sparkles, tab: true },
+  { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen, tab: true },
+  { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings, tab: false },
+  { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database, tab: false },
 ];
+
+// Mobile bottom tab bar. "Library" points at Profile until it gets its own page.
+const TAB_ITEMS = [
+  { view: 'foryou' as const, label: 'For You', icon: Heart },
+  { view: 'discover' as const, label: 'Discover', icon: Sparkles },
+  { view: 'browse' as const, label: 'Browse', icon: BookOpen },
+  { view: 'profile' as const, label: 'Library', icon: Library },
+];
+
+const BRAND = 'Novel Compass';
+const VIEW_TITLES: Record<AppView, string> = {
+  foryou: 'For You',
+  discover: 'Discover',
+  browse: 'Browse',
+  settings: 'Settings',
+  profile: 'Profile',
+  scraper: 'Scraper',
+  novel: '',
+};
 
 function viewUrl(view: AppView): string {
   const base = import.meta.env.BASE_URL;
@@ -82,6 +101,11 @@ export default function AppShell({
     window.location.hostname.endsWith('.github.io') ||
     window.location.hostname.endsWith('.pages.dev');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
+
+  useEffect(() => {
+    // The novel page sets its own "<Title> - Novel Compass" once the record loads.
+    document.title = VIEW_TITLES[activeView] ? `${VIEW_TITLES[activeView]} - ${BRAND}` : BRAND;
+  }, [activeView]);
 
   useEffect(() => {
     const refreshProfile = () =>
@@ -150,7 +174,7 @@ export default function AppShell({
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <SidebarMenuItem key={item.view}>
+                  <SidebarMenuItem key={item.view} className={item.tab ? 'sidebar-item-in-tabbar' : ''}>
                     <SidebarMenuButton
                       asChild
                       active={activeView === item.view}
@@ -170,59 +194,6 @@ export default function AppShell({
             </SidebarMenu>
           </SidebarGroup>
           <SidebarMediaGroup />
-          <SidebarGroup className="sidebar-group-compact">
-            <SidebarGroupLabel>Project</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="GitHub Repository">
-                  <a
-                    href="https://github.com/cbangera2/NovelCompass"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Code2 size={18} />
-                    <span>
-                      <strong>GitHub Repo</strong>
-                      <small>Source code & project</small>
-                    </span>
-                    <ExternalLink size={13} className="sidebar-external-icon" />
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Report an Issue">
-                  <a
-                    href="https://github.com/cbangera2/NovelCompass/issues"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Bug size={18} />
-                    <span>
-                      <strong>Report Issue</strong>
-                      <small>GitHub issue tracker</small>
-                    </span>
-                    <ExternalLink size={13} className="sidebar-external-icon" />
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Data Repository">
-                  <a
-                    href="https://github.com/cbangera2/novelcompass-data"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Database size={18} />
-                    <span>
-                      <strong>Data Repo</strong>
-                      <small>Catalog dataset</small>
-                    </span>
-                    <ExternalLink size={13} className="sidebar-external-icon" />
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
@@ -283,6 +254,19 @@ export default function AppShell({
           </nav>
         </footer>
       </SidebarInset>
+      <nav className="shell-tabbar" aria-label="Primary">
+        {TAB_ITEMS.map(({ view, label, icon: Icon }) => (
+          <a
+            key={view}
+            href={viewUrl(view)}
+            className={activeView === view ? 'active' : ''}
+            aria-current={activeView === view ? 'page' : undefined}
+          >
+            <Icon size={20} aria-hidden="true" />
+            <span>{label}</span>
+          </a>
+        ))}
+      </nav>
     </SidebarProvider>
   );
 }
@@ -346,14 +330,16 @@ function GlobalNovelSearch({
     }
   });
   const [open, setOpen] = useState(false);
+  const [seedMode, setSeedMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { settings } = useDisplaySettings();
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as Node)) { setOpen(false); setSeedMode(false); }
     };
     document.addEventListener('pointerdown', close);
     return () => document.removeEventListener('pointerdown', close);
@@ -374,6 +360,16 @@ function GlobalNovelSearch({
     };
     window.addEventListener('keydown', onShortcut);
     return () => window.removeEventListener('keydown', onShortcut);
+  }, []);
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      setSeedMode((event as CustomEvent<OpenSearchDetail>).detail?.mode === 'seed');
+      setOpen(true);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    };
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpen);
   }, []);
 
   useEffect(() => {
@@ -411,7 +407,7 @@ function GlobalNovelSearch({
 
   const typesParam = !isAllSelected && selectedTypes.length > 0 ? `&types=${encodeURIComponent(selectedTypes.join(','))}` : '';
   const browseUrl = `${import.meta.env.BASE_URL}?view=browse&q=${encodeURIComponent(query.trim())}${typesParam}`;
-  const hasPanelContent = loading || query.trim().length >= 2 || recent.length > 0;
+  const hasPanelContent = loading || query.trim().length >= 2 || recent.length > 0 || seedMode;
   const searchPanel = (
     <div className="shell-search-panel" ref={rootRef}>
       <label>
@@ -420,7 +416,7 @@ function GlobalNovelSearch({
           ref={inputRef}
           type="search"
           value={query}
-          placeholder={scopedPlaceholder}
+          placeholder={seedMode ? 'Search for a starting title…' : scopedPlaceholder}
           aria-label={
             isAllSelected ? 'Search the catalog' : `Search the catalog (${scopeLabel})`
           }
@@ -431,7 +427,7 @@ function GlobalNovelSearch({
             setOpen(true);
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') setOpen(false);
+            if (event.key === 'Escape') { setOpen(false); setSeedMode(false); }
           }}
         />
         {query && (
@@ -465,40 +461,29 @@ function GlobalNovelSearch({
             )}
             {!loading && query.trim().length < 2 && recent.length > 0 && (
               <p className="shell-search-heading">
-                <Clock3 size={13} /> Recent titles
+                <Clock3 size={13} /> {seedMode ? 'Recent titles — pick a starting title' : 'Recent titles'}
               </p>
             )}
-            {(query.trim().length >= 2 ? results : recent).map((novel) => {
-              const badge = getMediaBadgeInfo(novel);
-              return (
-                <a key={novel.id} href={novelPageUrl(novel.id)} data-preview-id={novel.id} onClick={() => choose(novel)}>
-                  {hasUsableCover(novel.cover_url) ? (
-                    <img src={novel.cover_url} alt="" loading="lazy" />
-                  ) : (
-                    <span>
-                      <BookOpen size={16} />
-                    </span>
-                  )}
-                  <span>
-                    <div className="suggestion-title-line">
-                      <strong>{novel.title}</strong>
-                      <span className="suggestion-badges">
-                        <span className={`search-badge format-badge ${badge.formatKey}`}>
-                          {badge.formatLabel}
-                        </span>
-                        <span className={`search-badge source-badge ${badge.sourceKey}`}>
-                          {badge.sourceLabel}
-                        </span>
-                      </span>
-                    </div>
-                    <small>{novel.author || 'Catalog title'}</small>
-                  </span>
-                  <ArrowRight size={15} aria-hidden="true" />
-                </a>
-              );
-            })}
+            {seedMode && query.trim().length < 2 && recent.length === 0 && (
+              <p className="shell-search-state">Type a title to use as the starting point.</p>
+            )}
+            {(query.trim().length >= 2 ? results : recent).map((novel) => (
+              <SearchResultRow
+                key={novel.id}
+                novel={novel}
+                title={displayNovelTitle(novel.title, undefined, settings.titlePreference)}
+                onNavigate={() => choose(novel)}
+                onSelect={seedMode ? () => {
+                  choose(novel);
+                  emitSeedSelected(novel);
+                  setOpen(false);
+                  setSeedMode(false);
+                  setQuery('');
+                } : undefined}
+              />
+            ))}
           </div>
-          {query.trim().length >= 2 && (
+          {query.trim().length >= 2 && !seedMode && (
             <a className="shell-search-all" href={browseUrl}>
               View all Browse results <ArrowRight size={14} />
             </a>
