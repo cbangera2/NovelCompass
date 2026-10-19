@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles, Star } from 'lucide-react';
 import { DSButton, Skeleton } from './design-system';
-import { hasUsableCover, novelPageUrl } from './novelLinks';
+import { formatStatusLabel, hasUsableCover, novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
@@ -9,6 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
+import { registerPreviews, type PreviewData } from './CoverPreview';
 import './for-you.css';
 
 export interface ListSummary {
@@ -177,13 +178,34 @@ function Cover({ rec, status, eager }: { rec: RowRec; status?: ReadingStatus; ea
       )}
       {status && <span className={`fy-status status-${status}`}>{STATUS_LABELS[status]}</span>}
       {onList.length > 0 && <span className="fy-known" title={`On your list: ${onList.join(', ')}`}>On your list</span>}
+      <div className="fy-stats">
+        <span className="fy-rating" title={`${rec.rating_votes.toLocaleString()} votes`}><Star size={12} />{rec.rating ? rec.rating.toFixed(1) : '—'}</span>
+        {rec.status_trans && <span>{formatStatusLabel(rec.status_trans)}</span>}
+        <span className="fy-match">{Math.round(rec.match_score_percent)}%</span>
+      </div>
     </div>
   );
 }
 
+/** Feed the shared cover hover card so For You picks preview instantly, match data and all. */
+function previewFor(rec: RowRec): PreviewData {
+  return {
+    id: rec.target_id,
+    title: rec.title,
+    rating: rec.rating,
+    rating_votes: rec.rating_votes,
+    media_type: rec.media_type,
+    status_trans: rec.status_trans,
+    statsOnCover: true,
+    matchPercent: rec.match_score_percent,
+    sharedTags: rec.shared_tags,
+    bullets: rec.evidence_bullets,
+  };
+}
+
 function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean }) {
   return (
-    <a className="fy-card" href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
+    <a className="fy-card" data-preview-id={rec.target_id} href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
       <Cover rec={rec} status={library.get(rec.target_id)} eager={eager} />
       <strong title={rec.title}>{rec.title}</strong>
       <div className="fy-strength" title={`${rec.match_score_percent}% of this row's strongest match`}>
@@ -435,7 +457,10 @@ export default function ForYouPage(): JSX.Element {
     if (requested.has(job.key)) return;
     requested.add(job.key);
     job.load(ROW_LIMIT, controller.signal)
-      .then((data) => setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } })))
+      .then((data) => {
+        registerPreviews(data.recommendations.map(previewFor));
+        setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } }));
+      })
       .catch((error) => {
         if (controller.signal.aborted) return;
         setRows((prev) => ({ ...prev, [job.key]: { status: 'error', message: error.message } }));
