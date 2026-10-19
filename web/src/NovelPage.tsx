@@ -12,7 +12,7 @@ import { LocalNovelFeedback, LocalUserProfile, ReadingStatus } from './profile/t
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { CuratedListSummary, NovelDetail, NovelInsights, Recommendation, RelatedSeriesItem } from './types';
 import { catalogVerdicts, CuratedListsCard, RatingDistributionCard, SeriesCard, summarizeRatings } from './NovelReaderSignals';
-import { formatStatusLabel, getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
+import { formatStatusLabel, getMediaBadgeInfo, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import { CHANNEL_LABELS, previewFromRecommendation, registerPreviews, signalStrength } from './CoverPreview';
 import './novel-page.css';
@@ -218,7 +218,7 @@ export default function NovelPage(): JSX.Element {
         <div className="novel-stats">
           <div><strong>{detail.rating.toFixed(1)}</strong><span>rating</span><small>{detail.rating_votes.toLocaleString()} votes</small></div>
           <div><strong>{Math.max(0, detail.reading_list_count).toLocaleString()}</strong><span>readers</span><small>on reading lists</small></div>
-          <div><strong>{detail.chapters_trans > 0 ? detail.chapters_trans.toLocaleString() : '—'}</strong><span>chapters</span><small>{detail.chapters_trans > 0 ? (detail.chapters_orig ? `${detail.chapters_orig.toLocaleString()} original` : 'translated') : 'not tracked'}</small></div>
+          <div><strong>{detail.chapters_trans > 0 ? detail.chapters_trans.toLocaleString() : '—'}</strong><span>{progressUnitLabel(detail.id, detail.media_type)}</span><small>{detail.chapters_trans > 0 ? (detail.chapters_orig ? `${detail.chapters_orig.toLocaleString()} original` : 'translated') : 'not tracked'}</small></div>
         </div>
         {insights && <div className="novel-standing" aria-label="Catalog standing">
           {insights.metrics.map((metric) => {

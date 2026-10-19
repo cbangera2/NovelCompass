@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { configuredDataMode, createDataSource, DataMode } from './data';
 import { useDataModePreference } from './dataModePreference';
-import { formatStatusLabel } from './novelLinks';
+import { formatStatusLabel, progressUnitLabel } from './novelLinks';
 import { NovelDetail, Recommendation } from './types';
 import './cover-preview.css';
 
@@ -192,7 +192,7 @@ export function CoverPreviewHost() {
       <div className="pop-facts">
         <span><b>{data.rating ? data.rating.toFixed(1) : '—'}</b>rating{data.rating_votes != null ? ` · ${data.rating_votes.toLocaleString()} votes` : ''}</span>
         {data.reading_list_count != null && <span><b>{data.reading_list_count.toLocaleString()}</b>readers</span>}
-        {data.chapters_trans != null && <span><b>{data.chapters_trans > 0 ? data.chapters_trans.toLocaleString() : '—'}</b>chapters{data.status_trans ? ` · ${formatStatusLabel(data.status_trans)}` : ''}</span>}
+        {data.chapters_trans != null && <span><b>{data.chapters_trans > 0 ? data.chapters_trans.toLocaleString() : '—'}</b>{progressUnitLabel(data.id, data.media_type)}{data.status_trans ? ` · ${formatStatusLabel(data.status_trans)}` : ''}</span>}
       </div>
       {data.signals && data.signals.length > 0 && <div className="pop-signals">
         <h5>Why it surfaced{data.matchPercent != null ? ` · ${data.matchPercent.toFixed(0)}% match` : ''}</h5>
