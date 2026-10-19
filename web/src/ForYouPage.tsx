@@ -9,6 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
+import { listPageUrl } from './routeState';
 import { registerPreviews, type PreviewData } from './CoverPreview';
 import './for-you.css';
 
@@ -216,6 +217,10 @@ function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, Re
   );
 }
 
+/** Shelves built from a curated list link to that list's page. */
+const listHref = (key: string) => (key.startsWith('list-') ? listPageUrl(Number(key.slice(5))) : undefined);
+const withLink = (text: string, href?: string) => (href ? <a className="fy-list-link" href={href}>{text}</a> : text);
+
 function seedLine(data: RowData) {
   const names = data.seeds.slice(0, 3).map((s) => s.title).join(', ');
   return `${data.subtitle}: ${names}${data.seeds.length > 3 ? ` +${data.seeds.length - 3} more` : ''}`;
@@ -226,6 +231,7 @@ function Row({
   fallbackTitle,
   heading,
   blurb,
+  href,
   library,
   onSeeAll,
   onVisible,
@@ -234,6 +240,7 @@ function Row({
   fallbackTitle: string;
   heading?: string;
   blurb?: string;
+  href?: string;
   library: Map<number, ReadingStatus>;
   onSeeAll: () => void;
   onVisible: () => void;
@@ -259,7 +266,7 @@ function Row({
     <section className="fy-row" ref={section}>
       <header>
         <div>
-          <h2>{heading ?? (state.status === 'ready' ? state.title : fallbackTitle)}</h2>
+          <h2>{withLink(heading ?? (state.status === 'ready' ? state.title : fallbackTitle), href)}</h2>
           {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{blurb ?? seedLine(state)}</p>}
         </div>
         {state.status === 'ready' && (
@@ -324,7 +331,7 @@ function RowGrid({
       <header>
         <div>
           <DSButton variant="ghost" className="fy-back" onClick={onBack}><ArrowLeft size={16} /> Back to rows</DSButton>
-          <h2>{job.heading ?? (state.status === 'ready' ? state.title : job.fallbackTitle)}</h2>
+          <h2>{withLink(job.heading ?? (state.status === 'ready' ? state.title : job.fallbackTitle), listHref(job.key))}</h2>
           {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{job.blurb ?? seedLine(state)}</p>}
         </div>
       </header>
@@ -563,6 +570,7 @@ export default function ForYouPage(): JSX.Element {
           fallbackTitle={fallbackTitle(job)}
           heading={headingFor(job)}
           blurb={blurbFor(job)}
+          href={listHref(job.key)}
           library={library}
           onSeeAll={() => setExpanded(job.key)}
           onVisible={() => requestRow(job)}

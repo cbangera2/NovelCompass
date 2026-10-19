@@ -12,7 +12,7 @@ const BASE = `${import.meta.env.BASE_URL}for-you-data`;
 const RRF_K = 60;
 const LIBRARY_SEEDS = 8; // each seed is one pool fetch, so cap how many a row blends
 
-interface ListFile {
+export interface ListFile {
   id: number;
   title: string;
   seeds: Array<{ id: number; title: string }>;
@@ -21,7 +21,7 @@ interface ListFile {
 }
 
 const listFiles = new Map<number, Promise<ListFile>>();
-function loadListFile(id: number): Promise<ListFile> {
+export function loadListFile(id: number): Promise<ListFile> {
   let pending = listFiles.get(id);
   if (!pending) {
     pending = fetch(`${BASE}/list-${id}.json`).then((r) => {
@@ -172,4 +172,11 @@ export async function rankListsByLibrary(lists: ListSummary[], entries: ProfileE
     if (score > 0) scored.push([lists[i].id, score]);
   });
   return scored.sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
+let snapshotListIds: Promise<Set<number>> | undefined;
+/** Ids of the curated lists that have a page in this snapshot (so links can go to our list page). */
+export function staticListIds(): Promise<Set<number>> {
+  snapshotListIds ??= staticLists().then((lists) => new Set(lists.map((l) => l.id)), () => new Set<number>());
+  return snapshotListIds;
 }
