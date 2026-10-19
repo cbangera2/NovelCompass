@@ -171,6 +171,7 @@ export default function App(): JSX.Element {
     if (data) registerPreviews(data.recommendations.map(previewFromRecommendation));
   }, [data]);
   const [visibleCount, setVisibleCount] = useState(8);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loadedLimit, setLoadedLimit] = useState(0);
   const [availableExhausted, setAvailableExhausted] = useState(false);
   const [observerSupported, setObserverSupported] = useState(true);
@@ -776,6 +777,29 @@ export default function App(): JSX.Element {
     .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
     .slice(0, maxResults), [data, feedbackByNovel, hideLibraryTitles, maxResults, profileEntries]);
 
+  // What every result shares with the seed is said once in the seed header; cards then show what sets them apart.
+  const resultInsights = useMemo(() => {
+    const recs = filteredRecommendations;
+    const tagCounts = new Map<string, number>();
+    const languageCounts = new Map<string, number>();
+    for (const rec of recs) {
+      for (const tag of new Set(rec.shared_tags)) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      if (rec.language) languageCounts.set(rec.language, (languageCounts.get(rec.language) || 0) + 1);
+    }
+    const enough = recs.length >= 4;
+    const commonTags = enough
+      ? [...tagCounts].filter(([, count]) => count / recs.length >= 0.5).sort((a, b) => b[1] - a[1]).map(([tag]) => tag)
+      : [];
+    const topLanguage = [...languageCounts].sort((a, b) => b[1] - a[1])[0];
+    return {
+      tagCounts,
+      commonTags: new Set(commonTags),
+      commonTagList: commonTags.slice(0, 8),
+      commonLanguage: enough && topLanguage && topLanguage[1] / recs.length >= 0.6 ? topLanguage[0] : undefined,
+      topScore: Math.max(1, ...recs.map((rec) => rec.match_score_percent)),
+    };
+  }, [filteredRecommendations]);
+
   const loadNextRecommendationBatch = () => {
     if (loading || !data) return;
     if (visibleCount < filteredRecommendations.length) {
@@ -806,7 +830,7 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-container">
-      <header className="header">
+      <header className={`header${data && !forYouMode ? ' header-compact' : ''}`}>
         <div className="brand-mark"><Sparkles size={18} aria-hidden="true" /></div>
         <div>
           <div className="eyebrow">Relationship-first discovery</div>
@@ -924,10 +948,21 @@ export default function App(): JSX.Element {
         )}
       </section>
 
-      <Card className="filter-panel" aria-label="Recommendation filters">
+      {data && !filtersOpen && (
+        <button type="button" className="filter-collapsed" onClick={() => setFiltersOpen(true)} aria-expanded="false">
+          <SlidersHorizontal size={15} aria-hidden="true" />
+          <strong>Refine matches</strong>
+          <span>{activeFilters.length ? `${activeFilters.length} active` : 'Using balanced defaults'}</span>
+          <em>Show filters</em>
+        </button>
+      )}
+      <Card className="filter-panel" aria-label="Recommendation filters" hidden={!!data && !filtersOpen}>
         <div className="filter-panel-heading">
           <div><strong>Refine matches</strong><span>{activeFilters.length ? `${activeFilters.length} active` : 'Using balanced defaults'}</span></div>
-          {activeFilters.length > 0 && <Button variant="ghost" onClick={resetFilters}>Reset all</Button>}
+          <div>
+            {activeFilters.length > 0 && <Button variant="ghost" onClick={resetFilters}>Reset all</Button>}
+            {data && <Button variant="ghost" onClick={() => setFiltersOpen(false)}>Hide</Button>}
+          </div>
         </div>
         <div className="filter-basics">
           <FieldGroup label="Show">
@@ -1154,6 +1189,12 @@ export default function App(): JSX.Element {
                 {forYouMeta?.affinityApplied ? ' · taste affinity on' : forYouMeta ? ' · taste affinity off (no tag details)' : ''}
                 {forYouMeta?.progress && loading ? ` · ${forYouMeta.progress}` : ''}
               </p>
+              {!forYouMode && resultInsights.commonTagList.length > 0 && (
+                <div className="matched-on">
+                  <span>Matched on</span>
+                  {resultInsights.commonTagList.map((tag) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>)}
+                </div>
+              )}
               {forYouMeta && forYouMeta.seedsFailed.length > 0 && (
                 <p className="for-you-failures">
                   {forYouMeta.seedsFailed.length} seed(s) failed (often missing static rec shards):{' '}
@@ -1183,6 +1224,11 @@ export default function App(): JSX.Element {
               // The shared-tropes bullet just restates the chips below it, so only show the other evidence.
               const evidenceBullets = rec.evidence_bullets.filter((bullet) => bullet && !/^shared key tropes/i.test(bullet));
               const compactEvidence = true;
+              const distinctTags = forYouMode ? rec.shared_tags : [
+                ...rec.shared_tags.filter((tag) => !resultInsights.commonTags.has(tag))
+                  .sort((a, b) => (resultInsights.tagCounts.get(a) || 0) - (resultInsights.tagCounts.get(b) || 0)),
+                ...rec.shared_tags.filter((tag) => resultInsights.commonTags.has(tag)),
+              ];
               const signals = Object.entries(CHANNEL_LABELS)
                 .map(([channel, label]) => ({ label, rank: rec.channel_ranks?.[channel] }))
                 .filter((signal): signal is { label: string; rank: number } => Number.isFinite(signal.rank))
@@ -1208,6 +1254,7 @@ export default function App(): JSX.Element {
 
                           <div className="card-summary">
                             <div className="card-score"><Sparkles size={12} aria-hidden="true" /> {rec.match_score_percent}% match</div>
+                            <div className="card-match-bar" aria-hidden="true"><i style={{ width: `${(rec.match_score_percent / resultInsights.topScore) * 100}%` }} /></div>
                             <h3 className="novel-title">
                               <a href={novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type)} data-preview-id={rec.target_id}>
                                 {displayNovelTitle(rec.title, undefined, settings.titlePreference)}
@@ -1249,7 +1296,7 @@ export default function App(): JSX.Element {
                                   {profileEntries.get(rec.target_id)?.rating ? ` · ${profileEntries.get(rec.target_id)?.rating}★` : ''}
                                 </span>
                               )}
-                              {rec.language && <a className="language-badge" href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
+                              {rec.language && (forYouMode || rec.language !== resultInsights.commonLanguage) && <a className="language-badge" href={browseFacetUrl('language', rec.language)}>{rec.language}</a>}
                               {rec.status_trans && <span>{rec.status_trans}</span>}
                             </div>
                             {signals.length > 0 && (
@@ -1280,15 +1327,15 @@ export default function App(): JSX.Element {
                     {rec.shared_tags.length > 0 && (
                       <aside className="card-tag-rail" aria-label="Shared tropes">
                         <div className="detail-chips card-tag-links">
-                          {rec.shared_tags.slice(0, 4).map((tag) => (
+                          {distinctTags.slice(0, 4).map((tag) => (
                             <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
                           ))}
                         </div>
-                        {rec.shared_tags.length > 4 && (
+                        {distinctTags.length > 4 && (
                           <details className="card-tag-more">
-                            <summary>+{rec.shared_tags.length - 4} more shared</summary>
+                            <summary>+{distinctTags.length - 4} more shared</summary>
                             <div className="detail-chips">
-                              {rec.shared_tags.slice(4).map((tag) => (
+                              {distinctTags.slice(4).map((tag) => (
                                 <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>
                               ))}
                             </div>

@@ -988,3 +988,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 :root[data-theme="light"] .taste-chips span { color: #4c4657; }
 
 .profile-list-import{align-items:center;display:flex;flex-wrap:wrap;gap:.75rem;margin:.5rem 0 1rem}.profile-list-import>span{color:var(--muted);flex:1 1 280px;font-size:.78rem;line-height:1.45}.profile-list-import-error{color:var(--red);flex-basis:100%;font-size:.8rem;margin:0}.profile-list-import-result{flex-basis:100%;font-size:.8rem;margin:0;padding-left:1.1rem}.profile-list-import-result .skipped{color:var(--muted)}
+
+.header-compact h1 { font-size: clamp(1.7rem, 3vw, 2.3rem); }
+.header-compact > div > p { display: none; }
+.filter-collapsed { align-items: center; background: color-mix(in srgb,var(--surface) 82%,transparent); border: 1px solid var(--border); border-radius: 12px; color: var(--text); cursor: pointer; display: flex; font: inherit; gap: .6rem; margin: 0 auto 1rem; max-width: 1120px; padding: .6rem .9rem; text-align: left; width: 100%; }
+.filter-collapsed:hover { border-color: var(--border-strong); }
+.filter-collapsed strong { font-size: .8rem; }
+.filter-collapsed span { color: var(--dim); font-size: .68rem; }
+.filter-collapsed em { color: var(--accent-bright); font-size: .68rem; font-style: normal; margin-left: auto; }
+.filter-panel[hidden] { display: none; }
+.filter-panel-heading > div:last-child { gap: .25rem; }
+.matched-on { align-items: center; display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+.matched-on > span { color: var(--dim); font-size: .62rem; font-weight: 750; letter-spacing: .09em; margin-right: .2rem; text-transform: uppercase; }
+.matched-on a { background: var(--accent-soft); border: 1px solid rgba(155,135,245,.23); border-radius: 999px; color: #d4cbff; font-size: .68rem; padding: .2rem .5rem; text-decoration: none; }
+.matched-on a:hover { border-color: var(--accent); color: var(--text); }
+.card-match-bar { background: rgba(255,255,255,.07); border-radius: 99px; height: 3px; margin: -.15rem 0 .45rem; overflow: hidden; width: 100%; }
+.card-match-bar i { background: linear-gradient(90deg, var(--accent), var(--accent-bright)); border-radius: inherit; display: block; height: 100%; }
