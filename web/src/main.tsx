@@ -9,6 +9,7 @@ import { loadNavigationPreferences } from './preferences';
 const BrowsePage = lazy(() => import('./BrowsePage'));
 const NovelPage = lazy(() => import('./NovelPage'));
 const ForYouPage = lazy(() => import('./ForYouPage'));
+const ListPage = lazy(() => import('./ListPage'));
 const ProfilePage = lazy(() => import('./profile/ProfilePage'));
 const ScraperDashboard = lazy(() => import('./ScraperDashboard'));
 const SettingsPage = lazy(() => import('./SettingsPage'));
@@ -17,7 +18,10 @@ const locationParams = new URLSearchParams(window.location.search);
 const requestedView = locationParams.get('view');
 const isDetailView = requestedView === 'novel' || requestedView === 'manga' || requestedView === 'anime' || requestedView === 'item';
 const hasExplicitDiscoverSeed = locationParams.has('seed');
-const activeView: AppView = isDetailView
+const isListView = requestedView === 'list';
+const activeView: AppView = isListView
+  ? 'foryou' // list pages live under For You in the sidebar
+  : isDetailView
   ? 'novel'
   : requestedView === 'discover' || requestedView === 'foryou' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings'
     ? requestedView
@@ -27,7 +31,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AppShell activeView={activeView}>
       <Suspense fallback={<main className="route-loading" aria-busy="true"><span>Loading workspace…</span></main>}>
-        {activeView === 'scraper'
+        {isListView
+          ? <ListPage />
+          : activeView === 'scraper'
           ? <ScraperDashboard />
           : activeView === 'foryou'
             ? <ForYouPage />
