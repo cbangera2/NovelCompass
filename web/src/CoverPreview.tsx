@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { configuredDataMode, createDataSource, DataMode } from './data';
 import { useDataModePreference } from './dataModePreference';
-import { formatStatusLabel, progressUnitLabel } from './novelLinks';
+import { audienceLabel, formatStatusLabel, progressUnitLabel } from './novelLinks';
 import { NovelDetail, Recommendation } from './types';
 import './cover-preview.css';
 
@@ -191,7 +191,7 @@ export function CoverPreviewHost() {
       <p>{[data.author, data.language, data.media_type, data.year].filter(Boolean).join(' · ')}</p>
       <div className="pop-facts">
         <span><b>{data.rating ? data.rating.toFixed(1) : '—'}</b>rating{data.rating_votes != null ? ` · ${data.rating_votes.toLocaleString()} votes` : ''}</span>
-        {data.reading_list_count != null && <span><b>{data.reading_list_count.toLocaleString()}</b>readers</span>}
+        {data.reading_list_count != null && <span><b>{data.reading_list_count.toLocaleString()}</b>{audienceLabel(data.id, data.media_type)}</span>}
         {data.chapters_trans != null && <span><b>{data.chapters_trans > 0 ? data.chapters_trans.toLocaleString() : '—'}</b>{progressUnitLabel(data.id, data.media_type)}{data.status_trans ? ` · ${formatStatusLabel(data.status_trans)}` : ''}</span>}
       </div>
       {data.signals && data.signals.length > 0 && <div className="pop-signals">

@@ -18,6 +18,11 @@ export function progressUnitLabel(id: number, mediaType?: string, short = false)
   return anime ? 'episodes' : 'chapters';
 }
 
+/** Anime have watchers; everything else has readers. */
+export function audienceLabel(id: number, mediaType?: string): string {
+  return resolveFormatKey(id, mediaType) === 'anime' ? 'watchers' : 'readers';
+}
+
 export function itemPageUrl(id: number, from?: number, mediaType?: string): string {
   const view = resolveFormatKey(id, mediaType);
   const params = new URLSearchParams({ view, id: String(id) });
