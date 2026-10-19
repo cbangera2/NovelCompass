@@ -1,0 +1,6 @@
+.core-filters { align-items: flex-end; display: flex; flex-wrap: wrap; gap: .5rem; }
+.core-filters > .ui-select, .core-filters > .browse-native-select { min-width: 8.5rem; }
+.active-filter-chips { align-items: center; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem; padding-top: .55rem; }
+.active-filter-chips .ui-button { background: var(--accent-soft); border: 1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius: 999px; color: var(--accent-bright); font-size: .68rem; gap: .3rem; min-height: 0; padding: .2rem .5rem; }
+.active-filter-chips .ui-button.clear-all { background: transparent; border-color: transparent; }
+@media (max-width: 560px) { .core-filters > * { flex: 1 1 8rem; } }

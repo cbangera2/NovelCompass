@@ -25,7 +25,7 @@
 .sidebar-group-compact .sidebar-menu-button{min-height:32px}
 .sidebar-group-compact .sidebar-menu-button small{display:none}
 .sidebar-group-compact .sidebar-menu-button strong{font-size:.72rem;font-weight:500}
-.sidebar-collapse{border-color:transparent;height:30px;justify-content:flex-start}
+.sidebar-collapse{border-color:transparent;height:30px;justify-content:flex-start}.sidebar-provider[data-collapsible="icon"] .sidebar-collapse{justify-content:center;margin:.1rem auto 0;padding:0;width:36px}
 .sidebar-footer{border-top:1px solid var(--border);padding-top:.6rem}
 .sidebar-footer .shell-account{border-color:transparent}
 .sidebar-footer .shell-account.active{box-shadow:none}
