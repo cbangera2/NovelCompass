@@ -11,6 +11,7 @@ import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, st
 import { cleanListTitle } from './forYouNames';
 import { registerPreviews, type PreviewData } from './CoverPreview';
 import './for-you.css';
+import { FormatScopeChip } from './components/FormatScopeChip';
 
 export interface ListSummary {
   id: number;
@@ -507,6 +508,7 @@ export default function ForYouPage(): JSX.Element {
       <header className="fy-hero">
         <p className="eyebrow"><Sparkles size={14} /> For You</p>
         <h1>Picked from what you love</h1>
+        <FormatScopeChip />
         <p>
           Rows start from your library (what you rated highly or finished) and from your lists, using their top titles as seeds.
           Titles from your library show their reading status and titles from your lists are badged, so you can sanity-check
