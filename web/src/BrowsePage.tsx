@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowDownUp,
   BookOpen,
@@ -9,9 +9,6 @@ import {
   Shuffle,
   SlidersHorizontal,
   Sparkles,
-  Star,
-  Users,
-  X,
 } from 'lucide-react';
 import {
   createDataSource,
@@ -23,11 +20,14 @@ import { useDataModePreference } from './dataModePreference';
 import { stableRouteUrl } from './routeState';
 import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './types';
 import { browseFacetUrl } from './metadataLinks';
+import { ActiveFilterChips, CoreFilters } from './components/CoreFilters';
+import { formatMinRating, readCoreFilterParams, writeCoreFilterParams } from './components/coreFilterParams';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
-import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { getMediaBadgeInfo, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
+import { Card, CardHeader, DSButton, Skeleton } from './design-system';
+import { novelPageUrl, progressUnitLabel } from './novelLinks';
+import { NovelCard } from './components/NovelCard';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
@@ -126,11 +126,15 @@ export default function BrowsePage({
         : 'desc'
       : savedDirection,
   );
-  const [language, setLanguage] = useState(initialString('language', 'language'));
+  const initialCore = readCoreFilterParams(initialParams, {
+    language: String(saved.language || ''),
+    minRating: Number(saved.minRating || 0),
+  });
+  const [language, setLanguage] = useState(initialCore.language);
   const [author, setAuthor] = useState(initialString('author', 'author'));
   const [genre, setGenre] = useState(initialString('genre', 'genre'));
   const [tag, setTag] = useState(initialString('tag', 'tag'));
-  const [minRating, setMinRating] = useState(initialNumber('min_rating', 'minRating'));
+  const [minRating, setMinRating] = useState(initialCore.minRating);
   const [maxRating, setMaxRating] = useState(initialNumber('max_rating', 'maxRating'));
   const [minVotes, setMinVotes] = useState(initialNumber('min_votes', 'minVotes'));
   const [minYear, setMinYear] = useState(initialNumber('min_year', 'minYear'));
@@ -421,11 +425,9 @@ export default function BrowsePage({
       q: query,
       sort,
       direction,
-      language,
       author,
       genre,
       tag,
-      min_rating: minRating,
       max_rating: maxRating,
       min_votes: minVotes,
       min_year: minYear,
@@ -442,6 +444,7 @@ export default function BrowsePage({
       exclude_library: excludeLibrary,
       density,
     };
+    writeCoreFilterParams(params, { language, minRating });
     Object.entries(values).forEach(([key, value]) => {
       if (value && value !== 'desc' && value !== 'grid')
         params.set(key, value === true ? '1' : String(value));
@@ -489,7 +492,8 @@ export default function BrowsePage({
         return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : 0;
       };
       setQuery(text('q'));
-      setLanguage(text('language'));
+      const core = readCoreFilterParams(params, { language: '', minRating: 0 });
+      setLanguage(core.language);
       setAuthor(text('author'));
       setGenre(text('genre'));
       setTag(text('tag'));
@@ -500,7 +504,7 @@ export default function BrowsePage({
       );
       setDirection(text('direction') === 'asc' ? 'asc' : 'desc');
       setDensity(text('density') === 'list' ? 'list' : 'grid');
-      setMinRating(number('min_rating', 5));
+      setMinRating(core.minRating);
       setMaxRating(number('max_rating', 5));
       setMinVotes(number('min_votes'));
       setMinYear(number('min_year'));
@@ -619,7 +623,7 @@ export default function BrowsePage({
     genre && { label: `Genre: ${genre}`, clear: () => setGenre('') },
     tag && { label: `Tag: ${tag}`, clear: () => setTag('') },
     language && { label: `Language: ${language}`, clear: () => setLanguage('') },
-    minRating > 0 && { label: `Rating: ${minRating}★+`, clear: () => setMinRating(0) },
+    minRating > 0 && { label: `Rating: ${formatMinRating(minRating)}`, clear: () => setMinRating(0) },
     maxRating > 0 && { label: `Rating ≤ ${maxRating}★`, clear: () => setMaxRating(0) },
     minVotes > 0 && { label: `Votes: ${minVotes.toLocaleString()}+`, clear: () => setMinVotes(0) },
     minYear > 0 && { label: `From ${minYear}`, clear: () => setMinYear(0) },
@@ -711,13 +715,13 @@ export default function BrowsePage({
       </nav>
       <Card className="browse-controls" aria-label="Catalog filters">
         <label className="browse-search">
-          <span>Search</span>
+          <span>Filter results</span>
           <div className="browse-search-input-wrap">
             <Search size={17} />
             <input
               value={query}
               onChange={(event) => resetPage(() => setQuery(event.target.value))}
-              placeholder="Search titles, aliases, or authors…"
+              placeholder="Filter by title, alias, or author…"
             />
           </div>
         </label>
@@ -733,6 +737,14 @@ export default function BrowsePage({
           <option value="newest">Newest year</option>
           <option value="title">Title A–Z</option>
         </BrowseSelect>
+        <CoreFilters
+          native={nativeControls}
+          language={language}
+          minRating={minRating}
+          languages={options.languages}
+          onLanguageChange={(value) => resetPage(() => setLanguage(value))}
+          onMinRatingChange={(value) => resetPage(() => setMinRating(value))}
+        />
         <DSButton
           variant="ghost"
           className="browse-direction"
@@ -778,28 +790,6 @@ export default function BrowsePage({
               {options.tags?.map((item) => (
                 <option key={item}>{item}</option>
               ))}
-            </BrowseSelect>
-            <BrowseSelect
-              native={nativeControls}
-              label="Language"
-              value={language}
-              onChange={(value) => resetPage(() => setLanguage(value))}
-            >
-              <option value="">All languages</option>
-              {options.languages?.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </BrowseSelect>
-            <BrowseSelect
-              native={nativeControls}
-              label="Minimum rating"
-              value={minRating}
-              onChange={(value) => resetPage(() => setMinRating(Number(value)))}
-            >
-              <option value="0">Any rating</option>
-              <option value="3">3★ and up</option>
-              <option value="4">4★ and up</option>
-              <option value="4.5">4.5★ and up</option>
             </BrowseSelect>
             <BrowseSelect
               native={nativeControls}
@@ -906,19 +896,11 @@ export default function BrowsePage({
           </FieldGroup>
         </details>
       </Card>
-      {activeFilters.length > 0 && (
-        <div className="browse-active-filters" aria-label="Active filters">
-          {activeFilters.map((filter) => (
-            <DSButton variant="ghost" key={filter.label} onClick={() => resetPage(filter.clear)}>
-              {filter.label}
-              <X size={12} />
-            </DSButton>
-          ))}
-          <DSButton variant="ghost" className="clear-all" onClick={clearAll}>
-            Clear all
-          </DSButton>
-        </div>
-      )}
+      <ActiveFilterChips
+        className="browse-active-filters"
+        filters={activeFilters.map((filter) => ({ label: filter.label, clear: () => resetPage(filter.clear) }))}
+        onClearAll={clearAll}
+      />
 
       {!tagSupported && (
         <p className="browse-notice">
@@ -1039,92 +1021,47 @@ function BrowseCard({
 }) {
   const { settings } = useDisplaySettings({ persist: persistDisplaySettings });
   const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
-  const badge = getMediaBadgeInfo(novel);
   const href = novelUrl(novel);
   const recommendationHref = similarUrl(novel);
-  const open = () => {
-    window.location.href = href;
-  };
-  return (
-    <Card
-      className="browse-card"
-      data-preview-card
-      role="link"
-      tabIndex={0}
-      onClick={(event) => {
-        if (!(event.target as HTMLElement).closest('a, button')) open();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
+  const facetClick = (handler: (value: string) => void, value: string) =>
+    embedded
+      ? (event: MouseEvent<HTMLAnchorElement>) => {
           event.preventDefault();
-          open();
+          handler(value);
         }
+      : undefined;
+  const sourceName = sourceDisplayName(novel.source, novel.id);
+  return (
+    <NovelCard
+      variant="row"
+      className="browse-result"
+      item={{
+        id: novel.id,
+        title,
+        href,
+        coverUrl: novel.cover_url,
+        mediaType: novel.media_type,
+        source: novel.source,
+        author: novel.author,
+        authorHref: novel.author ? (embedded ? '#' : browseFacetUrl('author', novel.author)) : undefined,
+        onAuthorClick: novel.author ? facetClick(onSelectAuthor, novel.author) : undefined,
+        rating: novel.rating,
+        ratingVotes: novel.rating_votes,
+        readers: novel.reading_list_count,
       }}
-    >
-      <a className="browse-cover" href={href} data-preview-id={novel.id}>
-        {hasUsableCover(novel.cover_url) ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
-      </a>
-      <div>
-        <a className="browse-title" href={href}>
-          {title}
+      chips={novel.genres?.slice(0, 3).map((item) => (
+        <a key={item} href={embedded ? '#' : browseFacetUrl('genre', item)} onClick={facetClick(onSelectGenre, item)}>
+          {item}
         </a>
-        <p>
-          {novel.author ? (
-            <a
-              href={embedded ? '#' : browseFacetUrl('author', novel.author)}
-              onClick={
-                embedded
-                  ? (event) => {
-                      event.preventDefault();
-                      onSelectAuthor(novel.author);
-                    }
-                  : undefined
-              }
-            >
-              {novel.author}
-            </a>
-          ) : (
-            'Unknown author'
-          )}
-        </p>
-        <div className="browse-meta">
-          <span className={`search-badge source-badge ${badge.sourceKey}`}>
-            {badge.sourceLabel}
-          </span>
-          <span className={`search-badge format-badge ${badge.formatKey}`}>
-            {badge.formatLabel}
-          </span>
-          <Badge tone="amber">
-            <Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'}{' '}
-            <small>({novel.rating_votes.toLocaleString()})</small>
-          </Badge>
-          <Badge>
-            <Users size={14} /> {Math.max(0, novel.reading_list_count).toLocaleString()}
-          </Badge>
-        </div>
-        <div className="browse-chips">
-          {novel.genres?.slice(0, 3).map((item) => (
-            <a
-              key={item}
-              href={embedded ? '#' : browseFacetUrl('genre', item)}
-              onClick={
-                embedded
-                  ? (event) => {
-                      event.preventDefault();
-                      onSelectGenre(item);
-                    }
-                  : undefined
-              }
-            >
-              {item}
-            </a>
-          ))}
-        </div>
-        <footer className="browse-card-actions">
-          <span>
-            {novel.year || 'Year unknown'}
-            {novel.chapters_trans ? ` · ${novel.chapters_trans} ${progressUnitLabel(novel.id, novel.media_type, true)}` : ''}
-          </span>
+      ))}
+      footerNote={
+        <>
+          {novel.year || 'Year unknown'}
+          {novel.chapters_trans ? ` · ${novel.chapters_trans} ${progressUnitLabel(novel.id, novel.media_type, true)}` : ''}
+        </>
+      }
+      actions={
+        <>
           {recommendationHref && (
             <Tooltip content="Find similar titles">
               <DSButton
@@ -1138,7 +1075,7 @@ function BrowseCard({
               </DSButton>
             </Tooltip>
           )}
-          <Tooltip content={`Open on ${sourceDisplayName(novel.source, novel.id)}`}>
+          <Tooltip content={`Open on ${sourceName}`}>
             <DSButton
               as="a"
               variant="ghost"
@@ -1150,14 +1087,14 @@ function BrowseCard({
               }
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Open ${title} on ${sourceDisplayName(novel.source, novel.id)}`}
+              aria-label={`Open ${title} on ${sourceName}`}
             >
               <ExternalLink size={16} aria-hidden="true" />
             </DSButton>
           </Tooltip>
-        </footer>
-      </div>
-    </Card>
+        </>
+      }
+    />
   );
 }
 

@@ -27,7 +27,9 @@ import { Badge } from './design-system';
 import { defaultHomeUrl } from './preferences';
 import { createDataSource } from './data';
 import type { NovelSearchResult } from './types';
-import { getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
+import { displayNovelTitle, useDisplaySettings } from './settings';
+import { SearchResultRow } from './components/SearchResultRow';
+import { emitSeedSelected, OPEN_SEARCH_EVENT, type OpenSearchDetail } from './components/searchEvents';
 import { NovelCompassMark } from './NovelCompassMark';
 import {
   Sidebar,
@@ -290,14 +292,16 @@ function GlobalNovelSearch({
     }
   });
   const [open, setOpen] = useState(false);
+  const [seedMode, setSeedMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { settings } = useDisplaySettings();
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as Node)) { setOpen(false); setSeedMode(false); }
     };
     document.addEventListener('pointerdown', close);
     return () => document.removeEventListener('pointerdown', close);
@@ -318,6 +322,16 @@ function GlobalNovelSearch({
     };
     window.addEventListener('keydown', onShortcut);
     return () => window.removeEventListener('keydown', onShortcut);
+  }, []);
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      setSeedMode((event as CustomEvent<OpenSearchDetail>).detail?.mode === 'seed');
+      setOpen(true);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    };
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpen);
   }, []);
 
   useEffect(() => {
@@ -355,7 +369,7 @@ function GlobalNovelSearch({
 
   const typesParam = !isAllSelected && selectedTypes.length > 0 ? `&types=${encodeURIComponent(selectedTypes.join(','))}` : '';
   const browseUrl = `${import.meta.env.BASE_URL}?view=browse&q=${encodeURIComponent(query.trim())}${typesParam}`;
-  const hasPanelContent = loading || query.trim().length >= 2 || recent.length > 0;
+  const hasPanelContent = loading || query.trim().length >= 2 || recent.length > 0 || seedMode;
   const searchPanel = (
     <div className="shell-search-panel" ref={rootRef}>
       <label>
@@ -364,7 +378,7 @@ function GlobalNovelSearch({
           ref={inputRef}
           type="search"
           value={query}
-          placeholder={scopedPlaceholder}
+          placeholder={seedMode ? 'Search for a starting title…' : scopedPlaceholder}
           aria-label={
             isAllSelected ? 'Search the catalog' : `Search the catalog (${scopeLabel})`
           }
@@ -375,7 +389,7 @@ function GlobalNovelSearch({
             setOpen(true);
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') setOpen(false);
+            if (event.key === 'Escape') { setOpen(false); setSeedMode(false); }
           }}
         />
         {query && (
@@ -409,40 +423,29 @@ function GlobalNovelSearch({
             )}
             {!loading && query.trim().length < 2 && recent.length > 0 && (
               <p className="shell-search-heading">
-                <Clock3 size={13} /> Recent titles
+                <Clock3 size={13} /> {seedMode ? 'Recent titles — pick a starting title' : 'Recent titles'}
               </p>
             )}
-            {(query.trim().length >= 2 ? results : recent).map((novel) => {
-              const badge = getMediaBadgeInfo(novel);
-              return (
-                <a key={novel.id} href={novelPageUrl(novel.id)} data-preview-id={novel.id} onClick={() => choose(novel)}>
-                  {hasUsableCover(novel.cover_url) ? (
-                    <img src={novel.cover_url} alt="" loading="lazy" />
-                  ) : (
-                    <span>
-                      <BookOpen size={16} />
-                    </span>
-                  )}
-                  <span>
-                    <div className="suggestion-title-line">
-                      <strong>{novel.title}</strong>
-                      <span className="suggestion-badges">
-                        <span className={`search-badge format-badge ${badge.formatKey}`}>
-                          {badge.formatLabel}
-                        </span>
-                        <span className={`search-badge source-badge ${badge.sourceKey}`}>
-                          {badge.sourceLabel}
-                        </span>
-                      </span>
-                    </div>
-                    <small>{novel.author || 'Catalog title'}</small>
-                  </span>
-                  <ArrowRight size={15} aria-hidden="true" />
-                </a>
-              );
-            })}
+            {seedMode && query.trim().length < 2 && recent.length === 0 && (
+              <p className="shell-search-state">Type a title to use as the starting point.</p>
+            )}
+            {(query.trim().length >= 2 ? results : recent).map((novel) => (
+              <SearchResultRow
+                key={novel.id}
+                novel={novel}
+                title={displayNovelTitle(novel.title, undefined, settings.titlePreference)}
+                onNavigate={() => choose(novel)}
+                onSelect={seedMode ? () => {
+                  choose(novel);
+                  emitSeedSelected(novel);
+                  setOpen(false);
+                  setSeedMode(false);
+                  setQuery('');
+                } : undefined}
+              />
+            ))}
           </div>
-          {query.trim().length >= 2 && (
+          {query.trim().length >= 2 && !seedMode && (
             <a className="shell-search-all" href={browseUrl}>
               View all Browse results <ArrowRight size={14} />
             </a>
