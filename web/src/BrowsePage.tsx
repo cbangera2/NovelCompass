@@ -1048,6 +1048,7 @@ function BrowseCard({
   return (
     <Card
       className="browse-card"
+      data-preview-card
       role="link"
       tabIndex={0}
       onClick={(event) => {
@@ -1060,7 +1061,7 @@ function BrowseCard({
         }
       }}
     >
-      <a className="browse-cover" href={href}>
+      <a className="browse-cover" href={href} data-preview-id={novel.id}>
         {hasUsableCover(novel.cover_url) ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
       </a>
       <div>

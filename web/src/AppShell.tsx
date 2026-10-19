@@ -469,7 +469,7 @@ function GlobalNovelSearch({
             {(query.trim().length >= 2 ? results : recent).map((novel) => {
               const badge = getMediaBadgeInfo(novel);
               return (
-                <a key={novel.id} href={novelPageUrl(novel.id)} onClick={() => choose(novel)}>
+                <a key={novel.id} href={novelPageUrl(novel.id)} data-preview-id={novel.id} onClick={() => choose(novel)}>
                   {hasUsableCover(novel.cover_url) ? (
                     <img src={novel.cover_url} alt="" loading="lazy" />
                   ) : (

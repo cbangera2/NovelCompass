@@ -84,7 +84,7 @@ export function SeriesCard({ items, fromId }: { items: RelatedSeriesItem[]; from
     {groups.map((group) => <div key={group.relation} className="series-group">
       <h4>{RELATION_LABELS[group.relation] || group.relation}</h4>
       <ul>{group.items.slice(0, 6).map((item) => <li key={item.id}>
-        <a href={novelPageUrl(item.id, fromId)}>
+        <a href={novelPageUrl(item.id, fromId)} data-preview-id={item.id}>
           <span className="series-cover">{item.cover_url ? <img src={item.cover_url} alt="" loading="lazy" /> : <BookOpen size={14} />}</span>
           <span><strong>{item.title}</strong><small>{[item.media_type, item.year].filter(Boolean).join(' · ')}</small></span>
         </a>

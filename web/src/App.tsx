@@ -41,6 +41,7 @@ import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
 import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
+import { previewFromRecommendation, registerPreviews } from './CoverPreview';
 
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
@@ -166,6 +167,9 @@ export default function App(): JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<RecommendResponse | null>(null);
+  useEffect(() => {
+    if (data) registerPreviews(data.recommendations.map(previewFromRecommendation));
+  }, [data]);
   const [visibleCount, setVisibleCount] = useState(8);
   const [loadedLimit, setLoadedLimit] = useState(0);
   const [availableExhausted, setAvailableExhausted] = useState(false);
@@ -868,7 +872,7 @@ export default function App(): JSX.Element {
             {suggestions.map((novel) => {
               const badge = getMediaBadgeInfo(novel);
               return (
-                <div className="suggestion-row" key={novel.id}>
+                <div className="suggestion-row" key={novel.id} data-preview-id={novel.id}>
                   <button
                     type="button"
                     role="option"
@@ -1182,6 +1186,7 @@ export default function App(): JSX.Element {
                 <Card
                   key={rec.target_id || index}
                   className="novel-card"
+                  data-preview-card
                   onClick={(event) => {
                     if (!(event.target as HTMLElement).closest('button, a, summary, select, label')) void openNovelDetail(rec);
                   }}
@@ -1190,7 +1195,7 @@ export default function App(): JSX.Element {
                     <div className="card-main">
                       <div className={`card-primary${compactEvidence ? ' card-primary-compact-evidence' : ''}`}>
                         <div className="card-top">
-                          <div className="card-cover">
+                          <div className="card-cover" data-preview-id={rec.target_id}>
                             <CoverImage src={rec.cover_url} alt={`Cover of ${displayNovelTitle(rec.title, undefined, settings.titlePreference)}`} variant="card" />
                             <span className="card-rank">#{index + 1}</span>
                           </div>
