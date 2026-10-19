@@ -5,7 +5,7 @@ import { hasUsableCover, novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
-import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
+import { libraryNovelIds, planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
@@ -361,16 +361,15 @@ export default function ForYouPage(): JSX.Element {
     return subscribeLocalProfile(setProfile);
   }, []);
 
-  // Library titles by catalog ID. "Seen" excludes plan-to-read, which you haven't read yet.
+  // Library titles by catalog ID, for the reading-status badges on cards.
   const library = useMemo(() => {
     const map = new Map<number, ReadingStatus>();
     for (const entry of profile?.entries ?? []) if (entry.novel_id != null) map.set(entry.novel_id, entry.status);
     return map;
   }, [profile]);
-  const seenIds = useMemo(
-    () => [...library].filter(([, status]) => status !== 'plan_to_read').map(([id]) => id).sort((a, b) => a - b),
-    [library],
-  );
+  // The hide toggle covers every list you have, plan-to-read included, so nothing you
+  // already saved — read or not — comes back as a fresh pick.
+  const seenIds = useMemo(() => libraryNovelIds(profile), [profile]);
   const seenKey = seenIds.join(',');
   // The profile knows your lists' real names; the DB may only hold a placeholder for imported ones.
   const profileTitles = useMemo(
@@ -485,7 +484,7 @@ export default function ForYouPage(): JSX.Element {
         <p>
           Rows start from your library (what you rated highly or finished) and from your lists, using their top titles as seeds.
           Titles from your library show their reading status and titles from your lists are badged, so you can sanity-check
-          the picks; the toggle hides what you've read.
+          the picks; the toggle hides everything already in your library, plan-to-read included.
         </p>
       </header>
 
@@ -494,7 +493,7 @@ export default function ForYouPage(): JSX.Element {
           <SlidersHorizontal size={15} /> Shelves · {selected.length}
         </DSButton>
         <DSButton variant="outline" onClick={() => setHideKnown((v) => !v)} aria-pressed={hideKnown}>
-          {hideKnown ? <EyeOff size={15} /> : <Eye size={15} />} {hideKnown ? `Hiding ${seenIds.length.toLocaleString()} I've read` : 'Showing titles I\'ve read'}
+          {hideKnown ? <EyeOff size={15} /> : <Eye size={15} />} {hideKnown ? `Hiding ${seenIds.length.toLocaleString()} in your library` : 'Showing my library titles'}
         </DSButton>
       </div>
       {shelvesOpen && (

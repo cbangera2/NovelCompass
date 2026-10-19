@@ -230,3 +230,47 @@ def test_for_you_row_limit_cap_supports_see_all_grid():
     assert ForYouRowRequest(list_ids=[1], limit=150).limit == 150
     with pytest.raises(ValidationError):
         ForYouRowRequest(list_ids=[1], limit=151)
+
+
+def test_library_ids_include_every_status_via_node():
+    """The For You hide toggle covers all library lists, plan-to-read included."""
+    script = r"""
+const fs = require('node:fs');
+const ts = require('./web/node_modules/typescript');
+const source = fs.readFileSync('./web/src/forYouLibrary.ts', 'utf8');
+const patched = source.replace(/import type .*?;\n/g, '');
+const compiled = ts.transpileModule(patched, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+(async () => {
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`;
+  const { libraryNovelIds } = await import(moduleUrl);
+  const profile = {
+    profile_id: 'p', parser_version: 1, dataset_version: 't',
+    imported_at: '2026-01-01T00:00:00.000Z', source_fingerprints: [], curated_lists: [],
+    entries: [
+      { slug: 'a', imported_title: 'Plan', status: 'plan_to_read', novel_id: 30, source_file: 'nu.html' },
+      { slug: 'b', imported_title: 'Reading', status: 'reading', novel_id: 10, source_file: 'nu.html' },
+      { slug: 'c', imported_title: 'Done', status: 'completed', novel_id: 20, source_file: 'nu.html' },
+      { slug: 'd', imported_title: 'Paused', status: 'paused', novel_id: 40, source_file: 'nu.html' },
+      { slug: 'e', imported_title: 'Dropped', status: 'dropped', novel_id: 50, source_file: 'nu.html' },
+      { slug: 'f', imported_title: 'Unmatched', status: 'completed', source_file: 'gdpr.json' },
+    ],
+  };
+  const ids = libraryNovelIds(profile);
+  const want = [10, 20, 30, 40, 50];
+  if (JSON.stringify(ids) !== JSON.stringify(want)) {
+    throw new Error('expected ' + JSON.stringify(want) + ' got ' + JSON.stringify(ids));
+  }
+  if (libraryNovelIds(null).length !== 0) throw new Error('null profile should be empty');
+  process.stdout.write(JSON.stringify({ ok: true, ids }));
+})().catch((e) => { console.error(e); process.exit(1); });
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    assert json.loads(result.stdout)["ids"] == [10, 20, 30, 40, 50]
