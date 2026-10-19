@@ -94,6 +94,9 @@ export default function NovelPage(): JSX.Element {
   }, [profile]);
   const knownCount = related.slice(0, 10).filter((item) => libraryIds.has(item.target_id)).length;
   const title = detail ? displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference) : '';
+  useEffect(() => {
+    if (title) document.title = `${title} - Novel Compass`;
+  }, [title]);
 
   const saveFeedback = async (signal: LocalNovelFeedback['signal']) => {
     if (!detail) return;

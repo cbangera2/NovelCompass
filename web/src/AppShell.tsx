@@ -58,6 +58,17 @@ const NAV_ITEMS = [
   { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database },
 ];
 
+const BRAND = 'Novel Compass';
+const VIEW_TITLES: Record<AppView, string> = {
+  foryou: 'For You',
+  discover: 'Discover',
+  browse: 'Browse',
+  settings: 'Settings',
+  profile: 'Profile',
+  scraper: 'Scraper',
+  novel: '',
+};
+
 function viewUrl(view: AppView): string {
   const base = import.meta.env.BASE_URL;
   return view === 'discover' ? `${base}?view=discover` : `${base}?view=${view}`;
@@ -79,6 +90,11 @@ export default function AppShell({
     window.location.hostname.endsWith('.github.io') ||
     window.location.hostname.endsWith('.pages.dev');
   const navItems = NAV_ITEMS.filter((item) => item.view !== 'scraper' || !staticDeployment);
+
+  useEffect(() => {
+    // The novel page sets its own "<Title> - Novel Compass" once the record loads.
+    document.title = VIEW_TITLES[activeView] ? `${VIEW_TITLES[activeView]} - ${BRAND}` : BRAND;
+  }, [activeView]);
 
   useEffect(() => {
     const refreshProfile = () =>
