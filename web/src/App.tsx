@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, FormEvent, useMemo, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import {
   BookOpen,
   Check,
@@ -44,6 +44,7 @@ import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { previewFromRecommendation, registerPreviews } from './CoverPreview';
 import { MediaBadges, NovelCard } from './components/NovelCard';
 import { RatingChip } from './components/RatingChip';
+import { openGlobalSearch, SEED_SELECTED_EVENT } from './components/searchEvents';
 import { ActiveFilterChips, CoreFilters, type ActiveFilter } from './components/CoreFilters';
 import { formatMinRating } from './components/coreFilterParams';
 
@@ -109,7 +110,6 @@ export default function App(): JSX.Element {
     selectedTypes,
     mediaParam,
     scopeSentence,
-    searchPlaceholder: seedSearchPlaceholder,
     includeOtherFormats,
     setIncludeOtherFormats,
     isAllSelected,
@@ -140,8 +140,6 @@ export default function App(): JSX.Element {
   const [dataset, setDataset] = useState<DatasetManifest | null>(null);
   const [query, setQuery] = useState(DEFAULT_NOVEL.title);
   const [selectedNovel, setSelectedNovel] = useState<NovelSearchResult | null>(DEFAULT_NOVEL);
-  const [suggestions, setSuggestions] = useState<NovelSearchResult[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [hiddenGemMode, setHiddenGemMode] = useState(Boolean(initialRoute.hiddenGemMode));
   const [excludeHarem, setExcludeHarem] = useState(Boolean(initialRoute.excludeHarem));
@@ -254,34 +252,6 @@ export default function App(): JSX.Element {
     return () => { cancelled = true; };
   }, [dataMode]);
 
-  useEffect(() => {
-    if (!dataSource) return;
-    const trimmed = query.trim();
-    if (
-      trimmed.length < 2 ||
-      (selectedNovel && trimmed === selectedNovel.title)
-    ) {
-      setSuggestions([]);
-      return;
-    }
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      try {
-        const results = await dataSource.searchNovels(trimmed, 8, controller.signal);
-        setSuggestions(results);
-        setShowSuggestions(true);
-      } catch (searchError: any) {
-        if (searchError.name !== 'AbortError') setSuggestions([]);
-      }
-    }, 180);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query, selectedNovel, dataSource]);
-
   const libraryExcludeIds = useMemo(() => {
     if (!profile) return [] as number[];
     const ids = buildExcludeIds(profile);
@@ -306,7 +276,6 @@ export default function App(): JSX.Element {
     setLoading(true);
     if (!expanding) setIncrementalError(null);
     setError(null);
-    setShowSuggestions(false);
 
     const basePayload: Omit<RecommendRequest, 'query'> = {
       limit: requestedLimit,
@@ -558,8 +527,6 @@ export default function App(): JSX.Element {
     setForYouMeta(null);
     setSelectedNovel(novel);
     setQuery(novel.title);
-    setSuggestions([]);
-    setShowSuggestions(false);
   };
   const pushSeedRoute = (novel: NovelSearchResult) => {
     const params = new URLSearchParams(window.location.search);
@@ -568,6 +535,20 @@ export default function App(): JSX.Element {
     params.delete('for_you');
     window.history.pushState(null, '', stableRouteUrl(params));
   };
+  // The header search picks the seed; it reports the choice here.
+  const seedSelectedRef = useRef<(novel: NovelSearchResult) => void>(() => undefined);
+  seedSelectedRef.current = (novel) => {
+    chooseNovel(novel);
+    pushSeedRoute(novel);
+    window.requestAnimationFrame(() => searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    void fetchRecommendations(novel);
+  };
+  useEffect(() => {
+    const onSeed = (event: Event) => seedSelectedRef.current((event as CustomEvent<NovelSearchResult>).detail);
+    window.addEventListener(SEED_SELECTED_EVENT, onSeed);
+    return () => window.removeEventListener(SEED_SELECTED_EVENT, onSeed);
+  }, []);
+
   const runForYou = () => {
     setForYouMode(true);
     setHideLibraryTitles(true);
@@ -708,12 +689,6 @@ export default function App(): JSX.Element {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [activeDetailId]);
-
-  const handleSearch = (e: FormEvent) => {
-    e.preventDefault();
-    if (selectedNovel) pushSeedRoute(selectedNovel);
-    fetchRecommendations();
-  };
 
   const cycleGenre = (genre: string) => {
     setGenreStates((current) => {
@@ -870,79 +845,20 @@ export default function App(): JSX.Element {
         </div>
       </header>
 
-      <section className="search-section ds-card" ref={searchSectionRef}>
-        <form onSubmit={handleSearch} className="search-input-wrapper">
+      <section className="search-section ds-card seed-section" ref={searchSectionRef}>
+        <div className="search-input-wrapper seed-display">
           <Search className="search-icon" size={20} aria-hidden="true" />
-          <div className="search-field">
-            <label htmlFor="novel-search">Starting title</label>
-            <input
-              id="novel-search"
-              type="text"
-              autoComplete="off"
-              placeholder={seedSearchPlaceholder}
-              value={query}
-              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelectedNovel(null);
-              }}
-            />
+          <div className="search-field seed-copy">
+            <label>Starting title</label>
+            <strong>{forYouMode ? 'For You (your library)' : selectedNovel ? displayNovelTitle(selectedNovel.title, undefined, settings.titlePreference) : 'No title selected'}</strong>
+            {selectedNovel && !forYouMode && (
+              <small><span className="seed-author">{selectedNovel.author || 'Unknown author'}</span><RatingChip rating={selectedNovel.rating} votes={selectedNovel.rating_votes} size={11} /><MediaBadges id={selectedNovel.id} mediaType={selectedNovel.media_type} source={selectedNovel.source} /></small>
+            )}
           </div>
-          <Button type="submit" variant="primary" className="search-button" disabled={loading || !dataSource}>
-            {!dataSource ? 'Loading dataset…' : loading ? 'Finding matches…' : <><Sparkles size={16} aria-hidden="true" /> Find related</>}
+          <Button type="button" variant="primary" className="search-button" disabled={!dataSource} onClick={() => openGlobalSearch({ mode: 'seed' })}>
+            {!dataSource ? 'Loading dataset…' : loading ? 'Finding matches…' : 'Change title'}
           </Button>
-        </form>
-
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="suggestions" role="listbox" aria-label="Title matches">
-            {suggestions.map((novel) => {
-              const badge = getMediaBadgeInfo(novel);
-              return (
-                <div className="suggestion-row" key={novel.id} data-preview-id={novel.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={selectedNovel?.id === novel.id}
-                    className="suggestion"
-                    onClick={() => {
-                      chooseNovel(novel);
-                      pushSeedRoute(novel);
-                      window.requestAnimationFrame(() => {
-                        searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      });
-                      void fetchRecommendations(novel);
-                    }}
-                  >
-                    <CoverImage src={novel.cover_url} alt="" variant="suggestion" />
-                    <span className="suggestion-copy">
-                      <span className="suggestion-title-line">
-                        <strong>{displayNovelTitle(novel.title, undefined, settings.titlePreference)}</strong>
-                        <span className="suggestion-badges">
-                          <MediaBadges id={novel.id} mediaType={novel.media_type} source={novel.source} />
-                        </span>
-                      </span>
-                      <small>{novel.author || 'Unknown author'} · <RatingChip rating={novel.rating} votes={novel.rating_votes} size={11} /></small>
-                    </span>
-                    <span className="select-label">Select</span>
-                  </button>
-                  <div className="suggestion-links">
-                    <Tooltip content="View details">
-                      <a href={novelPageUrl(novel.id)} aria-label={`View details for ${novel.title}`}>
-                        <BookOpen size={16} aria-hidden="true" />
-                      </a>
-                    </Tooltip>
-                    <Tooltip content={`Open on ${badge.sourceLabel}`}>
-                      <a href={novel.external_url || novel.novelupdates_url} target="_blank" rel="noopener noreferrer"
-                        aria-label={`Open ${novel.title} on ${badge.sourceLabel}`}>
-                        <ExternalLink size={16} aria-hidden="true" />
-                      </a>
-                    </Tooltip>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        </div>
       </section>
 
       <Card className="filter-panel" aria-label="Recommendation filters">

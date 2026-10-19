@@ -715,13 +715,13 @@ export default function BrowsePage({
       </nav>
       <Card className="browse-controls" aria-label="Catalog filters">
         <label className="browse-search">
-          <span>Search</span>
+          <span>Filter results</span>
           <div className="browse-search-input-wrap">
             <Search size={17} />
             <input
               value={query}
               onChange={(event) => resetPage(() => setQuery(event.target.value))}
-              placeholder="Search titles, aliases, or authors…"
+              placeholder="Filter by title, alias, or author…"
             />
           </div>
         </label>
