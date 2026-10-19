@@ -72,9 +72,10 @@
 .standing-track i{background:var(--accent-bright);border:2px solid var(--surface);border-radius:50%;box-shadow:0 0 0 1px var(--accent);height:13px;position:absolute;top:50%;transform:translate(-50%,-50%);width:13px}
 .novel-library-state{background:var(--surface);border:1px solid var(--border);border-radius:10px;gap:.7rem}
 .novel-library-state svg{color:var(--accent-bright)}
-.novel-library-state label{align-items:center;display:flex;gap:.55rem}
-.novel-library-state label span{color:var(--muted);font-weight:600}
-.novel-library-state select{background:var(--surface-raised);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:.72rem;font-weight:600;padding:.25rem .45rem}
+.novel-library-field{align-items:center;display:flex;gap:.55rem}
+.novel-library-field>span{color:var(--muted);font-weight:600}
+.novel-library-field .ui-select-trigger{font-size:.72rem;font-weight:600;min-height:30px;min-width:9.5rem;padding:.25rem .55rem}
+.ui-select-placeholder{color:var(--dim);font-weight:500}
 .novel-library-state span+span:before{content:""}
 .novel-section-nav{align-items:center}
 .novel-mini{align-items:center;display:flex;gap:.6rem;margin-left:auto;max-width:48%;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .15s,transform .15s}

@@ -5,6 +5,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createDataSource, externalMediaUrl, RecommendationDataSource, sourceDisplayName } from './data';
 import { Card, DSButton, Skeleton } from './design-system';
+import { Select } from './ui';
 import { browseFacetUrl } from './metadataLinks';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
@@ -235,13 +236,13 @@ export default function NovelPage(): JSX.Element {
         {verdictChips.length > 0 && <div className="novel-verdicts">{verdictChips.map((label) => <span key={label} className={label === 'Divisive' || label.includes('polarizing') ? 'warn' : ''}>{label}</span>)}</div>}
         <div className="novel-library-state">
           <Library size={15} />
-          <label>
+          <div className="novel-library-field">
             <span>{libraryEntry ? 'In your library' : 'Add to library'}</span>
-            <select value={libraryEntry?.status || ''} onChange={(event) => saveStatus(event.target.value as ReadingStatus)} aria-label="Reading status">
-              {!libraryEntry && <option value="" disabled>Choose status…</option>}
+            <Select value={libraryEntry?.status || ''} onChange={(event) => saveStatus(event.target.value as ReadingStatus)}
+              aria-label="Reading status" placeholder="Choose status…">
               {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
+            </Select>
+          </div>
           {libraryEntry?.rating ? <span>{libraryEntry.rating}★</span> : null}
           {libraryEntry?.progress ? <span>{libraryEntry.progress}</span> : null}
         </div>

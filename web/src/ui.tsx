@@ -55,9 +55,10 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
   onChange?: (event: { target: { value: string; name?: string }; currentTarget: { value: string; name?: string } }) => void;
   children?: ReactNode;
   className?: string;
+  placeholder?: string;
 }
 
-export function Select({ label, value, defaultValue, onChange, onValueChange, disabled, className = '', children, name, id }: SelectProps) {
+export function Select({ label, value, defaultValue, onChange, onValueChange, disabled, className = '', children, name, id, placeholder = 'Select...', 'aria-label': ariaLabel }: SelectProps) {
   const options = extractOptions(children);
   const itemsMap: Record<string, ReactNode> = {};
   options.forEach((opt) => {
@@ -79,9 +80,11 @@ export function Select({ label, value, defaultValue, onChange, onValueChange, di
     <label className={`ui-select ${className}`.trim()}>
       {label && <span>{label}</span>}
       <BaseSelect.Root items={itemsMap} value={stringValue} onValueChange={handleValueChange} disabled={disabled} name={name} id={id}>
-        <BaseSelect.Trigger className="ui-select-trigger">
-          <BaseSelect.Value placeholder="Select...">
-            {(selectedValue: any) => (selectedValue != null && itemsMap[selectedValue] !== undefined ? itemsMap[selectedValue] : selectedValue)}
+        <BaseSelect.Trigger className="ui-select-trigger" aria-label={ariaLabel}>
+          <BaseSelect.Value placeholder={placeholder}>
+            {(selectedValue: any) => (selectedValue != null && itemsMap[selectedValue] !== undefined
+              ? itemsMap[selectedValue]
+              : selectedValue ? selectedValue : <span className="ui-select-placeholder">{placeholder}</span>)}
           </BaseSelect.Value>
           <BaseSelect.Icon className="ui-select-icon">
             <ChevronDown size={14} />
