@@ -9,6 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
+import { registerPreviews, type PreviewData } from './CoverPreview';
 import './for-you.css';
 
 export interface ListSummary {
@@ -181,9 +182,24 @@ function Cover({ rec, status, eager }: { rec: RowRec; status?: ReadingStatus; ea
   );
 }
 
+/** Feed the shared cover hover card so For You picks preview instantly, match data and all. */
+function previewFor(rec: RowRec): PreviewData {
+  return {
+    id: rec.target_id,
+    title: rec.title,
+    rating: rec.rating,
+    rating_votes: rec.rating_votes,
+    media_type: rec.media_type,
+    status_trans: rec.status_trans,
+    matchPercent: rec.match_score_percent,
+    sharedTags: rec.shared_tags,
+    bullets: rec.evidence_bullets,
+  };
+}
+
 function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean }) {
   return (
-    <a className="fy-card" href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
+    <a className="fy-card" data-preview-id={rec.target_id} href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
       <Cover rec={rec} status={library.get(rec.target_id)} eager={eager} />
       <strong title={rec.title}>{rec.title}</strong>
       <div className="fy-strength" title={`${rec.match_score_percent}% of this row's strongest match`}>
@@ -435,7 +451,10 @@ export default function ForYouPage(): JSX.Element {
     if (requested.has(job.key)) return;
     requested.add(job.key);
     job.load(ROW_LIMIT, controller.signal)
-      .then((data) => setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } })))
+      .then((data) => {
+        registerPreviews(data.recommendations.map(previewFor));
+        setRows((prev) => ({ ...prev, [job.key]: { status: 'ready', ...data } }));
+      })
       .catch((error) => {
         if (controller.signal.aborted) return;
         setRows((prev) => ({ ...prev, [job.key]: { status: 'error', message: error.message } }));
