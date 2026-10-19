@@ -420,12 +420,13 @@ export default function ForYouPage(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedKey, hideKnown, seenKey, profileTitles, planKey]);
 
-  const epoch = useMemo(() => Math.random(), [jobs]); // remounts rows (re-arming their visibility trigger) when jobs change
+  const [epoch, setEpoch] = useState(0); // bumped when jobs change so rows remount and re-arm their visibility trigger
   // Rows load when they near the viewport, so a visit only pays for what is actually scrolled to.
   const loader = useRef<{ controller: AbortController; requested: Set<string> }>({ controller: new AbortController(), requested: new Set() });
   useEffect(() => {
     const controller = new AbortController();
     loader.current = { controller, requested: new Set() };
+    setEpoch((n) => n + 1);
     setRows(Object.fromEntries(jobs.map((j) => [j.key, { status: 'loading' } as RowState])));
     return () => controller.abort();
   }, [jobs]);
