@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles, Star } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { DSButton, Skeleton } from './design-system';
-import { formatStatusLabel, hasUsableCover, novelPageUrl } from './novelLinks';
+import { novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
@@ -10,6 +10,7 @@ import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
 import { registerPreviews, type PreviewData } from './CoverPreview';
+import { NovelCard } from './components/NovelCard';
 import './for-you.css';
 
 export interface ListSummary {
@@ -51,13 +52,6 @@ interface RowJob {
   load: (limit: number, signal: AbortSignal) => Promise<RowData>;
 }
 
-const STATUS_LABELS: Record<ReadingStatus, string> = {
-  reading: 'Reading',
-  completed: 'Completed',
-  plan_to_read: 'Plan to read',
-  dropped: 'Dropped',
-  paused: 'Paused',
-};
 
 const ROW_LIMIT = 24;
 const GRID_LIMIT = 150; // /api/for-you/row's cap; ranking quality falls off well before this
@@ -166,27 +160,6 @@ async function fetchLibraryRow(
   };
 }
 
-function Cover({ rec, status, eager }: { rec: RowRec; status?: ReadingStatus; eager?: boolean }) {
-  const [failed, setFailed] = useState(false);
-  const onList = rec.on_lists ?? [];
-  return (
-    <div className="fy-cover">
-      {hasUsableCover(rec.cover_url) && !failed ? (
-        <img src={rec.cover_url} alt="" loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : 'auto'} decoding="async" width={168} height={252} onError={() => setFailed(true)} />
-      ) : (
-        <span aria-hidden="true">{rec.title.slice(0, 1)}</span>
-      )}
-      {status && <span className={`fy-status status-${status}`}>{STATUS_LABELS[status]}</span>}
-      {onList.length > 0 && <span className="fy-known" title={`On your list: ${onList.join(', ')}`}>On your list</span>}
-      <div className="fy-stats">
-        <span className="fy-rating" title={`${rec.rating_votes.toLocaleString()} votes`}><Star size={12} />{rec.rating ? rec.rating.toFixed(1) : '—'}</span>
-        {rec.status_trans && <span>{formatStatusLabel(rec.status_trans)}</span>}
-        <span className="fy-match">{Math.round(rec.match_score_percent)}%</span>
-      </div>
-    </div>
-  );
-}
-
 /** Feed the shared cover hover card so For You picks preview instantly, match data and all. */
 function previewFor(rec: RowRec): PreviewData {
   return {
@@ -204,15 +177,27 @@ function previewFor(rec: RowRec): PreviewData {
 }
 
 function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean }) {
+  const onList = rec.on_lists ?? [];
   return (
-    <a className="fy-card" data-preview-id={rec.target_id} href={novelPageUrl(rec.target_id, undefined, rec.media_type)}>
-      <Cover rec={rec} status={library.get(rec.target_id)} eager={eager} />
-      <strong title={rec.title}>{rec.title}</strong>
-      <div className="fy-strength" title={`${rec.match_score_percent}% of this row's strongest match`}>
-        <i style={{ width: `${Math.max(6, rec.match_score_percent)}%` }} />
-      </div>
-      <small>{rec.evidence_bullets[0]}</small>
-    </a>
+    <NovelCard
+      variant="tile"
+      className="fy-card"
+      item={{
+        id: rec.target_id,
+        title: rec.title,
+        href: novelPageUrl(rec.target_id, undefined, rec.media_type),
+        coverUrl: rec.cover_url,
+        rating: rec.rating,
+        ratingVotes: rec.rating_votes,
+        statusTrans: rec.status_trans,
+      }}
+      libraryStatus={library.get(rec.target_id)}
+      matchPercent={rec.match_score_percent}
+      coverNote={onList.length > 0 ? { label: 'On your list', title: `On your list: ${onList.join(', ')}` } : undefined}
+      strengthPercent={rec.match_score_percent}
+      caption={rec.evidence_bullets[0]}
+      eager={eager}
+    />
   );
 }
 

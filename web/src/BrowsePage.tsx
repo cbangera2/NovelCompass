@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowDownUp,
   BookOpen,
@@ -9,8 +9,6 @@ import {
   Shuffle,
   SlidersHorizontal,
   Sparkles,
-  Star,
-  Users,
   X,
 } from 'lucide-react';
 import {
@@ -26,8 +24,9 @@ import { browseFacetUrl } from './metadataLinks';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
-import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { getMediaBadgeInfo, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
+import { Card, CardHeader, DSButton, Skeleton } from './design-system';
+import { novelPageUrl, progressUnitLabel } from './novelLinks';
+import { NovelCard } from './components/NovelCard';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
@@ -1039,92 +1038,47 @@ function BrowseCard({
 }) {
   const { settings } = useDisplaySettings({ persist: persistDisplaySettings });
   const title = displayNovelTitle(novel.title, undefined, settings.titlePreference);
-  const badge = getMediaBadgeInfo(novel);
   const href = novelUrl(novel);
   const recommendationHref = similarUrl(novel);
-  const open = () => {
-    window.location.href = href;
-  };
-  return (
-    <Card
-      className="browse-card"
-      data-preview-card
-      role="link"
-      tabIndex={0}
-      onClick={(event) => {
-        if (!(event.target as HTMLElement).closest('a, button')) open();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
+  const facetClick = (handler: (value: string) => void, value: string) =>
+    embedded
+      ? (event: MouseEvent<HTMLAnchorElement>) => {
           event.preventDefault();
-          open();
+          handler(value);
         }
+      : undefined;
+  const sourceName = sourceDisplayName(novel.source, novel.id);
+  return (
+    <NovelCard
+      variant="row"
+      className="browse-result"
+      item={{
+        id: novel.id,
+        title,
+        href,
+        coverUrl: novel.cover_url,
+        mediaType: novel.media_type,
+        source: novel.source,
+        author: novel.author,
+        authorHref: novel.author ? (embedded ? '#' : browseFacetUrl('author', novel.author)) : undefined,
+        onAuthorClick: novel.author ? facetClick(onSelectAuthor, novel.author) : undefined,
+        rating: novel.rating,
+        ratingVotes: novel.rating_votes,
+        readers: novel.reading_list_count,
       }}
-    >
-      <a className="browse-cover" href={href} data-preview-id={novel.id}>
-        {hasUsableCover(novel.cover_url) ? <img src={novel.cover_url} alt="" loading="lazy" /> : <BookOpen />}
-      </a>
-      <div>
-        <a className="browse-title" href={href}>
-          {title}
+      chips={novel.genres?.slice(0, 3).map((item) => (
+        <a key={item} href={embedded ? '#' : browseFacetUrl('genre', item)} onClick={facetClick(onSelectGenre, item)}>
+          {item}
         </a>
-        <p>
-          {novel.author ? (
-            <a
-              href={embedded ? '#' : browseFacetUrl('author', novel.author)}
-              onClick={
-                embedded
-                  ? (event) => {
-                      event.preventDefault();
-                      onSelectAuthor(novel.author);
-                    }
-                  : undefined
-              }
-            >
-              {novel.author}
-            </a>
-          ) : (
-            'Unknown author'
-          )}
-        </p>
-        <div className="browse-meta">
-          <span className={`search-badge source-badge ${badge.sourceKey}`}>
-            {badge.sourceLabel}
-          </span>
-          <span className={`search-badge format-badge ${badge.formatKey}`}>
-            {badge.formatLabel}
-          </span>
-          <Badge tone="amber">
-            <Star size={14} /> {novel.rating ? novel.rating.toFixed(1) : '—'}{' '}
-            <small>({novel.rating_votes.toLocaleString()})</small>
-          </Badge>
-          <Badge>
-            <Users size={14} /> {Math.max(0, novel.reading_list_count).toLocaleString()}
-          </Badge>
-        </div>
-        <div className="browse-chips">
-          {novel.genres?.slice(0, 3).map((item) => (
-            <a
-              key={item}
-              href={embedded ? '#' : browseFacetUrl('genre', item)}
-              onClick={
-                embedded
-                  ? (event) => {
-                      event.preventDefault();
-                      onSelectGenre(item);
-                    }
-                  : undefined
-              }
-            >
-              {item}
-            </a>
-          ))}
-        </div>
-        <footer className="browse-card-actions">
-          <span>
-            {novel.year || 'Year unknown'}
-            {novel.chapters_trans ? ` · ${novel.chapters_trans} ${progressUnitLabel(novel.id, novel.media_type, true)}` : ''}
-          </span>
+      ))}
+      footerNote={
+        <>
+          {novel.year || 'Year unknown'}
+          {novel.chapters_trans ? ` · ${novel.chapters_trans} ${progressUnitLabel(novel.id, novel.media_type, true)}` : ''}
+        </>
+      }
+      actions={
+        <>
           {recommendationHref && (
             <Tooltip content="Find similar titles">
               <DSButton
@@ -1138,7 +1092,7 @@ function BrowseCard({
               </DSButton>
             </Tooltip>
           )}
-          <Tooltip content={`Open on ${sourceDisplayName(novel.source, novel.id)}`}>
+          <Tooltip content={`Open on ${sourceName}`}>
             <DSButton
               as="a"
               variant="ghost"
@@ -1150,14 +1104,14 @@ function BrowseCard({
               }
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Open ${title} on ${sourceDisplayName(novel.source, novel.id)}`}
+              aria-label={`Open ${title} on ${sourceName}`}
             >
               <ExternalLink size={16} aria-hidden="true" />
             </DSButton>
           </Tooltip>
-        </footer>
-      </div>
-    </Card>
+        </>
+      }
+    />
   );
 }
 
