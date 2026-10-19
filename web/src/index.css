@@ -889,7 +889,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .detail-chips a:hover, .taste-chips a:hover { border-color: var(--accent); color: var(--text); }
 .card-tag-rail { border-top: 1px solid var(--border); margin-top: .65rem; min-height: 0; padding-top: .6rem; }
 .card-signals { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .6rem; }
-.card-signals span { border-left: 2px solid var(--accent); color: var(--muted); font-size: .64rem; padding-left: .4rem; }
+.card-signals span { background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .61rem; padding: .14rem .45rem; }
 .card-tag-label { color: var(--dim); display: block; font-size: .6rem; font-weight: 750; letter-spacing: .09em; margin-bottom: .4rem; text-transform: uppercase; }
 .card-tag-links { margin-top: 0; }
 .card-tag-more { margin-top: .42rem; }
@@ -980,6 +980,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 :root[data-theme="light"] .taste-snapshot { background: linear-gradient(145deg, rgba(102,72,200,.07), #fff); }
 :root[data-theme="light"] .taste-chips span,
 :root[data-theme="light"] .card-badges span,
+:root[data-theme="light"] .card-signals span,
 :root[data-theme="light"] .btn-feedback,
 :root[data-theme="light"] .weight-control,
 :root[data-theme="light"] .genre-chip { background: rgba(48,35,75,.035); }
