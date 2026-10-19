@@ -10,6 +10,7 @@ import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
 import { listPageUrl } from './listPageUrl';
+import { ForYouOnboarding } from './ForYouOnboarding';
 import { registerPreviews, type PreviewData } from './CoverPreview';
 import { NovelCard } from './components/NovelCard';
 import './for-you.css';
@@ -344,6 +345,7 @@ export default function ForYouPage(): JSX.Element {
   const [showAll, setShowAll] = useState(false);
   const [shelvesOpen, setShelvesOpen] = useState(false);
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
+  const [profileChecked, setProfileChecked] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [listError, setListError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -372,7 +374,7 @@ export default function ForYouPage(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    loadLocalProfile().then(setProfile).catch(() => setProfile(null));
+    loadLocalProfile().then(setProfile).catch(() => setProfile(null)).finally(() => setProfileChecked(true));
     return subscribeLocalProfile(setProfile);
   }, []);
 
@@ -544,11 +546,7 @@ export default function ForYouPage(): JSX.Element {
           <a href="?view=profile">profile</a> and rows seeded from your library will appear here.
         </p>
       )}
-      {!profile && (
-        <p className="fy-empty fy-library-empty">
-          Import your library on your <a href="?view=profile">profile</a> to get rows seeded from what you rated highly or finished.
-        </p>
-      )}
+      {profileChecked && <ForYouOnboarding profile={profile} lowData={!hasLibraryRows} />}
       {lists && !selected.length && <p className="fy-empty">Pick at least one list above to build list rows.</p>}
       {jobs.map((job) => (
         <Row
