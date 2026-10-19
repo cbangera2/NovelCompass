@@ -353,7 +353,7 @@ export default function ProfilePage(): JSX.Element {
               {visibleEntries.map((entry) => {
                 const catalog = libraryCatalog.get(entry.slug);
                 return (
-                <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`}>
+                <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`} data-preview-id={entry.novel_id ?? undefined}>
                   {entry.novel_id != null ? <button className="profile-entry-open" onClick={() => openLibraryDetail(entry)} aria-label={`Open details for ${entry.imported_title}`}>
                   <div className="profile-entry-cover">
                     {catalog?.cover_url

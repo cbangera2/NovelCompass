@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import AppShell, { AppView } from './AppShell';
+import { CoverPreviewHost } from './CoverPreview';
 import './index.css';
 import { loadNavigationPreferences } from './preferences';
 
@@ -38,5 +39,6 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
               : <App />}
       </Suspense>
     </AppShell>
+    <CoverPreviewHost />
   </React.StrictMode>
 );

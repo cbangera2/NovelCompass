@@ -88,7 +88,7 @@ export function NovelInsightsPanel({
             {insights.peers.slice(0, 10).map((peer, index) => {
               const maxReaders = Math.max(1, ...insights.peers.slice(0, 10).map((item) => item.reading_list_count));
               return (
-                <a key={peer.id} className="peer-row" href={novelPageUrl(peer.id, novelId)}>
+                <a key={peer.id} className="peer-row" data-preview-id={peer.id} href={novelPageUrl(peer.id, novelId)}>
                   <span className="peer-rank">{index + 1}</span>
                   <PeerCover src={peer.cover_url} />
                   <span className="peer-name">

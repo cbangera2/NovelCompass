@@ -14,20 +14,13 @@ import { CuratedListSummary, NovelDetail, NovelInsights, Recommendation, Related
 import { catalogVerdicts, CuratedListsCard, RatingDistributionCard, SeriesCard, summarizeRatings } from './NovelReaderSignals';
 import { formatStatusLabel, getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
+import { CHANNEL_LABELS, previewFromRecommendation, registerPreviews, signalStrength } from './CoverPreview';
 import './novel-page.css';
 import { useDataModePreference } from './dataModePreference';
 
 const STATUS_LABELS: Record<string, string> = {
   reading: 'Reading', completed: 'Completed', plan_to_read: 'Plan to read', dropped: 'Dropped', paused: 'Paused'
 };
-
-const CHANNEL_LABELS: Record<string, string> = {
-  vector: 'Meaning', tag: 'Tags', direct_rec: 'Reader recs',
-  rec_list: 'Curated lists', ease: 'Co-read pattern', structural: 'Catalog structure'
-};
-
-/** Rank 1 → full strength, rank ~100 → faint (ranks are pool positions, not percentages). */
-const signalStrength = (rank: number) => Math.max(0.12, 1 - Math.log10(Math.max(1, rank)) / 2);
 
 export default function NovelPage(): JSX.Element {
   const { mode: dataMode } = useDataModePreference();
@@ -40,6 +33,7 @@ export default function NovelPage(): JSX.Element {
   const [origin, setOrigin] = useState<NovelDetail | null>(null);
   const [relationship, setRelationship] = useState<Recommendation | null>(null);
   const [related, setRelated] = useState<Recommendation[]>([]);
+  useEffect(() => registerPreviews(related.map(previewFromRecommendation)), [related]);
   const [insights, setInsights] = useState<NovelInsights | null>(null);
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [error, setError] = useState('');
@@ -335,9 +329,7 @@ export default function NovelPage(): JSX.Element {
           </label>
           <div className="novel-related-grid">{related.filter((item) => !hideKnown || !libraryIds.has(item.target_id)).slice(0, 10).map((item) => {
             const entry = libraryIds.get(item.target_id);
-            const signals = Object.entries(CHANNEL_LABELS).map(([channel, label]) => ({ label, rank: item.channel_ranks[channel] }))
-              .filter((signal) => Number.isFinite(signal.rank)).sort((x, y) => x.rank - y.rank);
-            return <div className="related-item" key={item.target_id}>
+            return <div className="related-item" key={item.target_id} data-preview-id={item.target_id}>
               <a className="related-novel" href={novelPageUrl(item.target_id, novelId)}>
                 <span className="related-cover">
                   <RelatedCover src={item.cover_url} />
@@ -356,29 +348,6 @@ export default function NovelPage(): JSX.Element {
                 </span>
                 <small className="related-reason">{item.shared_tags.slice(0, 2).length ? `Shares ${item.shared_tags.slice(0, 2).join(', ')}` : (item.evidence_bullets[0] || '')}</small>
               </a>
-              <div className="related-pop" role="tooltip">
-                <strong>{item.title}</strong>
-                <p>{[item.author, item.language].filter(Boolean).join(' · ')}</p>
-                <div className="pop-facts">
-                  <span><b>{item.rating ? item.rating.toFixed(1) : '—'}</b>rating · {item.rating_votes.toLocaleString()} votes</span>
-                  <span><b>{item.reading_list_count.toLocaleString()}</b>readers</span>
-                  <span><b>{item.chapters_trans > 0 ? item.chapters_trans.toLocaleString() : '—'}</b>chapters{item.status_trans ? ` · ${formatStatusLabel(item.status_trans)}` : ''}</span>
-                </div>
-                {signals.length > 0 && <div className="pop-signals">
-                  <h5>Why it surfaced · {item.match_score_percent.toFixed(0)}% match</h5>
-                  {signals.map((signal) => <div key={signal.label}>
-                    <span>{signal.label}</span>
-                    <i><u style={{ width: `${signalStrength(signal.rank) * 100}%` }} /></i>
-                    <b>#{signal.rank}</b>
-                  </div>)}
-                </div>}
-                {item.shared_tags.length > 0 && <div className="pop-tags">
-                  <h5>Shared tags · {item.shared_tags.length}</h5>
-                  <span>{item.shared_tags.slice(0, 8).map((tag) => <em key={tag}>{tag}</em>)}{item.shared_tags.length > 8 && <em>+{item.shared_tags.length - 8}</em>}</span>
-                </div>}
-                {extraEvidence(item).length > 0 && <ul>{extraEvidence(item).map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
-                {(item.curated_lists?.length || 0) > 0 && <p className="pop-lists">On {item.curated_lists!.length} curated list{item.curated_lists!.length === 1 ? '' : 's'}</p>}
-              </div>
             </div>;
           })}</div>
         </section>}
@@ -391,11 +360,6 @@ export default function NovelPage(): JSX.Element {
       </section>
     </div>
   </main>;
-}
-
-/** Evidence not already shown as tag chips or the curated-list line in the hover card. */
-function extraEvidence(item: Recommendation): string[] {
-  return item.evidence_bullets.filter((bullet) => !/^(Shared key tropes|Co-occurs on)/i.test(bullet)).slice(0, 3);
 }
 
 function RelationshipPanel({ relationship, origin, current }: {
