@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, BookMarked, BookOpen, Check, ExternalLink, Heart, Library,
+  ArrowLeft, BookOpen, Check, ExternalLink, Heart, Library,
   MessageSquare, Search, Sparkles, Star, ThumbsDown
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +16,7 @@ import { catalogVerdicts, CuratedListsCard, RatingDistributionCard, SeriesCard, 
 import { audienceLabel, formatStatusLabel, getMediaBadgeInfo, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import { CHANNEL_LABELS, previewFromRecommendation, registerPreviews, signalStrength } from './CoverPreview';
+import { NovelCard } from './components/NovelCard';
 import './novel-page.css';
 import { useDataModePreference } from './dataModePreference';
 
@@ -334,26 +335,32 @@ export default function NovelPage(): JSX.Element {
           </label>
           <div className="novel-related-grid">{related.filter((item) => !hideKnown || !libraryIds.has(item.target_id)).slice(0, 10).map((item) => {
             const entry = libraryIds.get(item.target_id);
-            return <div className="related-item" key={item.target_id} data-preview-id={item.target_id}>
-              <a className="related-novel" href={novelPageUrl(item.target_id, novelId)}>
-                <span className="related-cover">
-                  <RelatedCover src={item.cover_url} />
-                  <b>{item.match_score_percent.toFixed(0)}%</b>
-                  {entry && <em className="related-owned">{STATUS_LABELS[entry.status] || 'In library'}</em>}
-                </span>
-                <strong>{item.title}</strong>
-                <small>{item.author || item.language}</small>
-                <small className="related-stats">{item.rating ? `${item.rating.toFixed(1)}★` : 'Unrated'} · {item.reading_list_count.toLocaleString()} readers</small>
-                <span className="related-signals" aria-hidden="true">
-                  {Object.keys(CHANNEL_LABELS).map((channel) => {
-                    const rank = item.channel_ranks[channel];
-                    const strength = Number.isFinite(rank) ? signalStrength(rank) : 0.06;
-                    return <i key={channel} style={{ opacity: strength }} />;
-                  })}
-                </span>
-                <small className="related-reason">{item.shared_tags.slice(0, 2).length ? `Shares ${item.shared_tags.slice(0, 2).join(', ')}` : (item.evidence_bullets[0] || '')}</small>
-              </a>
-            </div>;
+            return <NovelCard
+              key={item.target_id}
+              variant="tile"
+              className="related-tile"
+              item={{
+                id: item.target_id,
+                title: displayNovelTitle(item.title, undefined, settings.titlePreference),
+                href: novelPageUrl(item.target_id, novelId),
+                coverUrl: item.cover_url,
+                author: item.author || item.language,
+                rating: item.rating,
+                ratingVotes: item.rating_votes,
+                statusTrans: item.status_trans,
+              }}
+              libraryStatus={entry?.status}
+              matchPercent={item.match_score_percent}
+              caption={item.shared_tags.slice(0, 2).length ? `Shares ${item.shared_tags.slice(0, 2).join(', ')}` : (item.evidence_bullets[0] || '')}
+            >
+              <span className="related-signals" aria-hidden="true">
+                {Object.keys(CHANNEL_LABELS).map((channel) => {
+                  const rank = item.channel_ranks[channel];
+                  const strength = Number.isFinite(rank) ? signalStrength(rank) : 0.06;
+                  return <i key={channel} style={{ opacity: strength }} />;
+                })}
+              </span>
+            </NovelCard>;
           })}</div>
         </section>}
         <CuratedListsCard lists={curatedLists} />
@@ -385,8 +392,3 @@ function RelationshipPanel({ relationship, origin, current }: {
   </Card>;
 }
 
-function RelatedCover({ src }: { src?: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!hasUsableCover(src) || failed) return <BookMarked />;
-  return <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} />;
-}

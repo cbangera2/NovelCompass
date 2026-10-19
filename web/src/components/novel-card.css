@@ -1,0 +1,97 @@
+/* Shared NovelCard, RatingChip and StatusBadge. One place for card spacing, rating amber and status colors. */
+
+/* ---------- RatingChip ---------- */
+.rating-chip{align-items:center;color:var(--chart-3);display:inline-flex;gap:.22rem;line-height:1;white-space:nowrap}
+.rating-chip b{font-weight:750}
+.rating-chip small{color:var(--dim);font-size:.85em;font-weight:500}
+.rating-chip svg{flex:none}
+.rating-chip-pill{background:var(--surface-soft);border:1px solid var(--border);border-radius:999px;font-size:.65rem;padding:.22rem .48rem}
+.rating-chip-overlay small{color:rgba(255,255,255,.7)}
+
+/* ---------- StatusBadge ---------- */
+.status-badge{border-radius:999px;font-size:.6rem;font-weight:750;line-height:1;padding:.18rem .45rem;white-space:nowrap}
+.status-badge-pill{background:var(--surface-soft);border:1px solid var(--border);color:var(--muted)}
+.status-badge-pill.status-reading{color:#8fc7ff}
+.status-badge-pill.status-completed{color:var(--green)}
+.status-badge-pill.status-plan_to_read{color:#cfb5ff}
+.status-badge-pill.status-dropped{color:var(--red)}
+:root[data-theme="light"] .status-badge-pill.status-reading{color:#1d4ed8}
+:root[data-theme="light"] .status-badge-pill.status-plan_to_read{color:#6d28d9}
+.status-badge-overlay{background:rgba(0,0,0,.72);color:#fff;left:.4rem;position:absolute;top:.4rem}
+.status-badge-overlay.status-completed{background:#2f7d4f}
+.status-badge-overlay.status-dropped{background:#8a3a3a}
+.status-badge-overlay.status-plan_to_read{background:#3a5a8a}
+
+/* ---------- Shared pieces ---------- */
+.nc{color:var(--text);min-width:0}
+.nc-cover{background:var(--surface-soft);display:block;overflow:hidden;position:relative}
+.nc-cover img{display:block;height:100%;object-fit:cover;width:100%}
+.nc-cover-fallback{align-items:center;color:var(--dim);display:flex;font-size:1.6rem;font-weight:700;height:100%;justify-content:center;text-transform:uppercase}
+
+/* ---------- Tile: cover-first (For You rows, related titles) ---------- */
+.nc-tile{display:flex;flex-direction:column;gap:.35rem;text-decoration:none}
+.nc-tile .nc-cover{aspect-ratio:2/3;border:1px solid var(--border);border-radius:10px;transition:transform .15s,border-color .15s}
+.nc-tile:hover .nc-cover,.nc-tile:focus-visible .nc-cover{border-color:var(--accent);transform:translateY(-2px)}
+.nc-tile:hover .nc-title{color:var(--accent-bright)}
+.nc-tile .nc-cover-fallback{font-size:2rem}
+.nc-cover-note{background:rgba(0,0,0,.72);border-radius:999px;bottom:2rem;color:#fff;font-size:.62rem;left:.4rem;padding:.15rem .5rem;position:absolute}
+.nc-cover-stats{align-items:center;background:linear-gradient(transparent,rgba(0,0,0,.85));bottom:0;color:#fff;display:flex;font-size:.64rem;font-weight:700;gap:.4rem;left:0;padding:1.6rem .5rem .45rem;position:absolute;right:0}
+.nc-cover-stats .rating-chip{color:var(--chart-3)}
+:root[data-theme="light"] .nc-cover-stats .rating-chip{color:#d89113} /* the overlay is always dark */
+.nc-cover-status{color:rgba(255,255,255,.78);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-match-pill{background:rgba(15,14,30,.82);border:1px solid rgba(184,168,255,.55);border-radius:999px;color:#fff;margin-left:auto;padding:.08rem .38rem}
+.nc-tile .nc-title{-webkit-box-orient:vertical;-webkit-line-clamp:2;display:-webkit-box;font-size:.85rem;line-height:1.25;min-height:2.5em;overflow:hidden}
+.nc-tile-author{color:var(--dim);font-size:.66rem;margin-top:-.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-strength{background:var(--surface-soft);border-radius:2px;display:block;height:3px;overflow:hidden}
+.nc-strength i{background:var(--accent);display:block;height:100%}
+.nc-caption{-webkit-box-orient:vertical;-webkit-line-clamp:3;color:var(--muted);display:-webkit-box;font-size:.7rem;line-height:1.35;overflow:hidden}
+
+/* ---------- Row + detailed: cover left, summary right ---------- */
+.nc-row,.nc-detailed{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;display:flex;flex-direction:column;gap:.6rem;overflow:hidden;padding:.8rem;transition:border-color .15s,box-shadow .15s,transform .15s}
+.nc-row:hover,.nc-detailed:hover{border-color:rgba(155,135,245,.35);box-shadow:0 14px 40px rgba(0,0,0,.2);transform:translateY(-2px)}
+.nc-row:focus-visible{border-color:var(--accent);outline:2px solid var(--accent-soft);outline-offset:2px}
+:root[data-theme="light"] .nc-row,:root[data-theme="light"] .nc-detailed{background:linear-gradient(150deg,#fff,#f8f7fc);box-shadow:none}
+.nc-head{display:flex;gap:.8rem;min-width:0}
+.nc-cover-link{flex:0 0 80px}
+.nc-head .nc-cover{border-radius:8px;height:120px;width:80px}
+.nc-rank{background:rgba(9,11,18,.82);border-radius:6px;color:#fff;font-size:.62rem;font-weight:800;left:.3rem;padding:.12rem .32rem;position:absolute;top:.3rem}
+.nc-summary{display:flex;flex:1;flex-direction:column;gap:.32rem;min-width:0}
+.nc-score{align-items:center;color:var(--accent-bright);display:flex;font-size:.64rem;font-weight:750;gap:.25rem;letter-spacing:.045em;text-transform:uppercase}
+.nc-title-row{align-items:flex-start;display:flex;font-size:.98rem;font-weight:720;gap:.35rem;letter-spacing:-.015em;line-height:1.22;margin:0;min-width:0}
+.nc-title-row .nc-title{-webkit-box-orient:vertical;-webkit-line-clamp:2;color:inherit;display:-webkit-box;min-width:0;overflow:hidden;overflow-wrap:anywhere;text-decoration:none}
+.nc-title-row .nc-title:hover{color:var(--accent-bright)}
+.nc-external{color:var(--dim);display:inline-flex;flex:none;margin-top:.12rem}
+.nc-external:hover{color:var(--accent-bright)}
+.nc-author{color:var(--muted);font-size:.74rem;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-author a{color:inherit;text-decoration:none}
+.nc-author a:hover{text-decoration:underline}
+.nc-meta{align-items:center;color:var(--muted);display:flex;flex-wrap:wrap;font-size:.72rem;gap:.65rem}
+.nc-readers{align-items:center;display:inline-flex;gap:.22rem}
+.nc-badges,.nc-chips{align-items:center;display:flex;flex-wrap:wrap;gap:.3rem;min-width:0}
+.nc-chip,.nc-chips a,.nc-chips span{background:rgba(255,255,255,.045);border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:.61rem;line-height:1;padding:.18rem .42rem;text-decoration:none;text-transform:capitalize;white-space:nowrap}
+:root[data-theme="light"] .nc-chip,:root[data-theme="light"] .nc-chips a,:root[data-theme="light"] .nc-chips span{background:rgba(48,35,75,.035)}
+a.nc-chip:hover,.nc-chips a:hover{border-color:var(--accent);color:var(--text)}
+.nc-actions{align-items:center;border-top:1px solid var(--border);display:flex;gap:.3rem;margin-top:auto;padding-top:.6rem}
+.nc-footer-note{color:var(--dim);flex:1;font-size:.68rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- Detailed: evidence + collapsed tropes ---------- */
+.nc-why{display:flex;flex-direction:column;gap:.45rem}
+.nc-evidence{display:flex;flex-direction:column;gap:.3rem;list-style:none;margin:0;padding:0}
+.nc-evidence li{-webkit-box-orient:vertical;-webkit-line-clamp:2;color:#cac8d3;display:-webkit-box;font-size:.72rem;line-height:1.4;overflow:hidden;padding-left:1rem;position:relative}
+.nc-evidence li::before{color:var(--accent-bright);content:'✓';font-size:.62rem;left:0;position:absolute;top:.1rem}
+:root[data-theme="light"] .nc-evidence li{color:#4c4657}
+.nc-tags summary{align-items:baseline;color:var(--muted);cursor:pointer;display:flex;font-size:.68rem;gap:.45rem;list-style:none;min-width:0}
+.nc-tags summary::-webkit-details-marker{display:none}
+.nc-tags-count{align-items:center;color:var(--accent-bright);display:inline-flex;flex:none;font-weight:700;gap:.15rem}
+.nc-tags-count svg{transition:transform .15s}
+.nc-tags[open] .nc-tags-count svg{transform:rotate(90deg)}
+.nc-tags-preview{color:var(--dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-tags[open] .nc-tags-preview{display:none}
+.nc-tag-list{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem;max-height:6.5rem;overflow:auto}
+.nc-tag-list a,.nc-tag-list span{background:var(--accent-soft);border:1px solid rgba(155,135,245,.2);border-radius:999px;color:var(--accent-bright);font-size:.62rem;padding:.2rem .45rem;text-decoration:none}
+.nc-tag-list a:hover{border-color:var(--accent)}
+
+@media (max-width:640px){
+  .nc-cover-link{flex-basis:72px}
+  .nc-head .nc-cover{height:108px;width:72px}
+}
