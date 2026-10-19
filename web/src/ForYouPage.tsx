@@ -9,6 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
+import { passesMinRecRating, useDisplaySettings } from './settings';
 import './for-you.css';
 
 export interface ListSummary {
@@ -325,6 +326,8 @@ function RowGrid({
 export default function ForYouPage(): JSX.Element {
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
+  const { settings } = useDisplaySettings();
+  const minRating = settings.minRecRating;
   const [hideKnown, setHideKnown] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [shelvesOpen, setShelvesOpen] = useState(false);
@@ -384,6 +387,7 @@ export default function ForYouPage(): JSX.Element {
   const jobs = useMemo<RowJob[]>(() => {
     const out: RowJob[] = [];
     const exclude = hideKnown ? seenIds : [];
+    const rated = (row: RowData): RowData => ({ ...row, recommendations: row.recommendations.filter((r) => passesMinRecRating(r, minRating)) });
     const libraryJobs: Array<{ key: string; title: string; subtitle: string; seeds: LibrarySeed[] }> = [
       { key: 'lib-rated', title: 'Because you rated highly', subtitle: 'Seeded by your top-rated titles', seeds: plan.rated },
       { key: 'lib-finished', title: 'From what you finished', subtitle: 'Seeded by titles you completed', seeds: plan.finished },
@@ -397,7 +401,7 @@ export default function ForYouPage(): JSX.Element {
         out.push({
           key: lj.key,
           fallbackTitle: lj.title,
-          load: (limit, signal) => fetchLibraryRow(lj.title, lj.subtitle, lj.seeds, getTaste(signal), exclude, limit, signal),
+          load: (limit, signal) => fetchLibraryRow(lj.title, lj.subtitle, lj.seeds, getTaste(signal), exclude, limit, signal).then(rated),
         });
       }
     }
@@ -405,20 +409,20 @@ export default function ForYouPage(): JSX.Element {
       out.push({
         key: 'blend',
         fallbackTitle: 'Top picks for you',
-        load: (limit, signal) => fetchListRow(selected.slice(0, BLEND_LISTS), true, hideKnown, exclude, profileTitles, limit, signal),
+        load: (limit, signal) => fetchListRow(selected.slice(0, BLEND_LISTS), true, hideKnown, exclude, profileTitles, limit, signal).then(rated),
       });
     }
     for (const id of selected) {
       out.push({
         key: `list-${id}`,
         fallbackTitle: 'Because you love this list',
-        load: (limit, signal) => fetchListRow([id], false, hideKnown, exclude, profileTitles, limit, signal),
+        load: (limit, signal) => fetchListRow([id], false, hideKnown, exclude, profileTitles, limit, signal).then(rated),
       });
     }
     return out;
     // plan/profile are covered by planKey; seenIds by seenKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey]);
+  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey, minRating]);
 
   const [epoch, setEpoch] = useState(0); // bumped when jobs change so rows remount and re-arm their visibility trigger
   // Rows load when they near the viewport, so a visit only pays for what is actually scrolled to.
