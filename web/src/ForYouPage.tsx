@@ -9,7 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
-import { listPageUrl } from './routeState';
+import { listPageUrl } from './listPageUrl';
 import { ForYouOnboarding } from './ForYouOnboarding';
 import { registerPreviews, type PreviewData } from './CoverPreview';
 import { NovelCard } from './components/NovelCard';
