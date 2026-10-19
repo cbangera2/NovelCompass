@@ -52,3 +52,11 @@
 .settings-link-card>span{display:flex;flex:1;flex-direction:column;min-width:0}
 .settings-link-card small{color:var(--muted);font-size:.65rem}
 .settings-link-card>svg:last-child{color:var(--dim);flex:none}
+.shell-tabbar{display:none}
+@media(max-width:900px){
+.sidebar-provider{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
+.shell-tabbar{background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(18px);border-top:1px solid var(--border);bottom:0;display:grid;grid-template-columns:repeat(4,1fr);left:0;padding:.3rem .4rem calc(.3rem + env(safe-area-inset-bottom));position:fixed;right:0;z-index:50}
+.shell-tabbar a{align-items:center;border-radius:10px;color:var(--muted);display:flex;flex-direction:column;font-size:.64rem;font-weight:600;gap:.2rem;min-height:50px;justify-content:center;text-decoration:none}
+.shell-tabbar a.active{background:var(--accent-soft);color:var(--accent-bright)}
+.sidebar-mobile-sheet .sidebar-item-in-tabbar{display:none}
+}

@@ -9,6 +9,7 @@ import {
   Search,
   Settings,
   Heart,
+  Library,
   Sparkles,
   User,
   X,
@@ -53,11 +54,19 @@ import { useDataModePreference } from './dataModePreference';
 export type AppView = 'discover' | 'foryou' | 'browse' | 'profile' | 'settings' | 'scraper' | 'novel';
 
 const NAV_ITEMS = [
-  { view: 'foryou' as const, label: 'For You', note: 'Picked from your lists', icon: Heart },
-  { view: 'discover' as const, label: 'Discover', note: 'Find related titles', icon: Sparkles },
-  { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen },
-  { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings },
-  { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database },
+  { view: 'foryou' as const, label: 'For You', note: 'Picked from your lists', icon: Heart, tab: true },
+  { view: 'discover' as const, label: 'Discover', note: 'Find related titles', icon: Sparkles, tab: true },
+  { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen, tab: true },
+  { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings, tab: false },
+  { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database, tab: false },
+];
+
+// Mobile bottom tab bar. "Library" points at Profile until it gets its own page.
+const TAB_ITEMS = [
+  { view: 'foryou' as const, label: 'For You', icon: Heart },
+  { view: 'discover' as const, label: 'Discover', icon: Sparkles },
+  { view: 'browse' as const, label: 'Browse', icon: BookOpen },
+  { view: 'profile' as const, label: 'Library', icon: Library },
 ];
 
 const BRAND = 'Novel Compass';
@@ -165,7 +174,7 @@ export default function AppShell({
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <SidebarMenuItem key={item.view}>
+                  <SidebarMenuItem key={item.view} className={item.tab ? 'sidebar-item-in-tabbar' : ''}>
                     <SidebarMenuButton
                       asChild
                       active={activeView === item.view}
@@ -245,6 +254,19 @@ export default function AppShell({
           </nav>
         </footer>
       </SidebarInset>
+      <nav className="shell-tabbar" aria-label="Primary">
+        {TAB_ITEMS.map(({ view, label, icon: Icon }) => (
+          <a
+            key={view}
+            href={viewUrl(view)}
+            className={activeView === view ? 'active' : ''}
+            aria-current={activeView === view ? 'page' : undefined}
+          >
+            <Icon size={20} aria-hidden="true" />
+            <span>{label}</span>
+          </a>
+        ))}
+      </nav>
     </SidebarProvider>
   );
 }
