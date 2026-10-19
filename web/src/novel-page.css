@@ -72,9 +72,6 @@
 .standing-track i{background:var(--accent-bright);border:2px solid var(--surface);border-radius:50%;box-shadow:0 0 0 1px var(--accent);height:13px;position:absolute;top:50%;transform:translate(-50%,-50%);width:13px}
 .novel-library-state{background:var(--surface);border:1px solid var(--border);border-radius:10px;gap:.7rem}
 .novel-library-state svg{color:var(--accent-bright)}
-.novel-library-state label{align-items:center;display:flex;gap:.55rem}
-.novel-library-state label span{color:var(--muted);font-weight:600}
-.novel-library-state select{background:var(--surface-raised);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;font-size:.72rem;font-weight:600;padding:.25rem .45rem}
 .novel-library-state span+span:before{content:""}
 .novel-section-nav{align-items:center}
 .novel-mini{align-items:center;display:flex;gap:.6rem;margin-left:auto;max-width:48%;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .15s,transform .15s}
@@ -135,3 +132,27 @@
 .curated-lists>p{color:var(--dim);font-size:.66rem;margin:.6rem 0 0}
 @media(max-width:900px){.novel-signals-grid,.curated-lists ul{grid-template-columns:1fr}}
 .curated-lists-note{align-items:center;color:var(--muted);display:flex;font-size:.74rem;gap:.4rem;margin:.9rem 0 0}
+/* Compact hero: pair related blocks on one row instead of stacking them. */
+.novel-metrics{align-items:center;display:flex;flex-wrap:wrap;gap:1rem clamp(1.2rem,3vw,2.4rem);margin:1.1rem 0 .9rem}
+.novel-metrics .novel-stats{gap:clamp(.9rem,2.5vw,2rem);margin:0}
+.novel-metrics .novel-standing{flex:1 1 380px;gap:.5rem;margin:0;max-width:none}
+.novel-metrics .novel-standing>div{padding:.5rem .65rem}
+.novel-controls{align-items:center;display:flex;flex-wrap:wrap;gap:.6rem}
+.novel-controls .novel-library-state{margin:0}
+.novel-personal{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem 1.4rem;margin-top:.9rem}
+.novel-personal .novel-feedback,.novel-personal .novel-personal-rating{margin:0}
+.novel-hero{margin-bottom:1.4rem}
+@media(max-width:700px){.novel-controls{display:grid;grid-template-columns:1fr}.novel-controls .novel-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.novel-library-state .ui-select{min-width:150px}.novel-library-state .ui-select-trigger{height:32px}.novel-library-state .library-label{color:var(--muted);font-weight:600}
+@media(max-width:700px){
+  .novel-metrics{display:grid;gap:.6rem;grid-template-columns:minmax(0,1fr);margin:1rem 0 .8rem}
+  .novel-metrics .novel-stats{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}
+  .novel-metrics .novel-stats>div:last-child:nth-child(odd){grid-column:auto}
+  .novel-metrics .novel-stats small{overflow-wrap:anywhere}
+  .novel-metrics .novel-standing{gap:.4rem;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .novel-metrics .novel-standing>div{padding:.45rem .5rem}.novel-metrics .novel-standing strong{font-size:.85rem}.novel-metrics .novel-standing small{overflow-wrap:anywhere}
+  .novel-controls .novel-library-state{display:flex;width:100%}
+  .novel-personal{display:grid;gap:.7rem;grid-template-columns:minmax(0,1fr);margin-top:.9rem}
+  .novel-personal .novel-feedback{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .novel-personal .novel-feedback button:nth-of-type(3){grid-column:auto}
+}

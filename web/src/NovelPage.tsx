@@ -5,6 +5,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createDataSource, externalMediaUrl, RecommendationDataSource, sourceDisplayName } from './data';
 import { Card, DSButton, Skeleton } from './design-system';
+import { Select } from './ui';
 import { browseFacetUrl } from './metadataLinks';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
@@ -215,6 +216,7 @@ export default function NovelPage(): JSX.Element {
           {detail.language && <> · <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a></>}
           {detail.year && <> · {detail.year}</>}
         </p>
+        <div className="novel-metrics">
         <div className="novel-stats">
           <div><strong>{detail.rating.toFixed(1)}</strong><span>rating</span><small>{detail.rating_votes.toLocaleString()} votes</small></div>
           <div><strong>{Math.max(0, detail.reading_list_count).toLocaleString()}</strong><span>{audienceLabel(detail.id, detail.media_type)}</span><small>on reading lists</small></div>
@@ -232,16 +234,16 @@ export default function NovelPage(): JSX.Element {
             </div>;
           })}
         </div>}
+        </div>
         {verdictChips.length > 0 && <div className="novel-verdicts">{verdictChips.map((label) => <span key={label} className={label === 'Divisive' || label.includes('polarizing') ? 'warn' : ''}>{label}</span>)}</div>}
+        <div className="novel-controls">
         <div className="novel-library-state">
           <Library size={15} />
-          <label>
-            <span>{libraryEntry ? 'In your library' : 'Add to library'}</span>
-            <select value={libraryEntry?.status || ''} onChange={(event) => saveStatus(event.target.value as ReadingStatus)} aria-label="Reading status">
-              {!libraryEntry && <option value="" disabled>Choose status…</option>}
-              {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
+          <span className="library-label">{libraryEntry ? 'In your library' : 'Add to library'}</span>
+          <Select value={libraryEntry?.status || ''} onValueChange={(value) => saveStatus(value as ReadingStatus)} aria-label="Reading status">
+            {!libraryEntry && <option value="" disabled>Choose status…</option>}
+            {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </Select>
           {libraryEntry?.rating ? <span>{libraryEntry.rating}★</span> : null}
           {libraryEntry?.progress ? <span>{libraryEntry.progress}</span> : null}
         </div>
@@ -251,6 +253,8 @@ export default function NovelPage(): JSX.Element {
             Open on {sourceDisplayName(detail.source, detail.id)} <ExternalLink size={15} />
           </DSButton>
         </div>
+        </div>
+        <div className="novel-personal">
         <div className="novel-feedback" aria-label="Personal feedback">
           <span>Fine-tune your local profile</span>
           {([
@@ -269,7 +273,8 @@ export default function NovelPage(): JSX.Element {
             onClick={() => saveRating(currentRating === rating ? undefined : rating)}>
             <Star size={18} fill="currentColor" />
           </button>)}</div>
-          <small>{currentRating ? `${currentRating} of 5 · select again to clear` : 'Not rated · saved only in this browser'}</small>
+          {currentRating ? <small>{currentRating} of 5 · select again to clear</small> : null}
+        </div>
         </div>
       </div>
     </section>
