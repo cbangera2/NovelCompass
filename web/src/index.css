@@ -668,9 +668,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .ui-button-ghost:hover { background: var(--surface-raised); color: var(--text); }
 .ui-button-primary { background: var(--accent); border-color: transparent; color: white; }
 .ui-tooltip { display: inline-flex; position: relative; }
-.ui-tooltip-content { background: #111522; border: 1px solid var(--border-strong); border-radius: 8px; bottom: calc(100% + 7px); box-shadow: 0 10px 30px rgba(0,0,0,.5); color: #e5e1f8; font-size: .66rem; font-weight: 500; left: 50%; line-height: 1.35; max-width: 220px; opacity: 0; padding: .4rem .55rem; pointer-events: none; position: absolute; text-align: center; transform: translate(-50%,4px); transition: opacity .15s,transform .15s; visibility: hidden; white-space: normal; width: max-content; z-index: 100; }
+.ui-tooltip-content { background: #111522; border: 1px solid var(--border-strong); border-radius: 8px; bottom: calc(100% + 7px); box-shadow: 0 10px 30px rgba(0,0,0,.5); color: #e5e1f8; font-size: .66rem; font-weight: 500; left: 50%; line-height: 1.35; max-width: 220px; opacity: 0; padding: .4rem .55rem; pointer-events: none; position: absolute; text-align: center; transform: translate(-50%,4px); display: none; white-space: normal; width: max-content; z-index: 100; }
 .ui-tooltip-bottom .ui-tooltip-content { bottom: auto; top: calc(100% + 7px); transform: translate(-50%,-4px); }
-.ui-tooltip:hover .ui-tooltip-content,.ui-tooltip:focus-within .ui-tooltip-content { opacity: 1; transform: translate(-50%,0); visibility: visible; }
+/* display:none (not visibility:hidden) so a closed tooltip is not laid out and cannot widen the page on mobile. */
+.ui-tooltip:hover .ui-tooltip-content,.ui-tooltip:focus-within .ui-tooltip-content { animation: ui-tooltip-in .15s ease-out forwards; display: block; }
+@keyframes ui-tooltip-in { to { opacity: 1; transform: translate(-50%,0); } }
 .active-filter-chips { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .65rem; padding-top: .55rem; }
 .active-filter-chips span { background: var(--accent-soft); border: 1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius: 999px; color: var(--accent-bright); font-size: .62rem; padding: .18rem .4rem; }
 
@@ -752,7 +754,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 .results-heading { align-items: center; display: flex; gap: .85rem; margin: 0 0 1.1rem; }
 .cover-seed { border-radius: 8px; flex: 0 0 auto; height: 66px; object-fit: cover; width: 50px; }
-.results-heading-copy { min-width: min-content; }
+.results-heading-copy { max-width: 100%; min-width: 0; }
 .results-heading h2 { font-size: 1.45rem; line-height: 1.15; margin: .15rem 0; }
 .results-heading h2 a, .novel-title a { color: inherit; text-decoration: none; }
 .results-heading h2 a { align-items: center; display: inline-flex; gap: .4rem; }

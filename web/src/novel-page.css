@@ -62,7 +62,7 @@
 
 /* ---- Redesign pass ---- */
 .novel-hero{isolation:isolate;position:relative}
-.novel-hero:before{background:var(--hero-cover) center/cover;content:"";filter:blur(70px) saturate(1.4);inset:-2rem -3rem -1rem;opacity:.2;position:absolute;z-index:-1;border-radius:32px;mask-image:linear-gradient(#000 40%,transparent)}
+.novel-hero:before{background:var(--hero-cover) center/cover;content:"";filter:blur(70px) saturate(1.4);inset:-2rem calc(-1 * clamp(.85rem,2.5vw,2rem)) -1rem;opacity:.2;position:absolute;z-index:-1;border-radius:32px;mask-image:linear-gradient(#000 40%,transparent)}
 .novel-standing{display:grid;gap:.6rem;grid-template-columns:repeat(3,minmax(0,1fr));margin:0 0 1.1rem;max-width:560px}
 .novel-standing>div{background:var(--surface);border:1px solid var(--border);border-radius:12px;display:grid;gap:.1rem;padding:.65rem .8rem}
 .novel-standing span{color:var(--dim);font-size:.6rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
