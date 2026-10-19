@@ -28,6 +28,17 @@ function seedWeight(e: ProfileEntry): number {
   return Math.round((base + (e.status === 'completed' ? 0.25 : 0)) * 100) / 100;
 }
 
+/**
+ * Every catalog-matched title in the library, whatever list it sits on — plan to read,
+ * reading, completed, paused, dropped. Used to hide titles the reader has already
+ * saved, so a plan-to-read pick doesn't come back as a "new" suggestion.
+ */
+export function libraryNovelIds(profile: LocalUserProfile | null): number[] {
+  const ids = new Set<number>();
+  for (const entry of profile?.entries ?? []) if (entry.novel_id != null) ids.add(entry.novel_id);
+  return [...ids].sort((a, b) => a - b);
+}
+
 const toSeed = (e: ProfileEntry): LibrarySeed => ({ id: e.novel_id!, title: e.imported_title, weight: seedWeight(e) });
 const byStrength = (a: ProfileEntry, b: ProfileEntry) =>
   seedWeight(b) - seedWeight(a) || a.imported_title.localeCompare(b.imported_title);
