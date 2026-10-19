@@ -1,4 +1,4 @@
-export type HomeView = 'discover' | 'browse';
+export type HomeView = 'foryou' | 'discover' | 'browse';
 
 const NAVIGATION_KEY = 'novel-compass:navigation:v1';
 const FILTER_CONTROL_KEY = 'novel-compass:filter-control:v1';
@@ -16,7 +16,7 @@ function readObject(key: string): Record<string, unknown> {
 
 export function loadNavigationPreferences(): NavigationPreferences {
   const value = readObject(NAVIGATION_KEY);
-  return { version: 1, homeView: value.homeView === 'browse' ? 'browse' : 'discover' };
+  return { version: 1, homeView: value.homeView === 'browse' || value.homeView === 'discover' ? value.homeView : 'foryou' };
 }
 
 export function saveNavigationPreferences(homeView: HomeView): void {
@@ -58,7 +58,8 @@ export function resetSavedFilters(): void {
 }
 
 export function defaultHomeUrl(): string {
-  return loadNavigationPreferences().homeView === 'browse'
-    ? `${import.meta.env.BASE_URL}?view=browse`
-    : import.meta.env.BASE_URL;
+  const { homeView } = loadNavigationPreferences();
+  return homeView === 'discover'
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}?view=${homeView}`;
 }
