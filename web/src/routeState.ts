@@ -1,3 +1,4 @@
+import { readCoreFilterParams, writeCoreFilterParams } from './components/coreFilterParams';
 export const DISCOVER_DEFAULTS = {
   hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
   requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
@@ -39,8 +40,7 @@ export function parseDiscoverRoute(params: URLSearchParams, fallback: DiscoverRo
     excludeBL: booleanValue(params, 'xb', fallback.excludeBL),
     excludeYuri: booleanValue(params, 'xy', fallback.excludeYuri),
     requireCompleted: booleanValue(params, 'done', fallback.requireCompleted),
-    language: params.has('lang') ? params.get('lang') || '' : fallback.language,
-    minRating: numberValue(params, 'r', fallback.minRating, 0, 5),
+    ...readCoreFilterParams(params, { language: fallback.language, minRating: fallback.minRating }),
     minRatingVotes: numberValue(params, 'v', fallback.minRatingVotes),
     maxReaders: numberValue(params, 'mr', fallback.maxReaders),
     minYear: numberValue(params, 'y0', fallback.minYear),
@@ -67,7 +67,7 @@ export function discoverSearchParams(state: DiscoverRouteState): URLSearchParams
   set('for_you', Boolean(state.forYou), false);
   set('hg', state.hiddenGemMode, false); set('xh', state.excludeHarem, false);
   set('xb', state.excludeBL, false); set('xy', state.excludeYuri, false); set('done', state.requireCompleted, false);
-  set('lang', state.language, ''); set('r', state.minRating, 0); set('v', state.minRatingVotes, 0);
+  writeCoreFilterParams(params, state); set('v', state.minRatingVotes, 0);
   set('mr', state.maxReaders, 0); set('y0', state.minYear, 0); set('y1', state.maxYear, 0);
   const genres = Object.entries(state.genreStates || {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([name, value]) => `${value === 'include' ? '+' : '-'}${name}`).join(',');
