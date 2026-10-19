@@ -36,7 +36,7 @@ import {
   fetchForYouRecommendations,
   type TasteSeed,
 } from './profile/taste';
-import { displayNovelTitle, useDisplaySettings } from './settings';
+import { displayNovelTitle, passesMinRecRating, useDisplaySettings } from './settings';
 import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
@@ -774,7 +774,8 @@ export default function App(): JSX.Element {
   const filteredRecommendations = useMemo(() => (data?.recommendations || [])
     .filter((rec) => feedbackByNovel.get(rec.target_id) !== 'not_for_me')
     .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
-    .slice(0, maxResults), [data, feedbackByNovel, hideLibraryTitles, maxResults, profileEntries]);
+    .filter((rec) => passesMinRecRating(rec, settings.minRecRating))
+    .slice(0, maxResults), [data, feedbackByNovel, hideLibraryTitles, maxResults, profileEntries, settings.minRecRating]);
 
   const loadNextRecommendationBatch = () => {
     if (loading || !data) return;
