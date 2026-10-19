@@ -70,7 +70,7 @@
 .novel-mini.show{opacity:1;pointer-events:auto;transform:none}
 .novel-mini img{border-radius:5px;height:30px;object-fit:cover;width:21px}
 .novel-mini strong{font-size:.74rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.novel-mini a{align-items:center;background:var(--accent);border-radius:8px;color:#fff;display:flex;flex:none;font-size:.68rem;font-weight:700;gap:.3rem;padding:.4rem .65rem;text-decoration:none}
+.novel-mini a{align-items:center;background:var(--accent-solid);border-radius:8px;color:#fff;display:flex;flex:none;font-size:.68rem;font-weight:700;gap:.3rem;padding:.4rem .65rem;text-decoration:none}
 .related-signals{display:flex;gap:3px;margin:.25rem 0 .1rem}
 .related-signals i{background:var(--accent);border-radius:2px;height:4px;width:100%}
 @media(max-width:700px){.novel-standing{grid-template-columns:1fr}.novel-mini strong{display:none}}
