@@ -46,6 +46,7 @@ interface RowJob {
   key: string;
   fallbackTitle: string;
   heading?: string; // overrides the server's title
+  blurb?: string; // overrides the seed-title subtitle
   load: (limit: number, signal: AbortSignal) => Promise<RowData>;
 }
 
@@ -66,7 +67,10 @@ async function loadLists(): Promise<ListSummary[]> {
   if (await isStaticSource()) return staticLists();
   const response = await fetch('/api/for-you/lists');
   if (!response.ok) throw new Error(`Server returned ${response.status}`);
-  return (await response.json()).lists;
+  const lists: ListSummary[] = (await response.json()).lists;
+  // Theme tags come from the precomputed snapshot; the live API doesn't compute them.
+  const themes = new Map((await staticLists().catch(() => [] as ListSummary[])).map((l) => [l.id, l.theme]));
+  return lists.map((l) => ({ ...l, theme: themes.get(l.id) }));
 }
 
 async function postJson<T>(url: string, body: unknown, signal: AbortSignal): Promise<T> {
@@ -191,6 +195,7 @@ function Row({
   state,
   fallbackTitle,
   heading,
+  blurb,
   library,
   onSeeAll,
   onVisible,
@@ -198,6 +203,7 @@ function Row({
   state: RowState;
   fallbackTitle: string;
   heading?: string;
+  blurb?: string;
   library: Map<number, ReadingStatus>;
   onSeeAll: () => void;
   onVisible: () => void;
@@ -224,7 +230,7 @@ function Row({
       <header>
         <div>
           <h2>{heading ?? (state.status === 'ready' ? state.title : fallbackTitle)}</h2>
-          {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{seedLine(state)}</p>}
+          {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{blurb ?? seedLine(state)}</p>}
         </div>
         {state.status === 'ready' && (
           <div className="fy-row-nav">
@@ -289,7 +295,7 @@ function RowGrid({
         <div>
           <DSButton variant="ghost" className="fy-back" onClick={onBack}><ArrowLeft size={16} /> Back to rows</DSButton>
           <h2>{job.heading ?? (state.status === 'ready' ? state.title : job.fallbackTitle)}</h2>
-          {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{seedLine(state)}</p>}
+          {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{job.blurb ?? seedLine(state)}</p>}
         </div>
       </header>
       {state.status === 'error' && <p className="fy-error">Couldn't load this row: {state.message}</p>}
@@ -437,7 +443,15 @@ export default function ForYouPage(): JSX.Element {
   const expandedJob = expanded ? jobs.find((j) => j.key === expanded) : undefined;
   const hasLibraryRows = plan.rated.length > 0 || plan.finished.length > 0;
   const headingFor = (job: RowJob) =>
-    job.key.startsWith('list-') ? cleanListTitle(titles.get(Number(job.key.slice(5))) ?? '') || undefined : undefined;
+    job.key.startsWith('list-') ? cleanListTitle(titles.get(Number(job.key.slice(5))) ?? '', Number(job.key.slice(5))) || undefined : undefined;
+  const blurbFor = (job: RowJob) => {
+    if (job.key === 'blend') return `A mix of your top ${Math.min(selected.length, BLEND_LISTS)} shelves`;
+    if (!job.key.startsWith('list-')) return undefined;
+    const list = (lists ?? []).find((l) => l.id === Number(job.key.slice(5)));
+    if (!list) return undefined;
+    const parts = [list.curator ? `Curated by ${list.curator}` : '', ...(list.theme ?? []).slice(0, 3)];
+    return parts.filter(Boolean).join(' · ') || undefined;
+  };
   const fallbackTitle = (job: RowJob) =>
     job.key.startsWith('list-') ? `Because you love ${titles.get(Number(job.key.slice(5))) ?? 'this list'}` : job.fallbackTitle;
 
@@ -445,7 +459,7 @@ export default function ForYouPage(): JSX.Element {
     return (
       <main className="fy-shell">
         <RowGrid
-          job={{ ...expandedJob, fallbackTitle: fallbackTitle(expandedJob), heading: headingFor(expandedJob) }}
+          job={{ ...expandedJob, fallbackTitle: fallbackTitle(expandedJob), heading: headingFor(expandedJob), blurb: blurbFor(expandedJob) }}
           preview={rows[expandedJob.key] ?? { status: 'loading' }}
           library={library}
           onBack={() => setExpanded(null)}
@@ -484,7 +498,7 @@ export default function ForYouPage(): JSX.Element {
               aria-pressed={selected.includes(list.id)}
               title={list.theme?.length ? `${titles.get(list.id) ?? list.title} · ${list.items} titles · ${list.theme.join(', ')}` : undefined}
             >
-              {cleanListTitle(titles.get(list.id) ?? list.title)}
+              {cleanListTitle(titles.get(list.id) ?? list.title, list.id)}
             </button>
           ))}
           {(lists ?? []).some((list) => !list.curator) && (
@@ -514,6 +528,7 @@ export default function ForYouPage(): JSX.Element {
           state={rows[job.key] ?? { status: 'loading' }}
           fallbackTitle={fallbackTitle(job)}
           heading={headingFor(job)}
+          blurb={blurbFor(job)}
           library={library}
           onSeeAll={() => setExpanded(job.key)}
           onVisible={() => requestRow(job)}
