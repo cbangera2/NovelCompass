@@ -1,4 +1,4 @@
-import { Compass, FilterX, Monitor, Moon, Sun, Type } from 'lucide-react';
+import { Bug, Code2, Compass, Database, ExternalLink, FilterX, Info, Monitor, Moon, Sun, Type } from 'lucide-react';
 import { useDisplaySettings } from './settings';
 import { Badge, Card, CardHeader } from './design-system';
 import { loadFilterControlPreferences, loadNavigationPreferences, resetSavedFilters, saveFilterControlPreferences, saveNavigationPreferences } from './preferences';
@@ -79,6 +79,20 @@ export default function SettingsPage(): JSX.Element {
         <p className="settings-disclosure">{forcedMode
           ? `This deployment forces the ${forcedMode === 'static' ? 'static snapshot' : 'live API'} source, so a browser preference cannot override it.`
           : 'Saved locally and synchronized across tabs. If Live database is unavailable, the app shows an error and keeps your choice so you can retry; only Automatic falls back.'}</p>
+      </Card>
+      <Card className="settings-card">
+        <CardHeader title="About" description="Novel Compass is open source. Code, issues and the catalog dataset live on GitHub." action={<Info size={19} />} />
+        <div className="settings-choice-grid title-choices">
+          {([
+            [Code2, 'GitHub repository', 'Source code and project', 'https://github.com/cbangera2/NovelCompass'],
+            [Bug, 'Report an issue', 'GitHub issue tracker', 'https://github.com/cbangera2/NovelCompass/issues'],
+            [Database, 'Data repository', 'Catalog dataset', 'https://github.com/cbangera2/novelcompass-data']
+          ] as const).map(([Icon, label, note, href]) => (
+            <a key={href} className="settings-link-card" href={href} target="_blank" rel="noopener noreferrer">
+              <Icon size={18} /><span><strong>{label}</strong><small>{note}</small></span><ExternalLink size={13} aria-hidden="true" />
+            </a>
+          ))}
+        </div>
       </Card>
       <Card className="settings-storage-note">
         <Badge tone="green">Private local setting</Badge>
