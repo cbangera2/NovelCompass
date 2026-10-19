@@ -86,3 +86,8 @@ export function stableRouteUrl(params: URLSearchParams): string {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
   return `${pathname}?${sorted.toString()}${hash}`;
 }
+
+/** Curated list page (`?view=list&id=<NovelUpdates list id>`). */
+export function listPageUrl(id: number): string {
+  return `${import.meta.env.BASE_URL}?view=list&id=${id}`;
+}

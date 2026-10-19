@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import { BookOpen, ExternalLink, Users } from 'lucide-react';
 import { CuratedListSummary, NovelDetail, NovelInsights, RelatedSeriesItem } from './types';
 import { novelPageUrl } from './novelLinks';
+import { staticListIds } from './forYouStatic';
+import { listPageUrl } from './routeState';
 
 type Star = '5' | '4' | '3' | '2' | '1';
 const STARS: Star[] = ['5', '4', '3', '2', '1'];
@@ -97,6 +100,9 @@ export function SeriesCard({ items, fromId }: { items: RelatedSeriesItem[]; from
 const GENERIC_LIST_TITLE = /^Novel Updates List \d+$/i;
 
 export function CuratedListsCard({ lists }: { lists: CuratedListSummary[] }) {
+  // Lists with a page in this snapshot open our list page; the rest still go to Novel Updates.
+  const [known, setKnown] = useState<Set<number>>(new Set());
+  useEffect(() => { void staticListIds().then(setKnown); }, []);
   if (!lists.length) return null;
   const named = lists.filter((list) => !GENERIC_LIST_TITLE.test(list.title));
   const unnamed = lists.length - named.length;
@@ -104,10 +110,13 @@ export function CuratedListsCard({ lists }: { lists: CuratedListSummary[] }) {
   return <section className="curated-lists" aria-label="Curated lists featuring this title">
     <header><div><span className="eyebrow">Community curation</span><h3>On {lists.length} reader-made list{lists.length === 1 ? '' : 's'}</h3></div></header>
     {named.length > 0 && <ul>{named.slice(0, 6).map((list) => <li key={list.id}>
-      <a href={`https://www.novelupdates.com/viewlist/${list.id}/`} target="_blank" rel="noopener noreferrer">
+      <a
+        href={known.has(list.id) ? listPageUrl(list.id) : `https://www.novelupdates.com/viewlist/${list.id}/`}
+        {...(known.has(list.id) ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
+      >
         <strong>{list.title}</strong>
         <small>{list.curator ? `by ${list.curator} · ` : ''}{list.item_count ? `${list.item_count} titles` : 'list'}{list.followers > 0 && <> · <Users size={11} /> {list.followers.toLocaleString()}</>}</small>
-        <ExternalLink size={13} />
+        {known.has(list.id) ? <BookOpen size={13} /> : <ExternalLink size={13} />}
       </a>
     </li>)}</ul>}
     {(unnamed > 0 || named.length > 6) && <p>{named.length > 6 ? `${named.length - 6} more named lists` : ''}{named.length > 6 && unnamed > 0 ? ' and ' : ''}{unnamed > 0 ? `${unnamed} list${unnamed === 1 ? '' : 's'} without a saved title` : ''}.</p>}
