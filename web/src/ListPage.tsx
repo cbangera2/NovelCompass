@@ -60,6 +60,10 @@ export default function ListPage(): JSX.Element {
     return () => { cancelled = true; };
   }, [id]);
 
+  useEffect(() => {
+    if (state.status === 'ready') document.title = `${state.title} - Novel Compass`;
+  }, [state]);
+
   const sourceUrl = `https://www.novelupdates.com/viewlist/${id}/`;
   const back = `${import.meta.env.BASE_URL}?view=foryou`;
 
