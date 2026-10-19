@@ -11,6 +11,18 @@ function resolveFormatKey(id: number, mediaType?: string): 'novel' | 'manga' | '
   return 'novel';
 }
 
+/** Anime count episodes; everything else counts chapters. */
+export function progressUnitLabel(id: number, mediaType?: string, short = false): string {
+  const anime = resolveFormatKey(id, mediaType) === 'anime';
+  if (short) return anime ? 'eps' : 'ch.';
+  return anime ? 'episodes' : 'chapters';
+}
+
+/** Anime have watchers; everything else has readers. */
+export function audienceLabel(id: number, mediaType?: string): string {
+  return resolveFormatKey(id, mediaType) === 'anime' ? 'watchers' : 'readers';
+}
+
 export function itemPageUrl(id: number, from?: number, mediaType?: string): string {
   const view = resolveFormatKey(id, mediaType);
   const params = new URLSearchParams({ view, id: String(id) });

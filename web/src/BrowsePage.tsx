@@ -27,7 +27,7 @@ import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { getMediaBadgeInfo, hasUsableCover, novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
 
@@ -1123,7 +1123,7 @@ function BrowseCard({
         <footer className="browse-card-actions">
           <span>
             {novel.year || 'Year unknown'}
-            {novel.chapters_trans ? ` · ${novel.chapters_trans} ch.` : ''}
+            {novel.chapters_trans ? ` · ${novel.chapters_trans} ${progressUnitLabel(novel.id, novel.media_type, true)}` : ''}
           </span>
           {recommendationHref && (
             <Tooltip content="Find similar titles">
