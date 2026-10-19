@@ -1,6 +1,6 @@
 import { ChangeEvent, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
-import { FileUp, X } from 'lucide-react';
+import { FileUp, Loader2, X } from 'lucide-react';
 import { createDataSource } from '../data';
 import { enrichAniListTitles, parseAniListGdprFile } from './anilistGdpr';
 import { IMPORT_FILE_ACCEPT, IMPORT_KIND_LABELS, sniffFile } from './detectImport';
@@ -35,6 +35,7 @@ export function ProfileImportDialog({
   const [message, setMessage] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const finish = (text: string) => {
     setOpen(false);
@@ -95,18 +96,25 @@ export function ProfileImportDialog({
 
       setMessage(`Reading ${usable.map(({ kind }) => IMPORT_KIND_LABELS[kind]).join(', ')}…`);
       const parsed = await Promise.all(usable.map(async ({ file, kind, text }) => {
-        if (kind === 'myanimelist') return parseMalFile(file, text);
+        if (kind === 'myanimelist') {
+          return parseMalFile(file, text, (done, total) => {
+            setMessage(`Matching ${file.name} against AniList (${done} of ${total})…`);
+            setProgress({ done, total });
+          });
+        }
         if (kind === 'anilist') {
           const file_ = await parseAniListGdprFile(file);
           return { ...file_, entries: await enrichAniListTitles(file_.entries) };
         }
         return parseProfileFile(file);
       }));
+      setProgress(null);
       await prepareParsed(parsed, 'Matching titles against the catalog…');
       if (notes.length) setMessage(notes.join(' '));
     } catch (error) {
       setFiles([]);
       setEntries([]);
+      setProgress(null);
       setMessage(error instanceof Error ? error.message : 'Those files could not be imported.');
       setBusy(false);
     }
@@ -230,7 +238,12 @@ export function ProfileImportDialog({
               </div>
             </div>
           )}
-          {message && <p className="profile-import-message" role="status">{message}</p>}
+          {busy && message ? (
+            <div className="profile-import-message profile-import-progress" role="status" aria-live="polite">
+              <span><Loader2 size={15} className="profile-import-spinner" aria-hidden /> {message}</span>
+              {progress && progress.total > 0 && <progress value={progress.done} max={progress.total} />}
+            </div>
+          ) : message && <p className="profile-import-message" role="status">{message}</p>}
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

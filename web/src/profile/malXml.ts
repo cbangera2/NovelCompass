@@ -209,6 +209,7 @@ export async function resolveMalIds(
   entries: ProfileEntry[],
   fetchImpl: typeof fetch = fetch,
   pauseMs = 700,
+  onProgress?: (done: number, total: number) => void,
 ): Promise<ProfileEntry[]> {
   const query = `
     query ($ids: [Int], $type: MediaType) {
@@ -216,6 +217,9 @@ export async function resolveMalIds(
     }
   `;
   const anilistByMal = new Map<string, number>();
+  const total = entries.length;
+  let done = 0;
+  onProgress?.(0, total);
   for (const type of ['ANIME', 'MANGA'] as const) {
     const kind = type === 'ANIME' ? 'anime' : 'manga';
     const ids = entries
@@ -238,6 +242,8 @@ export async function resolveMalIds(
       } catch {
         // Offline / rate-limited: leave these on title matching.
       }
+      done += Math.min(50, ids.length - i);
+      onProgress?.(done, total);
       if (i + 50 < ids.length) await new Promise((resolve) => setTimeout(resolve, pauseMs));
     }
   }
@@ -249,10 +255,14 @@ export async function resolveMalIds(
   });
 }
 
-export async function parseMalFile(file: File, text: string): Promise<ParsedProfileFile> {
+export async function parseMalFile(
+  file: File,
+  text: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<ParsedProfileFile> {
   if (file.size > MAX_PROFILE_FILE_BYTES) throw new Error(`${file.name} is larger than 15 MB.`);
   const parsed = isMalXml(text)
     ? await parseMalXml(text, file.name.replace(/\.gz$/i, ''))
     : await parseMalHtml(text, file.name);
-  return { ...parsed, entries: await resolveMalIds(parsed.entries) };
+  return { ...parsed, entries: await resolveMalIds(parsed.entries, fetch, 700, onProgress) };
 }
