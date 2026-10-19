@@ -224,6 +224,7 @@ export async function parseAniListGdprFile(file: File): Promise<ParsedProfileFil
   return {
     filename: file.name,
     fingerprint: await sha256(text),
+    source: 'anilist',
     detected_status: 'reading',
     selected_status: 'reading',
     username: username || undefined,
