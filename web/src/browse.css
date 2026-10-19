@@ -80,3 +80,5 @@
   color: var(--accent-bright);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
+.browse-controls .core-filters{display:contents}
+@media(min-width:1001px){.browse-controls{grid-template-columns:minmax(200px,2fr) repeat(3,minmax(110px,1fr)) auto auto}}
