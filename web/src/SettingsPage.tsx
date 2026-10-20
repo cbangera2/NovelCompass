@@ -10,7 +10,7 @@ import { Select } from './ui';
 
 const HOME_COPY = {
   foryou: { title: 'For You home', note: 'Start from shelves picked from your lists' },
-  discover: { title: 'Discover home', note: 'Start from a title relationship search' },
+  discover: { title: 'Similar titles home', note: 'Start from a title relationship search' },
   browse: { title: 'Browse home', note: 'Start from the full catalog' },
 } as const;
 
@@ -51,7 +51,7 @@ export default function SettingsPage(): JSX.Element {
         </div>
         <label className="settings-toggle"><input type="checkbox" checked={rememberFilters}
           onChange={(event) => { setRememberFilters(event.target.checked); saveFilterControlPreferences(event.target.checked); }} />
-          <span><strong>Remember Browse and Discover filters</strong><small>Restore the most recently used filters when returning. Explicit URL filters always win.</small></span>
+          <span><strong>Remember Browse and Similar filters</strong><small>Restore the most recently used filters when returning. Explicit URL filters always win.</small></span>
         </label>
         <button className="settings-reset-button" onClick={() => { resetSavedFilters(); setResetMessage('Saved filter snapshots cleared.'); }}><FilterX size={15} />Reset saved filters</button>
         {resetMessage && <p className="settings-disclosure" role="status">{resetMessage}</p>}

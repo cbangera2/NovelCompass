@@ -5,6 +5,7 @@ import {
   ExternalLink,
   LayoutGrid,
   List,
+  ChevronRight,
   Search,
   Shuffle,
   SlidersHorizontal,
@@ -664,6 +665,7 @@ export default function BrowsePage({
               ? 'Explore every title in this snapshot. Popularity uses list counts; highest rated uses the published rating and vote count.'
               : `Showing ${scopeSentence} from this snapshot. Toggle formats above to change scope — the same selection applies to search and recommendations.`)}
         </p>
+        <a className="browse-lists-link" href={`${import.meta.env.BASE_URL}?view=list`}>Browse curated lists <ChevronRight size={14} /></a>
       </header>
 
       <nav className="browse-presets" aria-label="Catalog views">

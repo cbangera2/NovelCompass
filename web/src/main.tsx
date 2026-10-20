@@ -20,7 +20,7 @@ const isDetailView = requestedView === 'novel' || requestedView === 'manga' || r
 const hasExplicitDiscoverSeed = locationParams.has('seed');
 const isListView = requestedView === 'list';
 const activeView: AppView = isListView
-  ? 'foryou' // list pages live under For You in the sidebar
+  ? (locationParams.has('id') ? 'foryou' : 'browse') // one list sits under For You; the list index sits under Browse
   : isDetailView
   ? 'novel'
   : requestedView === 'discover' || requestedView === 'foryou' || requestedView === 'scraper' || requestedView === 'browse' || requestedView === 'profile' || requestedView === 'settings'

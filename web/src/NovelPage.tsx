@@ -184,7 +184,7 @@ export default function NovelPage(): JSX.Element {
     setActiveSection(id);
   };
 
-  if (error) return <main className="novel-page-state"><Card><BookOpen /><h1>Title unavailable</h1><p>{error}</p><DSButton as="a" href={import.meta.env.BASE_URL}>Return to Discover</DSButton></Card></main>;
+  if (error) return <main className="novel-page-state"><Card><BookOpen /><h1>Title unavailable</h1><p>{error}</p><DSButton as="a" href={import.meta.env.BASE_URL}>Return to Similar titles</DSButton></Card></main>;
   if (!detail || !source) return <main className="novel-page novel-page-loading" aria-busy="true"><Skeleton className="novel-hero-skeleton" /><Skeleton className="novel-content-skeleton" /></main>;
 
   return <main className="novel-page">
