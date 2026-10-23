@@ -12,6 +12,8 @@ import {
   Recommendation,
   SeedNovel
 } from '../types';
+import { idle } from '../idle';
+import type { AnalyticsCorpus } from '../novelStats';
 import {
   bucketForNovel,
   DataSourceError,
@@ -171,6 +173,7 @@ export class StaticDataSource implements RecommendationDataSource {
   private bootstrapPromise?: Promise<void>;
   private catalogPromise?: Promise<void>;
   private facetsPromise?: Promise<FacetsFile>;
+  private analyticsCorpusPromise?: Promise<AnalyticsCorpus>;
   private compactFacetPromises = new Map<string, Promise<Record<string, { g?: number[]; t?: number[] }>>>();
   private detailPromises = new Map<string, Promise<Record<string, any>>>();
   private compactRecommendationPromises = new Map<string, Promise<CompactRecommendationShard>>();
@@ -557,6 +560,37 @@ export class StaticDataSource implements RecommendationDataSource {
       related_series_count: Number(detail.related_series_count || 0),
       recommendation_list_count: Number(detail.recommendation_list_count || 0)
     };
+  }
+
+  /** One compact row per catalog title, for the title-page analytics. Needs the full catalog, not the extension's compact one. */
+  getAnalyticsCorpus(): Promise<AnalyticsCorpus> {
+    this.analyticsCorpusPromise ??= (async () => {
+      if (isCompactExtensionManifest(await this.getManifest())) {
+        throw new DataSourceError('Catalog analytics need the full static catalog.');
+      }
+      await this.loadCatalog();
+      const facets = await this.loadFacets().catch(() => undefined);
+      // Not needed for first paint: wait for an idle moment so building 30k rows never competes with it.
+      await idle();
+      // Loaded on demand so the extension bundle, which shares this class, doesn't carry the analytics code.
+      const { buildCorpus } = await import('../novelStats');
+      return buildCorpus(
+        [...this.cards.values()].map((card) => ({
+          id: card.id,
+          mediaType: card.media_type,
+          rating: card.rating,
+          votes: card.rating_votes,
+          readers: card.reading_list_count,
+          units: card.chapters_trans || 0,
+          genres: card.genre_ids,
+          tags: facets?.novels?.[String(card.id)]?.t || [],
+        })),
+        this.genres,
+        facets?.tags?.length ? facets.tags : this.tags,
+      );
+    })();
+    this.analyticsCorpusPromise.catch(() => { this.analyticsCorpusPromise = undefined; });
+    return this.analyticsCorpusPromise;
   }
 
   async getNovelInsights(id: number): Promise<NovelInsights> {
