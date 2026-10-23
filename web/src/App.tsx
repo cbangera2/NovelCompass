@@ -811,8 +811,8 @@ export default function App(): JSX.Element {
       <header className="header">
         <div className="brand-mark"><Sparkles size={18} aria-hidden="true" /></div>
         <div>
-          <div className="eyebrow">Relationship-first discovery</div>
-          <h1>Find your next obsession.</h1>
+          <div className="eyebrow">Similar titles</div>
+          <h1>More like a title you loved.</h1>
           <FormatScopeChip />
           <p>
             Start with a title you loved. We trace shared tropes, recommendations, and related works

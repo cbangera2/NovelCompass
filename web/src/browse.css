@@ -82,3 +82,4 @@
 }
 .browse-controls .core-filters{display:contents}
 @media(min-width:1001px){.browse-controls{grid-template-columns:minmax(200px,2fr) repeat(3,minmax(110px,1fr)) auto auto}}
+.browse-lists-link{align-items:center;color:var(--accent-bright);display:inline-flex;font-size:.9rem;gap:.2rem;text-decoration:none}.browse-lists-link:hover{text-decoration:underline}

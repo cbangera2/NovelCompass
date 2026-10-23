@@ -5,6 +5,7 @@ import { DSButton, Skeleton } from './design-system';
 import { cleanListTitle } from './forYouNames';
 import { loadListFile, staticLists } from './forYouStatic';
 import type { ListSummary } from './ForYouPage';
+import { listPageUrl } from './listPageUrl';
 import { hasUsableCover, novelPageUrl } from './novelLinks';
 import type { NovelSearchResult } from './types';
 import './for-you.css';
@@ -31,7 +32,44 @@ function Cover({ novel }: { novel: NovelSearchResult }) {
   );
 }
 
+function ListIndex(): JSX.Element {
+  const [lists, setLists] = useState<ListSummary[] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    document.title = 'Curated lists - Novel Compass';
+    staticLists().then((all) => setLists([...all].sort((a, b) => b.items - a.items))).catch((e) => setError(e instanceof Error ? e.message : 'Could not load lists.'));
+  }, []);
+  return (
+    <main className="fy-shell list-page">
+      <DSButton as="a" variant="ghost" className="fy-back" href={`${import.meta.env.BASE_URL}?view=browse`}><ArrowLeft size={16} /> Back to Browse</DSButton>
+      <header className="list-page-head">
+        <span className="eyebrow">Curated lists</span>
+        <h1>Hand-built collections</h1>
+        <p>Reader-made lists from Novel Updates. Open one to see every title on it.</p>
+      </header>
+      {error && <p className="list-page-error">{error}</p>}
+      {!lists && !error && <div className="list-index">{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="fy-card-skeleton" />)}</div>}
+      {lists && <ul className="list-index">
+        {lists.map((list) => (
+          <li key={list.id}>
+            <a href={listPageUrl(list.id)}>
+              <strong>{cleanListTitle(list.title, list.id) || list.title}</strong>
+              <small>{[list.curator ? `by ${list.curator}` : '', `${list.items.toLocaleString()} titles`].filter(Boolean).join(' · ')}</small>
+              {list.theme?.length ? <span>{list.theme.slice(0, 3).join(' · ')}</span> : null}
+            </a>
+          </li>
+        ))}
+      </ul>}
+    </main>
+  );
+}
+
 export default function ListPage(): JSX.Element {
+  if (!new URLSearchParams(window.location.search).has('id')) return <ListIndex />;
+  return <ListDetail />;
+}
+
+function ListDetail(): JSX.Element {
   const id = Number(new URLSearchParams(window.location.search).get('id'));
   const [state, setState] = useState<State>({ status: 'loading' });
 
@@ -94,6 +132,7 @@ export default function ListPage(): JSX.Element {
               {state.summary?.theme?.length ? ` · ${state.summary.theme.slice(0, 3).join(', ')}` : ''}
             </p>
             <a href={sourceUrl} target="_blank" rel="noopener noreferrer">View on Novel Updates <ExternalLink size={13} /></a>
+            {' · '}<a href={`${import.meta.env.BASE_URL}?view=list`}>All lists</a>
           </header>
           <div className="fy-grid">
             {state.titles.map((novel) => (

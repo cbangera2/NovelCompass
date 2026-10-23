@@ -55,7 +55,7 @@ export type AppView = 'discover' | 'foryou' | 'browse' | 'profile' | 'settings' 
 
 const NAV_ITEMS = [
   { view: 'foryou' as const, label: 'For You', note: 'Picked from your lists', icon: Heart, tab: true },
-  { view: 'discover' as const, label: 'Discover', note: 'Find related titles', icon: Sparkles, tab: true },
+  { view: 'discover' as const, label: 'Similar', note: 'More like a title you love', icon: Sparkles, tab: true },
   { view: 'browse' as const, label: 'Browse', note: 'Explore the catalog', icon: BookOpen, tab: true },
   { view: 'settings' as const, label: 'Settings', note: 'Appearance & titles', icon: Settings, tab: false },
   { view: 'scraper' as const, label: 'Scraper', note: 'Update local data', icon: Database, tab: false },
@@ -64,7 +64,7 @@ const NAV_ITEMS = [
 // Mobile bottom tab bar. "Library" points at Profile until it gets its own page.
 const TAB_ITEMS = [
   { view: 'foryou' as const, label: 'For You', icon: Heart },
-  { view: 'discover' as const, label: 'Discover', icon: Sparkles },
+  { view: 'discover' as const, label: 'Similar', icon: Sparkles },
   { view: 'browse' as const, label: 'Browse', icon: BookOpen },
   { view: 'profile' as const, label: 'Library', icon: Library },
 ];
@@ -72,7 +72,7 @@ const TAB_ITEMS = [
 const BRAND = 'Novel Compass';
 const VIEW_TITLES: Record<AppView, string> = {
   foryou: 'For You',
-  discover: 'Discover',
+  discover: 'Similar titles',
   browse: 'Browse',
   settings: 'Settings',
   profile: 'Profile',

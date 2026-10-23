@@ -7,3 +7,8 @@
 .fy-list-link { color: inherit; text-decoration: none; }
 .fy-list-link:hover { text-decoration: underline; }
 .fy-list-link::after { content: ' ›'; opacity: .45; }
+.list-index { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); list-style: none; margin: 0; padding: 0; }
+.list-index a { background: var(--panel, rgba(255,255,255,.04)); border: 1px solid var(--border, rgba(255,255,255,.1)); border-radius: 12px; color: inherit; display: grid; gap: .25rem; height: 100%; padding: .9rem 1rem; text-decoration: none; }
+.list-index a:hover { border-color: var(--accent); }
+.list-index small, .list-index span { color: var(--muted); font-size: .8rem; }
+.list-index .fy-card-skeleton { height: 5.5rem; }
