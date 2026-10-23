@@ -12,6 +12,7 @@ import {
   Recommendation,
   SeedNovel
 } from '../types';
+import { idle } from '../idle';
 import type { AnalyticsCorpus } from '../novelStats';
 import {
   bucketForNovel,
@@ -569,6 +570,8 @@ export class StaticDataSource implements RecommendationDataSource {
       }
       await this.loadCatalog();
       const facets = await this.loadFacets().catch(() => undefined);
+      // Not needed for first paint: wait for an idle moment so building 30k rows never competes with it.
+      await idle();
       // Loaded on demand so the extension bundle, which shares this class, doesn't carry the analytics code.
       const { buildCorpus } = await import('../novelStats');
       return buildCorpus(

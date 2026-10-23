@@ -1,20 +1,15 @@
-import { useMemo } from 'react';
 import { Check, Clock, Fingerprint, Gauge, Layers, UserCheck, X } from 'lucide-react';
 import { Card } from './design-system';
 import { browseFacetUrl } from './metadataLinks';
 import {
   BUCKET_NOUN,
-  facetAnalysis,
   FIT_LABEL,
-  lengthAnalysis,
-  trustAnalysis,
-  type AnalyticsCorpus,
   type FacetCohort,
   type FitResult,
   type TrustAnalysis,
 } from './novelStats';
+import type { TitleAnalysis } from './useNovelAnalytics';
 import { novelPageUrl } from './novelLinks';
-import type { NovelDetail } from './types';
 import './novel-analytics.css';
 
 const pct = (value: number) => `${Math.round(value * 100)}%`;
@@ -79,29 +74,25 @@ function NicheRow({ cohort, noun }: { cohort: FacetCohort; noun: string }) {
 }
 
 export function NovelAnalytics({
-  corpus,
-  novelId,
-  detail,
+  analysis,
   profile,
   fit,
 }: {
-  corpus: AnalyticsCorpus;
-  novelId: number;
-  detail: NovelDetail;
+  analysis: TitleAnalysis;
   profile: boolean;
   fit: FitResult | null;
 }) {
-  const trust = useMemo(() => trustAnalysis(corpus, novelId, detail.rating_dist), [corpus, novelId, detail.rating_dist]);
-  const facets = useMemo(() => facetAnalysis(corpus, novelId), [corpus, novelId]);
-  const length = useMemo(() => lengthAnalysis(corpus, novelId), [corpus, novelId]);
+  const { trust, facets, length } = analysis;
   const noun = facets ? BUCKET_NOUN[facets.bucket] : 'titles';
 
-  const hasFit = fit != null;
-  if (!trust && !facets?.niches.length && !facets?.distinctive.length && !length && !hasFit) return null;
+  // Without a library the fit card is just a prompt, so it goes at the end as a slim banner instead of leading the block.
+  const hasFit = fit != null && !('reason' in fit && fit.reason === 'no-profile');
+  const showPrompt = fit != null && 'reason' in fit && fit.reason === 'no-profile';
+  if (!trust && !facets?.niches.length && !facets?.distinctive.length && !length && !hasFit && !showPrompt) return null;
 
   return (
     <section className="novel-analytics" aria-label="Title analytics">
-      {hasFit && (
+      {hasFit && fit && (
         <Card className={`na-card na-fit ${'verdict' in fit ? `fit-${fit.verdict}` : ''}`}>
           <Eyebrow icon={<UserCheck size={13} />}>Your fit</Eyebrow>
           {'verdict' in fit ? (
@@ -183,6 +174,13 @@ export function NovelAnalytics({
           <h3>Where it ranks among similar {noun}</h3>
           <ul>{facets.niches.map((cohort) => <NicheRow key={`${cohort.kind}-${cohort.name}`} cohort={cohort} noun={noun} />)}</ul>
           <p className="na-note">Ranked by the sample-size-adjusted rating, against {noun} that share the same genre or tag.</p>
+        </Card>
+      )}
+      {showPrompt && (
+        <Card className="na-card na-wide na-prompt">
+          <UserCheck size={16} aria-hidden="true" />
+          <p>See how this title fits <em>your</em> taste: which of its tags you like, which you avoid, and which of your titles are closest.</p>
+          <a className="na-cta" href="?view=profile">{profile ? 'Open your profile' : 'Import your library'}</a>
         </Card>
       )}
     </section>

@@ -54,29 +54,31 @@ export function buildCorpus(
 
 // ---------- per-bucket statistics (cached per corpus) ----------
 
+// Hot paths below use typed arrays and counting passes instead of sorting full catalogs and keying Maps by id:
+// the title page does this once per visit, on the main thread, so every millisecond is a phone's tenth of one.
+
 interface BucketStats {
   items: CorpusItem[];
-  rated: CorpusItem[];
+  ratedCount: number;
   priorMean: number;
   priorVotes: number;
-  adjusted: Map<number, number>;
-  adjustedSorted: number[];
-  ratingSorted: number[];
-  votesSorted: number[];
+  /** Sample-size-adjusted rating, parallel to `items`; NaN for unrated titles. */
+  adjusted: Float64Array;
+  votesSorted: Float64Array;
 }
 
 const statsCache = new WeakMap<AnalyticsCorpus, Map<Bucket, BucketStats>>();
 
 const isRated = (item: CorpusItem) => item.votes > 0 && item.rating > 0;
 
-function median(sorted: number[]): number {
+function median(sorted: ArrayLike<number>): number {
   if (!sorted.length) return 0;
   const mid = sorted.length >> 1;
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /** Number of values strictly greater than `value` in an ascending array. */
-function countGreater(sortedAsc: number[], value: number): number {
+function countGreater(sortedAsc: ArrayLike<number>, value: number): number {
   let lo = 0;
   let hi = sortedAsc.length;
   while (lo < hi) {
@@ -94,23 +96,23 @@ function bucketStats(corpus: AnalyticsCorpus, bucket: Bucket): BucketStats {
   if (cached) return cached;
 
   const items = corpus.items.filter((item) => item.bucket === bucket);
-  const rated = items.filter(isRated);
-  const priorMean = rated.length ? rated.reduce((sum, item) => sum + item.rating, 0) / rated.length : 0;
-  const votesSorted = rated.map((item) => item.votes).sort((a, b) => a - b);
+  const votes = new Float64Array(items.length);
+  let ratedCount = 0;
+  let ratingSum = 0;
+  for (const item of items) {
+    if (!isRated(item)) continue;
+    ratingSum += item.rating;
+    votes[ratedCount++] = item.votes;
+  }
+  const votesSorted = votes.subarray(0, ratedCount).sort();
+  const priorMean = ratedCount ? ratingSum / ratedCount : 0;
   // The prior is "as if every title had the typical number of votes already at the typical rating".
   const priorVotes = Math.max(1, median(votesSorted));
-  const adjusted = new Map<number, number>();
-  for (const item of rated) adjusted.set(item.id, shrink(item.rating, item.votes, priorMean, priorVotes));
-  const stats: BucketStats = {
-    items,
-    rated,
-    priorMean,
-    priorVotes,
-    adjusted,
-    adjustedSorted: [...adjusted.values()].sort((a, b) => a - b),
-    ratingSorted: rated.map((item) => item.rating).sort((a, b) => a - b),
-    votesSorted,
-  };
+  const adjusted = new Float64Array(items.length).fill(NaN);
+  items.forEach((item, index) => {
+    if (isRated(item)) adjusted[index] = shrink(item.rating, item.votes, priorMean, priorVotes);
+  });
+  const stats: BucketStats = { items, ratedCount, priorMean, priorVotes, adjusted, votesSorted };
   perBucket.set(bucket, stats);
   return stats;
 }
@@ -156,19 +158,25 @@ export function trustAnalysis(
   const item = corpus.byId.get(id);
   if (!item || !isRated(item)) return null;
   const stats = bucketStats(corpus, item.bucket);
-  const adjusted = stats.adjusted.get(id);
-  if (adjusted == null) return null;
+  const mine = stats.adjusted[stats.items.indexOf(item)];
+  if (Number.isNaN(mine)) return null;
+  let rawBetter = 0;
+  let adjustedBetter = 0;
+  stats.items.forEach((other, index) => {
+    if (other.rating > item.rating && isRated(other)) rawBetter += 1;
+    if (stats.adjusted[index] > mine) adjustedBetter += 1;
+  });
   const votesPercentile = Math.round(1000 * (stats.votesSorted.length - countGreater(stats.votesSorted, item.votes)) / stats.votesSorted.length) / 10;
   const result: TrustAnalysis = {
     bucket: item.bucket,
     rating: item.rating,
     votes: item.votes,
-    adjusted,
+    adjusted: mine,
     priorMean: stats.priorMean,
     priorVotes: stats.priorVotes,
-    population: stats.rated.length,
-    rawRank: countGreater(stats.ratingSorted, item.rating) + 1,
-    adjustedRank: countGreater(stats.adjustedSorted, adjusted) + 1,
+    population: stats.ratedCount,
+    rawRank: rawBetter + 1,
+    adjustedRank: adjustedBetter + 1,
     votesPercentile,
     sample: votesPercentile < 25 ? 'thin' : votesPercentile > 75 ? 'large' : 'typical',
   };
@@ -215,41 +223,70 @@ export function facetAnalysis(corpus: AnalyticsCorpus, id: number): FacetAnalysi
   const item = corpus.byId.get(id);
   if (!item || (!item.genres.length && !item.tags.length)) return null;
   const stats = bucketStats(corpus, item.bucket);
-  const mine = stats.adjusted.get(id);
+  const mine = stats.adjusted[stats.items.indexOf(item)];
 
-  interface Acc { kind: 'genre' | 'tag'; ref: number; pop: number; ratedPop: number; ratingSum: number; adjBetter: number; readersBetter: number }
-  const accs = new Map<string, Acc>();
-  const genreAcc = new Map<number, Acc>();
-  const tagAcc = new Map<number, Acc>();
-  for (const g of item.genres) { const a = { kind: 'genre' as const, ref: g, pop: 0, ratedPop: 0, ratingSum: 0, adjBetter: 0, readersBetter: 0 }; genreAcc.set(g, a); accs.set(`g${g}`, a); }
-  for (const t of item.tags) { const a = { kind: 'tag' as const, ref: t, pop: 0, ratedPop: 0, ratingSum: 0, adjBetter: 0, readersBetter: 0 }; tagAcc.set(t, a); accs.set(`t${t}`, a); }
+  // One accumulator slot per facet of this title; facet id -> slot through flat lookup tables.
+  const facets = [
+    ...item.genres.map((ref) => ({ kind: 'genre' as const, ref })),
+    ...item.tags.map((ref) => ({ kind: 'tag' as const, ref })),
+  ];
+  const slotTable = (kind: 'genre' | 'tag', size: number) => {
+    const table = new Int32Array(size).fill(-1);
+    facets.forEach((facet, slot) => { if (facet.kind === kind) table[facet.ref] = slot; });
+    return table;
+  };
+  const genreSlot = slotTable('genre', Math.max(corpus.genreNames.length, ...item.genres, 0) + 1);
+  const tagSlot = slotTable('tag', Math.max(corpus.tagNames.length, ...item.tags, 0) + 1);
+  const pop = new Int32Array(facets.length);
+  const ratedPop = new Int32Array(facets.length);
+  const ratingSum = new Float64Array(facets.length);
+  const adjBetter = new Int32Array(facets.length);
+  const readersBetter = new Int32Array(facets.length);
 
-  for (const other of stats.items) {
-    const otherAdjusted = stats.adjusted.get(other.id);
-    const visit = (acc: Acc | undefined) => {
-      if (!acc) return;
-      acc.pop += 1;
-      if (otherAdjusted != null) {
-        acc.ratedPop += 1;
-        acc.ratingSum += other.rating;
-        if (mine != null && otherAdjusted > mine) acc.adjBetter += 1;
-      }
-      if (other.readers > item.readers) acc.readersBetter += 1;
-    };
-    for (const g of other.genres) visit(genreAcc.get(g));
-    for (const t of other.tags) visit(tagAcc.get(t));
+  const { items, adjusted } = stats;
+  for (let index = 0; index < items.length; index += 1) {
+    const other = items[index];
+    const otherAdjusted = adjusted[index];
+    const rated = otherAdjusted === otherAdjusted; // not NaN
+    const moreReaders = other.readers > item.readers;
+    const better = rated && otherAdjusted > mine;
+    const genres = other.genres;
+    for (let k = 0; k < genres.length; k += 1) {
+      const genre = genres[k];
+      if (genre >= genreSlot.length) continue;
+      const slot = genreSlot[genre];
+      if (slot < 0) continue;
+      pop[slot] += 1;
+      if (rated) { ratedPop[slot] += 1; ratingSum[slot] += other.rating; }
+      if (better) adjBetter[slot] += 1;
+      if (moreReaders) readersBetter[slot] += 1;
+    }
+    const tags = other.tags;
+    for (let k = 0; k < tags.length; k += 1) {
+      const tag = tags[k];
+      if (tag >= tagSlot.length) continue;
+      const slot = tagSlot[tag];
+      if (slot < 0) continue;
+      pop[slot] += 1;
+      if (rated) { ratedPop[slot] += 1; ratingSum[slot] += other.rating; }
+      if (better) adjBetter[slot] += 1;
+      if (moreReaders) readersBetter[slot] += 1;
+    }
   }
 
-  const toCohort = (acc: Acc): FacetCohort => ({
-    kind: acc.kind,
-    name: (acc.kind === 'genre' ? corpus.genreNames[acc.ref] : corpus.tagNames[acc.ref]) || '',
-    population: acc.pop,
-    prevalence: stats.items.length ? acc.pop / stats.items.length : 0,
-    avgRating: acc.ratedPop ? acc.ratingSum / acc.ratedPop : 0,
-    ratingRank: acc.adjBetter + 1,
-    readerRank: acc.readersBetter + 1,
+  const all = facets.flatMap((facet, slot): FacetCohort[] => {
+    const name = (facet.kind === 'genre' ? corpus.genreNames[facet.ref] : corpus.tagNames[facet.ref]) || '';
+    if (!name || pop[slot] === 0) return [];
+    return [{
+      kind: facet.kind,
+      name,
+      population: pop[slot],
+      prevalence: items.length ? pop[slot] / items.length : 0,
+      avgRating: ratedPop[slot] ? ratingSum[slot] / ratedPop[slot] : 0,
+      ratingRank: adjBetter[slot] + 1,
+      readerRank: readersBetter[slot] + 1,
+    }];
   });
-  const all = [...accs.values()].map(toCohort).filter((c) => c.name && c.population > 0);
   const niches = all
     .filter((c) => c.population >= MIN_NICHE_SIZE)
     .sort((a, b) => a.population - b.population || a.name.localeCompare(b.name))
@@ -262,7 +299,7 @@ export function facetAnalysis(corpus: AnalyticsCorpus, id: number): FacetAnalysi
     .filter((c) => c.prevalence >= COMMON_FROM)
     .sort((a, b) => b.prevalence - a.prevalence || a.name.localeCompare(b.name))
     .slice(0, 4);
-  return { bucket: item.bucket, bucketSize: stats.items.length, niches, distinctive, common };
+  return { bucket: item.bucket, bucketSize: items.length, niches, distinctive, common };
 }
 
 // ---------- 4. length and time commitment ----------

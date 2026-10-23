@@ -201,3 +201,33 @@ describe('fitAnalysis', () => {
     expect(result.scope).toBe('all');
   });
 });
+
+describe('small and odd corpora', () => {
+  const lone = (extra: Partial<Parameters<typeof buildCorpus>[0][number]> = {}) =>
+    buildCorpus([{ id: 3_000_001, mediaType: 'anime', rating: 4, votes: 10, readers: 1, units: 12, genres: [], tags: [], ...extra }], GENRES, TAGS);
+
+  it('returns nothing, not NaN or a crash, when there is no tag or length data', () => {
+    const corpus = lone();
+    expect(facetAnalysis(corpus, 3_000_001)).toBeNull();
+    expect(lengthAnalysis(corpus, 3_000_001)).toBeNull(); // fewer than 10 titles to compare with
+    const trust = trustAnalysis(corpus, 3_000_001)!;
+    expect(trust.adjusted).toBeCloseTo(4, 5);
+    expect(trust.adjustedRank).toBe(1);
+    expect(Number.isFinite(trust.votesPercentile)).toBe(true);
+  });
+
+  it('ignores facet ids that are missing from the name tables', () => {
+    const corpus = lone({ genres: [99], tags: [250] });
+    const analysis = facetAnalysis(corpus, 3_000_001)!;
+    expect(analysis.niches).toEqual([]);
+    expect(analysis.distinctive).toEqual([]);
+  });
+
+  it('is null for ids that are not in the catalog', () => {
+    const corpus = lone();
+    expect(trustAnalysis(corpus, 42)).toBeNull();
+    expect(facetAnalysis(corpus, 42)).toBeNull();
+    expect(lengthAnalysis(corpus, 42)).toBeNull();
+    expect(fitAnalysis(corpus, 42, null)).toEqual({ reason: 'no-profile' });
+  });
+});

@@ -10,7 +10,7 @@ import { browseFacetUrl } from './metadataLinks';
 import { NovelAnalytics } from './NovelAnalytics';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
 import { FIT_LABEL, fitAnalysis } from './novelStats';
-import { useAnalyticsCorpus } from './useNovelAnalytics';
+import { useAnalyticsCorpus, useTitleAnalysis } from './useNovelAnalytics';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { LocalNovelFeedback, LocalUserProfile, ReadingStatus } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
@@ -90,7 +90,8 @@ export default function NovelPage(): JSX.Element {
   const libraryEntry = profile?.entries.find((item) => item.novel_id === novelId);
   const currentRating = libraryEntry?.rating;
   const ratingSummary = useMemo(() => summarizeRatings(detail?.rating_dist), [detail]);
-  const corpus = useAnalyticsCorpus(source);
+  const corpus = useAnalyticsCorpus(detail ? source : null);
+  const analysis = useTitleAnalysis(corpus, novelId, detail?.rating_dist);
   // Skip the fit for titles you've already rated: you know how you feel about those.
   const fit = useMemo(
     () => (corpus && detail && currentRating == null ? fitAnalysis(corpus, novelId, profile) : null),
@@ -384,7 +385,7 @@ export default function NovelPage(): JSX.Element {
       </section>
       <section id="insights" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>03</span><div><h2>Insights</h2><p>How this title sits within the current catalog snapshot.</p></div></header>
-        {corpus && <NovelAnalytics corpus={corpus} novelId={novelId} detail={detail} profile={Boolean(profile)} fit={fit} />}
+        {analysis && <NovelAnalytics analysis={analysis} profile={Boolean(profile)} fit={fit} />}
         <NovelInsightsPanel novelId={novelId} source={source} providedInsights={insights} currentNovel={detail} />
       </section>
     </div>
