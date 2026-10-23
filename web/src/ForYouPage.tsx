@@ -10,6 +10,7 @@ import type { NovelDetail } from './types';
 import { createDataSource } from './data';
 import { mediaTypeInScope, useMediaFilterState, type MediaTypeChoice } from './mediaFilterState';
 import { MIN_GENRE_ROW_TITLES, pickGenreRows, rowTitle, type BrowseFormat } from './forYouGenres';
+import { customRowKey, useForYouRowPrefs } from './forYouRowPrefs';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
 import { listPageUrl } from './listPageUrl';
@@ -167,7 +168,8 @@ async function fetchLibraryRow(
   };
 }
 
-const VOTES_FLOOR: Record<BrowseFormat, number> = { anime: 300, manga: 100 };
+const VOTES_FLOOR: Record<MediaTypeChoice, number> = { novel: 300, anime: 300, manga: 100 };
+const FORMAT_ORDER: MediaTypeChoice[] = ['novel', 'manga', 'anime'];
 const TOP_RATED: Record<MediaTypeChoice, { title: string; subtitle: string }> = {
   novel: { title: 'Top rated light novels', subtitle: 'Highest rated across the catalog' },
   manga: { title: 'Top rated manga', subtitle: 'Highest rated across the catalog' },
@@ -188,7 +190,7 @@ const GENRE_ROWS_WITHOUT_NOVELS = 12;
  * votes floor, then merged.
  */
 async function fetchBrowseRow(opts: {
-  types: BrowseFormat[];
+  types: MediaTypeChoice[];
   kind: BrowseRowKind;
   title: string;
   subtitle: string;
@@ -202,7 +204,7 @@ async function fetchBrowseRow(opts: {
     media_type: type,
     genre: opts.genre,
     tag: opts.tag,
-    exclude_genres: 'Hentai',
+    exclude_genres: 'Hentai,Smut',
     sort: opts.kind === 'rating' ? 'rating' : 'popular',
     direction: 'desc',
     min_votes: opts.kind === 'rating' ? VOTES_FLOOR[type] : undefined,
@@ -294,6 +296,7 @@ function Row({
   href,
   library,
   onSeeAll,
+  onHide,
   onVisible,
 }: {
   state: RowState;
@@ -303,6 +306,7 @@ function Row({
   href?: string;
   library: Map<number, ReadingStatus>;
   onSeeAll: () => void;
+  onHide?: () => void;
   onVisible: () => void;
 }) {
   const track = useRef<HTMLDivElement>(null);
@@ -332,6 +336,7 @@ function Row({
         {state.status === 'ready' && (
           <div className="fy-row-nav">
             <DSButton variant="ghost" onClick={onSeeAll}>See all</DSButton>
+            {onHide && <DSButton variant="ghost" className="fy-hide-btn" title="Hide this row" aria-label={`Hide row: ${heading ?? state.title}`} onClick={onHide}><EyeOff size={15} /></DSButton>}
             <DSButton variant="ghost" className="fy-scroll-btn" aria-label="Scroll left" onClick={() => scroll(-1)}><ChevronLeft size={18} /></DSButton>
             <DSButton variant="ghost" className="fy-scroll-btn" aria-label="Scroll right" onClick={() => scroll(1)}><ChevronRight size={18} /></DSButton>
           </div>
@@ -419,6 +424,8 @@ export default function ForYouPage(): JSX.Element {
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const { selectedTypes } = useMediaFilterState();
+  const { prefs, setHidden, removeCustom } = useForYouRowPrefs();
+  const prefsKey = JSON.stringify(prefs);
   const novelsOn = selectedTypes.includes('novel');
   const typesKey = selectedTypes.join(',');
   const [hideKnown, setHideKnown] = useState(false);
@@ -502,39 +509,56 @@ export default function ForYouPage(): JSX.Element {
         });
       }
     }
-    if (novelsOn && selected.length > 1) {
+    const hidden = (key: string) => prefs.hidden.includes(key);
+    const push = (job: RowJob) => { if (!hidden(job.key)) out.push(job); };
+    const formats = FORMAT_ORDER.filter((t) => selectedTypes.includes(t));
+    const browseTypes = formats.filter((t): t is BrowseFormat => t !== 'novel');
+
+    // Rows the reader added in Settings come first: they asked for them. A row whose format is switched off is skipped.
+    for (const row of prefs.custom.filter((c) => selectedTypes.includes(c.type))) {
+      const title = rowTitle(row.name, row.kind, [row.type], selectedTypes.length > 1);
       out.push({
+        key: customRowKey(row),
+        fallbackTitle: title,
+        load: (limit) => fetchBrowseRow({
+          types: [row.type],
+          kind: row.kind,
+          title,
+          subtitle: row.kind === 'rating' ? 'Highest rated, with plenty of votes' : 'Most readers across the catalog',
+          genre: row.field === 'genre' ? row.name : undefined,
+          tag: row.field === 'tag' ? row.name : undefined,
+          excludeIds: exclude,
+          limit,
+        }).then(inScope),
+      });
+    }
+    if (novelsOn && selected.length > 1) {
+      push({
         key: 'blend',
         fallbackTitle: 'Top picks for you',
         load: (limit, signal) => fetchListRow(selected.slice(0, BLEND_LISTS), true, hideKnown, exclude, profileTitles, limit, signal).then(inScope),
       });
     }
-    const browseTypes = selectedTypes.filter((t): t is BrowseFormat => t !== 'novel');
-    // Top-rated rows give each other format a row near the top, which is what a visitor with no library sees.
-    for (const type of browseTypes) {
-      out.push({
+    // Top-rated rows give every format a row near the top, which is what a visitor with no library sees.
+    for (const type of formats) {
+      push({
         key: `top-${type}`,
         fallbackTitle: TOP_RATED[type].title,
         load: (limit) => fetchBrowseRow({ types: [type], kind: 'rating', ...TOP_RATED[type], excludeIds: exclude, limit }).then(inScope),
       });
     }
-    // With no light-novel shelves, a second row per format keeps the page from feeling thin.
-    if (!novelsOn) {
-      for (const type of browseTypes) {
-        out.push({
-          key: `popular-${type}`,
-          fallbackTitle: POPULAR_TITLES[type],
-          load: (limit) => fetchBrowseRow({ types: [type], kind: 'popular', title: POPULAR_TITLES[type], subtitle: 'Most readers across the catalog', excludeIds: exclude, limit }).then(inScope),
-        });
-      }
-    }
+    const popularJobs = formats.map((type): RowJob => ({
+      key: `popular-${type}`,
+      fallbackTitle: POPULAR_TITLES[type],
+      load: (limit) => fetchBrowseRow({ types: [type], kind: 'popular', title: POPULAR_TITLES[type], subtitle: 'Most readers across the catalog', excludeIds: exclude, limit }).then(inScope),
+    }));
     // Loose tags put the same blockbusters at the top of every genre, so each preview row skips whatever the
     // Top rated rows and the genre rows above it already show. Memoized, so the chain is fetched once.
     let seedTaken: Promise<Set<number>> | null = null;
-    const getSeedTaken = () => (seedTaken ??= Promise.all(browseTypes.map((type) =>
+    const getSeedTaken = () => (seedTaken ??= Promise.all(browseTypes.filter((type) => !hidden(`top-${type}`)).map((type) =>
       fetchBrowseRow({ types: [type], kind: 'rating', ...TOP_RATED[type], excludeIds: exclude, limit: ROW_LIMIT }),
     )).then((rowsData) => new Set(rowsData.flatMap((row) => row.recommendations.map((r) => r.target_id)))));
-    const picked = pickGenreRows(selectedTypes, novelsOn ? GENRE_ROWS_WITH_NOVELS : GENRE_ROWS_WITHOUT_NOVELS);
+    const picked = pickGenreRows(selectedTypes, novelsOn ? GENRE_ROWS_WITH_NOVELS : GENRE_ROWS_WITHOUT_NOVELS, prefs.hidden);
     const genreTitle = (index: number) => rowTitle(picked[index].label, 'rating', picked[index].types, selectedTypes.length > 1);
     const rankedRows: Array<Promise<RowData> | undefined> = [];
     const rankedAt = (index: number): Promise<RowData> => (rankedRows[index] ??= fetchBrowseRow({
@@ -563,7 +587,12 @@ export default function ForYouPage(): JSX.Element {
         return inScope({ ...data, recommendations });
       },
     }));
-    if (!novelsOn) out.push(...genreRows);
+    // With no light-novel shelves, a second row per format and the genre rows fill the page; with them,
+    // those go below the shelves as a short "more to explore" tail.
+    if (!novelsOn) {
+      popularJobs.forEach(push);
+      genreRows.forEach(push);
+    }
     // Curated lists hold light novels only, so their shelves are skipped when novels are out of scope.
     for (const id of novelsOn ? selected : []) {
       out.push({
@@ -572,11 +601,14 @@ export default function ForYouPage(): JSX.Element {
         load: (limit, signal) => fetchListRow([id], false, hideKnown, exclude, profileTitles, limit, signal).then(inScope),
       });
     }
-    if (novelsOn) out.push(...genreRows);
+    if (novelsOn) {
+      popularJobs.forEach(push);
+      genreRows.forEach(push);
+    }
     return out;
     // plan/profile are covered by planKey; seenIds by seenKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey, typesKey]);
+  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey, typesKey, prefsKey]);
 
   const [epoch, setEpoch] = useState(0); // bumped when jobs change so rows remount and re-arm their visibility trigger
   // Rows load when they near the viewport, so a visit only pays for what is actually scrolled to.
@@ -620,6 +652,13 @@ export default function ForYouPage(): JSX.Element {
     const list = (lists ?? []).find((l) => l.id === Number(job.key.slice(5)));
     if (!list) return undefined;
     return (list.theme ?? []).slice(0, 3).join(' · ') || undefined;
+  };
+  // Library rows are personal, so they stay. List shelves go through the Shelves picker; custom rows are deleted.
+  const hideJob = (job: RowJob): (() => void) | undefined => {
+    if (job.key.startsWith('lib-')) return undefined;
+    if (job.key.startsWith('custom-')) return () => removeCustom(job.key.slice('custom-'.length));
+    if (job.key.startsWith('list-')) return () => toggle(Number(job.key.slice(5)));
+    return () => setHidden(job.key, true);
   };
   const fallbackTitle = (job: RowJob) =>
     job.key.startsWith('list-') ? `Because you love ${titles.get(Number(job.key.slice(5))) ?? 'this list'}` : job.fallbackTitle;
@@ -704,9 +743,14 @@ export default function ForYouPage(): JSX.Element {
           href={listHref(job.key)}
           library={library}
           onSeeAll={() => setExpanded(job.key)}
+          onHide={hideJob(job)}
           onVisible={() => requestRow(job)}
         />
       ))}
+      <p className="fy-customize">
+        <a href="?view=settings#for-you-rows">Customize rows</a>
+        {prefs.hidden.length > 0 && ` · ${prefs.hidden.length} hidden`}
+      </p>
     </main>
   );
 }

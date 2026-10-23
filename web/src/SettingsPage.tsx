@@ -7,6 +7,7 @@ import { DataMode } from './data';
 import { useDataModePreference } from './dataModePreference';
 
 import { Select } from './ui';
+import ForYouRowSettings from './ForYouRowSettings';
 
 const HOME_COPY = {
   foryou: { title: 'For You home', note: 'Start from shelves picked from your lists' },
@@ -56,6 +57,7 @@ export default function SettingsPage(): JSX.Element {
         <button className="settings-reset-button" onClick={() => { resetSavedFilters(); setResetMessage('Saved filter snapshots cleared.'); }}><FilterX size={15} />Reset saved filters</button>
         {resetMessage && <p className="settings-disclosure" role="status">{resetMessage}</p>}
       </Card>
+      <ForYouRowSettings />
       <Card className="settings-card">
         <CardHeader title="Title display" description="Choose how titles are displayed when the active dataset provides associated names." action={<Type size={19} />} />
         <div className="settings-choice-grid title-choices">

@@ -55,14 +55,24 @@ export const GENRE_ROWS: GenreRowDef[] = [
 /** Rows below this many titles (after the votes floor) are dropped rather than shown half empty. */
 export const MIN_GENRE_ROW_TITLES = 12;
 
-/** The first `limit` rows that have enough titles in at least one of the selected non-novel formats. */
-export function pickGenreRows(selected: MediaTypeChoice[], limit: number): Array<GenreRowDef & { types: BrowseFormat[] }> {
+/**
+ * The first `limit` rows that have enough titles in at least one of the selected non-novel formats.
+ * Rows the reader hid are skipped before the cut, so hiding one brings the next in.
+ */
+export function pickGenreRows(
+  selected: MediaTypeChoice[],
+  limit: number,
+  hidden: readonly string[] = [],
+): Array<GenreRowDef & { types: BrowseFormat[] }> {
   const wanted = selected.filter((t): t is BrowseFormat => t !== 'novel');
   return GENRE_ROWS.flatMap((row) => {
+    if (hidden.includes(genreRowKey(row))) return [];
     const types = row.formats.filter((f) => wanted.includes(f));
     return types.length ? [{ ...row, types }] : [];
   }).slice(0, limit);
 }
+
+export const genreRowKey = (row: Pick<GenreRowDef, 'key'>) => `genre-${row.key}`;
 
 const NOUNS: Record<MediaTypeChoice, string> = { novel: 'light novels', manga: 'manga', anime: 'anime' };
 

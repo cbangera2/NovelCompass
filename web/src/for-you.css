@@ -22,3 +22,5 @@
 .fy-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(hover:none){.fy-scroll-btn{display:none}}
+.fy-hide-btn{opacity:.55}.fy-row:hover .fy-hide-btn,.fy-hide-btn:focus-visible{opacity:1}
+.fy-customize{color:var(--muted);font-size:.78rem;margin:2rem 0 0;text-align:center}.fy-customize a{color:var(--accent-bright)}
