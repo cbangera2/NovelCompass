@@ -39,6 +39,12 @@ Owns: `profile/*`, new `ListPage`, onboarding, `routeState.ts` (adding views).
 - Contrast fixes (light-theme badges, accent button, `--dim`) are a separate small PR "D1" that anyone can take; see audit P1-3/P1-4.
 
 ## Status log (append newest first)
+- 2026-10-19 — All items A1–C3 plus D1 (#30) and the sidebar fix (#28) are squash-merged to `main` (#28–#40). Verified on main: typecheck, lint, pytest, no horizontal overflow on 8 views at 390/1280, per-route titles.
+
+## Remaining follow-ups (not started)
+- Light theme not checked on most new work; live API data mode untested; iOS safe-area on the bottom tab bar needs a real device.
+- Browse format-scope reset reported but not reproduced; Discover language chip title-casing; Settings About link title size; duplicate search clear buttons.
+- Onboarding saves picks as completed / 5 stars; `Select` drops `aria-label` (shared component gap).
 - 2026-10-19 — All 12 items have PRs (#28-#40). Test-merged all stacks into a scratch branch: only conflicts are #30 (contrast) vs #37..#40 stack in `for-you.css` and `index.css` (mechanical; keep B5 tooltip rules, drop old `.fy-stats` rules because NovelCard replaced them). Combined result passes typecheck, lint and the 14-combo overflow check. Known gap: list page `document.title` says "For You"; should be the list name. Recommended merge order: A stack (#37,#39,#40), then #28, #30 (rebase), B stack (#29,#31,#32,#33,#35), C stack (#34,#36,#38).
 - 2026-10-19 — A1 (#37), B1–B5 (#29,#31,#32,#33,#35, stacked), C1–C2 (#34,#36, stacked), D1 contrast (#30) are open PRs. A2, A3, C3 re-launched after an API rate limit killed the first run. Nothing merged yet. Known overlap: #30 and #37 both edit the For You match pill CSS (#37 should win on merge).
 - 2026-10-19 — Roadmap created. Sidebar fix exists locally on branch `ui/sidebar-polish` in worktree `/Users/cbang/Developer/nuc-foryou-card-polish` (uncommitted).
