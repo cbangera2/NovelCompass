@@ -9,6 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { createDataSource } from './data';
 import { mediaTypeInScope, useMediaFilterState, type MediaTypeChoice } from './mediaFilterState';
+import { formatNoun, MIN_GENRE_ROW_TITLES, pickGenreRows, type BrowseFormat } from './forYouGenres';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
 import { listPageUrl } from './listPageUrl';
@@ -166,10 +167,11 @@ async function fetchLibraryRow(
   };
 }
 
-const TOP_RATED: Record<MediaTypeChoice, { title: string; subtitle: string; minVotes: number }> = {
-  novel: { title: 'Top rated light novels', subtitle: 'Highest rated across the catalog', minVotes: 300 },
-  manga: { title: 'Top rated manga', subtitle: 'Highest rated across the catalog', minVotes: 150 },
-  anime: { title: 'Top rated anime', subtitle: 'Highest rated across the catalog', minVotes: 500 },
+const VOTES_FLOOR: Record<BrowseFormat, number> = { anime: 300, manga: 100 };
+const TOP_RATED: Record<MediaTypeChoice, { title: string; subtitle: string }> = {
+  novel: { title: 'Top rated light novels', subtitle: 'Highest rated across the catalog' },
+  manga: { title: 'Top rated manga', subtitle: 'Highest rated across the catalog' },
+  anime: { title: 'Top rated anime', subtitle: 'Highest rated across the catalog' },
 };
 const POPULAR_TITLES: Record<MediaTypeChoice, string> = {
   novel: 'Most popular light novels',
@@ -177,27 +179,48 @@ const POPULAR_TITLES: Record<MediaTypeChoice, string> = {
   anime: 'Most popular anime',
 };
 type BrowseRowKind = 'rating' | 'popular';
+const GENRE_ROWS_WITH_NOVELS = 4; // a short "more to explore" tail under the novel shelves
+const GENRE_ROWS_WITHOUT_NOVELS = 12;
 
-/** A non-personalized row for a format your library can't seed (e.g. anime when you only imported novels). */
-async function fetchTopRatedRow(type: MediaTypeChoice, kind: BrowseRowKind, excludeIds: number[], limit: number): Promise<RowData> {
+/**
+ * A catalog-browse row for the non-novel formats: top rated or most popular, optionally within one
+ * genre or tag. Not personalized, so it works with no library. Each format is queried with its own
+ * votes floor, then merged.
+ */
+async function fetchBrowseRow(opts: {
+  types: BrowseFormat[];
+  kind: BrowseRowKind;
+  title: string;
+  subtitle: string;
+  genre?: string;
+  tag?: string;
+  excludeIds: number[];
+  limit: number;
+}): Promise<RowData> {
   const source = await createDataSource();
-  const { title, subtitle, minVotes } = kind === 'rating'
-    ? TOP_RATED[type]
-    : { title: POPULAR_TITLES[type], subtitle: 'Most readers across the catalog', minVotes: 0 };
-  const response = await source.browseNovels({
+  const pages = await Promise.all(opts.types.map((type) => source.browseNovels({
     media_type: type,
-    sort: kind === 'rating' ? 'rating' : 'popular',
+    genre: opts.genre,
+    tag: opts.tag,
+    exclude_genres: 'Hentai',
+    sort: opts.kind === 'rating' ? 'rating' : 'popular',
     direction: 'desc',
-    min_votes: minVotes || undefined,
+    min_votes: opts.kind === 'rating' ? VOTES_FLOOR[type] : undefined,
     page: 1,
     page_size: 100,
-  });
-  const exclude = new Set(excludeIds);
+  })));
+  const exclude = new Set(opts.excludeIds);
+  const items = pages.flatMap((page) => page.items).filter((item) => !exclude.has(item.id));
+  if (pages.length > 1) {
+    items.sort(opts.kind === 'rating'
+      ? (a, b) => b.rating - a.rating || b.rating_votes - a.rating_votes
+      : (a, b) => b.reading_list_count - a.reading_list_count);
+  }
   return {
-    title,
-    subtitle,
+    title: opts.title,
+    subtitle: opts.subtitle,
     seeds: [],
-    recommendations: response.items.filter((item) => !exclude.has(item.id)).slice(0, limit).map((item) => ({
+    recommendations: items.slice(0, opts.limit).map((item) => ({
       target_id: item.id,
       title: item.title,
       cover_url: item.cover_url,
@@ -388,6 +411,10 @@ function RowGrid({
   );
 }
 
+/** Genre rows whose snapshot has too few titles are dropped once loaded instead of showing a stub. */
+const isThinGenreRow = (job: RowJob, state: RowState | undefined) =>
+  job.key.startsWith('genre-') && state?.status === 'ready' && state.recommendations.length < MIN_GENRE_ROW_TITLES;
+
 export default function ForYouPage(): JSX.Element {
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
@@ -482,24 +509,61 @@ export default function ForYouPage(): JSX.Element {
         load: (limit, signal) => fetchListRow(selected.slice(0, BLEND_LISTS), true, hideKnown, exclude, profileTitles, limit, signal).then(inScope),
       });
     }
+    const browseTypes = selectedTypes.filter((t): t is BrowseFormat => t !== 'novel');
     // Top-rated rows give each other format a row near the top, which is what a visitor with no library sees.
-    for (const type of selectedTypes.filter((t) => t !== 'novel')) {
+    for (const type of browseTypes) {
       out.push({
         key: `top-${type}`,
         fallbackTitle: TOP_RATED[type].title,
-        load: (limit) => fetchTopRatedRow(type, 'rating', exclude, limit).then(inScope),
+        load: (limit) => fetchBrowseRow({ types: [type], kind: 'rating', ...TOP_RATED[type], excludeIds: exclude, limit }).then(inScope),
       });
     }
     // With no light-novel shelves, a second row per format keeps the page from feeling thin.
     if (!novelsOn) {
-      for (const type of selectedTypes) {
+      for (const type of browseTypes) {
         out.push({
           key: `popular-${type}`,
           fallbackTitle: POPULAR_TITLES[type],
-          load: (limit) => fetchTopRatedRow(type, 'popular', exclude, limit).then(inScope),
+          load: (limit) => fetchBrowseRow({ types: [type], kind: 'popular', title: POPULAR_TITLES[type], subtitle: 'Most readers across the catalog', excludeIds: exclude, limit }).then(inScope),
         });
       }
     }
+    // Loose tags put the same blockbusters at the top of every genre, so each preview row skips whatever the
+    // Top rated rows and the genre rows above it already show. Memoized, so the chain is fetched once.
+    let seedTaken: Promise<Set<number>> | null = null;
+    const getSeedTaken = () => (seedTaken ??= Promise.all(browseTypes.map((type) =>
+      fetchBrowseRow({ types: [type], kind: 'rating', ...TOP_RATED[type], excludeIds: exclude, limit: ROW_LIMIT }),
+    )).then((rowsData) => new Set(rowsData.flatMap((row) => row.recommendations.map((r) => r.target_id)))));
+    const picked = pickGenreRows(selectedTypes, novelsOn ? GENRE_ROWS_WITH_NOVELS : GENRE_ROWS_WITHOUT_NOVELS);
+    const genreTitle = (index: number) => `Best ${formatNoun(picked[index].types)}: ${picked[index].label}`;
+    const rankedRows: Array<Promise<RowData> | undefined> = [];
+    const rankedAt = (index: number): Promise<RowData> => (rankedRows[index] ??= fetchBrowseRow({
+      types: picked[index].types,
+      kind: 'rating',
+      title: genreTitle(index),
+      subtitle: 'Highest rated, with plenty of votes',
+      genre: picked[index].genre,
+      tag: picked[index].tag,
+      excludeIds: exclude,
+      limit: 100,
+    }));
+    const visible: Array<Promise<RowRec[]> | undefined> = [];
+    const visibleAt = (index: number): Promise<RowRec[]> => (visible[index] ??= (async () => {
+      const taken = new Set(await getSeedTaken());
+      for (let k = 0; k < index; k += 1) (await visibleAt(k)).forEach((r) => taken.add(r.target_id));
+      return (await rankedAt(index)).recommendations.filter((r) => !taken.has(r.target_id)).slice(0, ROW_LIMIT);
+    })());
+    const genreRows = picked.map((row, index): RowJob => ({
+      key: `genre-${row.key}`,
+      fallbackTitle: genreTitle(index),
+      load: async (limit) => {
+        const data = await rankedAt(index);
+        // The "See all" grid keeps the full ranking; only the preview rows are de-duplicated.
+        const recommendations = limit > ROW_LIMIT ? data.recommendations.slice(0, limit) : await visibleAt(index);
+        return inScope({ ...data, recommendations });
+      },
+    }));
+    if (!novelsOn) out.push(...genreRows);
     // Curated lists hold light novels only, so their shelves are skipped when novels are out of scope.
     for (const id of novelsOn ? selected : []) {
       out.push({
@@ -508,6 +572,7 @@ export default function ForYouPage(): JSX.Element {
         load: (limit, signal) => fetchListRow([id], false, hideKnown, exclude, profileTitles, limit, signal).then(inScope),
       });
     }
+    if (novelsOn) out.push(...genreRows);
     return out;
     // plan/profile are covered by planKey; seenIds by seenKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -629,7 +694,7 @@ export default function ForYouPage(): JSX.Element {
       )}
       {profileChecked && <ForYouOnboarding profile={profile} lowData={!hasLibraryRows} />}
       {novelsOn && lists && !selected.length && <p className="fy-empty">Pick at least one list above to build list rows.</p>}
-      {jobs.map((job) => (
+      {jobs.filter((job) => !isThinGenreRow(job, rows[job.key])).map((job) => (
         <Row
           key={`${epoch}-${job.key}`}
           state={rows[job.key] ?? { status: 'loading' }}
