@@ -3,7 +3,6 @@
 .list-page-head p { color: var(--muted); margin: 0 0 .6rem; }
 .list-page-head a, .list-page-error a { align-items: center; color: var(--accent-bright); display: inline-flex; font-size: .8rem; gap: .3rem; }
 .list-page-error { margin-top: 1.5rem; }
-.list-page .fy-card small { -webkit-line-clamp: 1; }
 .fy-list-link { color: inherit; text-decoration: none; }
 .fy-list-link:hover { text-decoration: underline; }
 .fy-list-link::after { content: ' ›'; opacity: .45; }
