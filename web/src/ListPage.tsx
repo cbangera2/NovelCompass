@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ExternalLink, Star } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { createDataSource } from './data';
 import { DSButton, Skeleton } from './design-system';
 import { cleanListTitle } from './forYouNames';
 import { loadListFile, staticLists } from './forYouStatic';
 import type { ListSummary } from './ForYouPage';
-import { hasUsableCover, novelPageUrl } from './novelLinks';
+import { NovelCard } from './components/NovelCard';
+import { novelPageUrl } from './novelLinks';
 import type { NovelSearchResult } from './types';
 import './for-you.css';
 import './list-page.css';
@@ -14,22 +15,6 @@ type State =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; summary?: ListSummary; title: string; seeds: number; titles: NovelSearchResult[]; missing: number };
-
-function Cover({ novel }: { novel: NovelSearchResult }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <div className="fy-cover">
-      {hasUsableCover(novel.cover_url) && !failed ? (
-        <img src={novel.cover_url} alt="" loading="lazy" decoding="async" width={168} height={252} onError={() => setFailed(true)} />
-      ) : (
-        <span aria-hidden="true">{novel.title.slice(0, 1)}</span>
-      )}
-      <div className="fy-stats">
-        <span className="fy-rating" title={`${novel.rating_votes.toLocaleString()} votes`}><Star size={12} />{novel.rating ? novel.rating.toFixed(1) : '—'}</span>
-      </div>
-    </div>
-  );
-}
 
 export default function ListPage(): JSX.Element {
   const id = Number(new URLSearchParams(window.location.search).get('id'));
@@ -89,7 +74,6 @@ export default function ListPage(): JSX.Element {
             <span className="eyebrow">Curated list</span>
             <h1>{state.title}</h1>
             <p>
-              {state.summary?.curator ? `Curated by ${state.summary.curator} · ` : ''}
               {state.titles.length.toLocaleString()} titles
               {state.summary?.theme?.length ? ` · ${state.summary.theme.slice(0, 3).join(', ')}` : ''}
             </p>
@@ -97,11 +81,21 @@ export default function ListPage(): JSX.Element {
           </header>
           <div className="fy-grid">
             {state.titles.map((novel) => (
-              <a key={novel.id} className="fy-card" data-preview-id={novel.id} href={novelPageUrl(novel.id, undefined, novel.media_type)}>
-                <Cover novel={novel} />
-                <strong title={novel.title}>{novel.title}</strong>
-                {novel.author && <small>{novel.author}</small>}
-              </a>
+              <NovelCard
+                key={novel.id}
+                variant="tile"
+                className="fy-card"
+                item={{
+                  id: novel.id,
+                  title: novel.title,
+                  href: novelPageUrl(novel.id, undefined, novel.media_type),
+                  coverUrl: novel.cover_url,
+                  mediaType: novel.media_type,
+                  author: novel.author,
+                  rating: novel.rating,
+                  ratingVotes: novel.rating_votes,
+                }}
+              />
             ))}
           </div>
           {state.missing > 0 && <p className="fy-end">{state.missing} more title{state.missing === 1 ? '' : 's'} on this list {state.missing === 1 ? 'is' : 'are'} not in this catalog snapshot.</p>}
