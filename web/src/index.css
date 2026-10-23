@@ -202,6 +202,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .analytics-scope-tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1rem; }
 .analytics-scope-tabs button { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); cursor: pointer; font-size: .72rem; font-weight: 650; padding: .35rem .7rem; }
 .analytics-scope-tabs button.active,.analytics-scope-tabs button[aria-selected="true"] { background: var(--accent-soft); border-color: color-mix(in srgb,var(--accent) 35%,transparent); color: var(--accent-bright); }
+.analytics-summaries { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); margin-bottom: .8rem; }
+.analytics-summary { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; display: grid; gap: .75rem; padding: 1rem; }
+.analytics-summary-stats { display: grid; gap: .5rem; grid-template-columns: repeat(3,1fr); text-align: center; }
+.analytics-summary-stats > div { display: flex; flex-direction: column; gap: .25rem; }
+.analytics-summary-stats strong { color: var(--accent, var(--chart-1)); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.analytics-summary-stats span { color: var(--muted); font-size: .72rem; font-weight: 600; }
+.analytics-summary-bar { background: var(--bg, #0b1018); border-radius: 999px; display: flex; gap: 2px; height: 10px; overflow: hidden; }
+.analytics-summary-bar i { display: block; min-width: 4px; }
+.analytics-summary-legend { color: var(--muted); display: flex; flex-wrap: wrap; font-size: .68rem; gap: .3rem .9rem; list-style: none; margin: 0; padding: 0; }
+.analytics-summary-legend li { align-items: center; display: inline-flex; gap: .35rem; }
+.analytics-summary-legend i { border-radius: 2px; height: 8px; width: 8px; }
+.analytics-summary-legend strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .analytics-kpi-grid { display: grid; gap: .55rem; grid-template-columns: repeat(auto-fit,minmax(118px,1fr)); margin-bottom: 1rem; }
 .analytics-kpi-grid > div { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; gap: .2rem; padding: .75rem .8rem; }
 .analytics-kpi-grid strong { font-size: 1.2rem; font-variant-numeric: tabular-nums; }

@@ -24,6 +24,7 @@ import {
   filterEntriesByScope,
   genreBreakdown,
   languageBreakdown,
+  formatSummaries,
   mediaKindBreakdown,
   overviewKpis,
   profileHasDates,
@@ -36,6 +37,8 @@ import {
 /** Load more matched details than before, but stay responsive for large NU libraries. */
 const DETAIL_LIMIT = 250;
 const DETAIL_CONCURRENCY = 10;
+
+const FORMAT_NOUNS: Record<ProfileMediaKind, string> = { anime: 'Anime', manga: 'Manga', novel: 'Novels' };
 
 const STATUS_COLORS: Record<string, string> = {
   reading: 'var(--chart-1)',
@@ -199,6 +202,7 @@ export default function ProfileAnalytics({
     return details.filter((detail) => allowed.has(detail.id));
   }, [details, scopedEntries]);
 
+  const summaries = useMemo(() => formatSummaries(scopedEntries, detailById), [scopedEntries, detailById]);
   const kpis = useMemo(() => overviewKpis(scopedEntries), [scopedEntries]);
   const statusData = useMemo(() => countByStatus(scopedEntries).filter((row) => row.count > 0), [scopedEntries]);
   const scoreData = useMemo(() => scoreDistribution(scopedEntries), [scopedEntries]);
@@ -271,6 +275,31 @@ export default function ProfileAnalytics({
           })}
         </div>
       )}
+
+      <div className="analytics-summaries">
+        {summaries.map((summary) => (
+          <article key={summary.kind} className="analytics-summary" aria-label={`${FORMAT_NOUNS[summary.kind]} summary`}>
+            <div className="analytics-summary-stats">
+              <div><strong>{summary.total.toLocaleString()}</strong><span>Total {FORMAT_NOUNS[summary.kind]}</span></div>
+              <div title={summary.kind === 'anime' ? 'Estimated at 24 minutes per episode' : undefined}>
+                <strong>{summary.kind === 'anime' ? '~' : ''}{summary.progressValue.toLocaleString()}</strong>
+                <span>{summary.progressLabel}</span>
+              </div>
+              <div><strong>{summary.meanScore != null ? summary.meanScore.toFixed(1) : '—'}</strong><span>Mean Score</span></div>
+            </div>
+            <div className="analytics-summary-bar" role="img" aria-label={summary.statuses.map((row) => `${row.label} ${row.count}`).join(', ')}>
+              {summary.statuses.map((row) => (
+                <i key={row.status} style={{ background: STATUS_COLORS[row.status], flexGrow: row.count }} title={`${row.label}: ${row.count}`} />
+              ))}
+            </div>
+            <ul className="analytics-summary-legend">
+              {summary.statuses.map((row) => (
+                <li key={row.status}><i style={{ background: STATUS_COLORS[row.status] }} />{row.label} <strong>{row.count.toLocaleString()}</strong></li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
 
       <div className="analytics-kpi-grid">
         <div><strong>{kpis.total.toLocaleString()}</strong><span>Total titles</span></div>
