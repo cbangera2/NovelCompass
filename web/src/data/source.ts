@@ -12,6 +12,7 @@ import {
   RecommendRequest,
   RecommendResponse
 } from '../types';
+import type { AnalyticsCorpus } from '../novelStats';
 
 export interface RecommendationDataSource {
   readonly mode: 'api' | 'static';
@@ -27,6 +28,8 @@ export interface RecommendationDataSource {
   getRelatedSeries?(id: number): Promise<RelatedSeriesItem[]>;
   /** Curated Novel Updates lists that include this title (live API only). */
   getCuratedLists?(id: number): Promise<CuratedListSummary[]>;
+  /** Compact per-title rows for the catalog-wide analytics on a title page (static snapshot only). */
+  getAnalyticsCorpus?(): Promise<AnalyticsCorpus>;
   getRecommendations(request: RecommendRequest): Promise<RecommendResponse>;
   browseNovels(request: BrowseRequest): Promise<BrowseResponse>;
   getRandomNovel(request: BrowseRequest, randomValue?: number): Promise<BrowseNovel>;

@@ -7,7 +7,10 @@ import { createDataSource, externalMediaUrl, RecommendationDataSource, sourceDis
 import { Card, DSButton, Skeleton } from './design-system';
 import { Select } from './ui';
 import { browseFacetUrl } from './metadataLinks';
+import { NovelAnalytics } from './NovelAnalytics';
 import { NovelInsightsPanel } from './NovelInsightsPanel';
+import { FIT_LABEL, fitAnalysis } from './novelStats';
+import { useAnalyticsCorpus } from './useNovelAnalytics';
 import { loadLocalProfile, saveLocalProfile } from './profile/store';
 import { LocalNovelFeedback, LocalUserProfile, ReadingStatus } from './profile/types';
 import { displayNovelTitle, useDisplaySettings } from './settings';
@@ -87,7 +90,17 @@ export default function NovelPage(): JSX.Element {
   const libraryEntry = profile?.entries.find((item) => item.novel_id === novelId);
   const currentRating = libraryEntry?.rating;
   const ratingSummary = useMemo(() => summarizeRatings(detail?.rating_dist), [detail]);
-  const verdictChips = [...(ratingSummary?.verdict ? [ratingSummary.verdict] : []), ...catalogVerdicts(insights)];
+  const corpus = useAnalyticsCorpus(source);
+  // Skip the fit for titles you've already rated: you know how you feel about those.
+  const fit = useMemo(
+    () => (corpus && detail && currentRating == null ? fitAnalysis(corpus, novelId, profile) : null),
+    [corpus, detail, currentRating, novelId, profile],
+  );
+  const verdictChips = [
+    ...(ratingSummary?.verdict ? [ratingSummary.verdict] : []),
+    ...catalogVerdicts(insights),
+    ...(fit && 'verdict' in fit && fit.verdict !== 'mixed' ? [FIT_LABEL[fit.verdict]] : []),
+  ];
   const libraryIds = useMemo(() => {
     const map = new Map<number, LocalUserProfile['entries'][number]>();
     profile?.entries.forEach((entry) => { if (entry.novel_id != null) map.set(entry.novel_id, entry); });
@@ -239,7 +252,7 @@ export default function NovelPage(): JSX.Element {
           })}
         </div>}
         </div>
-        {verdictChips.length > 0 && <div className="novel-verdicts">{verdictChips.map((label) => <span key={label} className={label === 'Divisive' || label.includes('polarizing') ? 'warn' : ''}>{label}</span>)}</div>}
+        {verdictChips.length > 0 && <div className="novel-verdicts">{verdictChips.map((label) => <span key={label} className={label === 'Divisive' || label.includes('polarizing') || label.includes('not for you') ? 'warn' : ''}>{label}</span>)}</div>}
         <div className="novel-controls">
         <div className="novel-library-state">
           <Library size={15} />
@@ -371,6 +384,7 @@ export default function NovelPage(): JSX.Element {
       </section>
       <section id="insights" data-novel-section className="novel-major-section">
         <header className="novel-section-heading"><span>03</span><div><h2>Insights</h2><p>How this title sits within the current catalog snapshot.</p></div></header>
+        {corpus && <NovelAnalytics corpus={corpus} novelId={novelId} detail={detail} profile={Boolean(profile)} fit={fit} />}
         <NovelInsightsPanel novelId={novelId} source={source} providedInsights={insights} currentNovel={detail} />
       </section>
     </div>

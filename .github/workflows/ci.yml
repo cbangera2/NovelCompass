@@ -53,6 +53,9 @@ jobs:
       - name: Run non-mutating quality checks
         run: pnpm --dir web run check
 
+      - name: Unit-test web logic
+        run: pnpm --dir web run test:web
+
       - name: Test and package Chrome extension
         run: |
           pnpm --dir web run test:extension
