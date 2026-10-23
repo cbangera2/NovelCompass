@@ -224,3 +224,46 @@ export function overviewKpis(entries: ProfileEntry[]): OverviewKpis {
 export function profileHasDates(profile: LocalUserProfile): boolean {
   return profile.entries.some((entry) => entry.started_on || entry.finished_on);
 }
+
+/** AniList's own default when a title has no episode length; the export doesn't carry per-title durations. */
+const DEFAULT_EPISODE_MINUTES = 24;
+
+export interface FormatSummary {
+  kind: ProfileMediaKind;
+  total: number;
+  /** Anime: estimated days watched. Manga / novels: chapters read. */
+  progressValue: number;
+  progressLabel: string;
+  /** Mean of your scores on AniList's 0-100 scale; null when nothing is rated. */
+  meanScore: number | null;
+  statuses: Array<{ status: ReadingStatus; label: string; count: number }>;
+}
+
+const FORMAT_ORDER: ProfileMediaKind[] = ['anime', 'manga', 'novel'];
+
+/** One AniList-style stat block per format present in the library. */
+export function formatSummaries(
+  entries: ProfileEntry[],
+  detailById: Map<number, NovelDetail> = new Map()
+): FormatSummary[] {
+  const byKind = new Map<ProfileMediaKind, ProfileEntry[]>();
+  entries.forEach((entry) => {
+    const detail = entry.novel_id != null ? detailById.get(entry.novel_id) : undefined;
+    const kind = inferMediaKind(entry, detail);
+    byKind.set(kind, [...(byKind.get(kind) || []), entry]);
+  });
+  return FORMAT_ORDER.flatMap((kind): FormatSummary[] => {
+    const rows = byKind.get(kind);
+    if (!rows?.length) return [];
+    const units = rows.reduce((sum, entry) => sum + progressUnits(entry), 0);
+    const scores = rows.flatMap((entry) => (entry.rating != null ? [entry.rating] : []));
+    return [{
+      kind,
+      total: rows.length,
+      progressValue: kind === 'anime' ? Math.round((units * DEFAULT_EPISODE_MINUTES) / 144) / 10 : units,
+      progressLabel: kind === 'anime' ? 'Days Watched' : 'Chapters Read',
+      meanScore: scores.length ? Math.round(mean(scores) * 200) / 10 : null,
+      statuses: countByStatus(rows).filter((row) => row.count > 0),
+    }];
+  });
+}
