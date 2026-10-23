@@ -64,6 +64,17 @@ export function pickGenreRows(selected: MediaTypeChoice[], limit: number): Array
   }).slice(0, limit);
 }
 
-export function formatNoun(types: BrowseFormat[]): string {
-  return types.length > 1 ? 'anime & manga' : types[0];
+const NOUNS: Record<MediaTypeChoice, string> = { novel: 'light novels', manga: 'manga', anime: 'anime' };
+
+export function formatNoun(types: MediaTypeChoice[]): string {
+  return types.map((t) => NOUNS[t]).join(' & ');
+}
+
+/**
+ * "Best Romance anime" when several formats are on (so you can tell the rows apart), plain "Best Romance"
+ * when only one is, since the format is then obvious from the page.
+ */
+export function rowTitle(label: string, kind: 'rating' | 'popular', types: MediaTypeChoice[], showFormat: boolean): string {
+  const lead = kind === 'rating' ? 'Best' : 'Most popular';
+  return showFormat ? `${lead} ${label} ${formatNoun(types)}` : `${lead} ${label}`;
 }

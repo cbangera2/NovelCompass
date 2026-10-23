@@ -9,7 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { createDataSource } from './data';
 import { mediaTypeInScope, useMediaFilterState, type MediaTypeChoice } from './mediaFilterState';
-import { formatNoun, MIN_GENRE_ROW_TITLES, pickGenreRows, type BrowseFormat } from './forYouGenres';
+import { MIN_GENRE_ROW_TITLES, pickGenreRows, rowTitle, type BrowseFormat } from './forYouGenres';
 import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, staticLists } from './forYouStatic';
 import { cleanListTitle } from './forYouNames';
 import { listPageUrl } from './listPageUrl';
@@ -535,7 +535,7 @@ export default function ForYouPage(): JSX.Element {
       fetchBrowseRow({ types: [type], kind: 'rating', ...TOP_RATED[type], excludeIds: exclude, limit: ROW_LIMIT }),
     )).then((rowsData) => new Set(rowsData.flatMap((row) => row.recommendations.map((r) => r.target_id)))));
     const picked = pickGenreRows(selectedTypes, novelsOn ? GENRE_ROWS_WITH_NOVELS : GENRE_ROWS_WITHOUT_NOVELS);
-    const genreTitle = (index: number) => `Best ${formatNoun(picked[index].types)}: ${picked[index].label}`;
+    const genreTitle = (index: number) => rowTitle(picked[index].label, 'rating', picked[index].types, selectedTypes.length > 1);
     const rankedRows: Array<Promise<RowData> | undefined> = [];
     const rankedAt = (index: number): Promise<RowData> => (rankedRows[index] ??= fetchBrowseRow({
       types: picked[index].types,
