@@ -19,6 +19,9 @@ import urllib.error
 from pathlib import Path
 from typing import Any, Dict, List
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.scraper.anilist_credits import extract_creators  # noqa: E402
+
 ANILIST_API_URL = "https://graphql.anilist.co"
 
 BULK_COVER_QUERY = """
@@ -35,7 +38,7 @@ query ($ids: [Int], $type: MediaType) {
       staff {
         edges { role node { name { full } } }
       }
-      studios { nodes { name } }
+      studios { nodes { name isAnimationStudio } }
       averageScore
       meanScore
       popularity
@@ -134,17 +137,7 @@ def backfill(db_path: str, batch_size: int = 50, delay: float = 0.7) -> None:
                                 (media.get("coverImage") or {}).get("medium")
 
                     # Author / Staff
-                    authors = []
-                    for edge in (media.get("staff") or {}).get("edges") or []:
-                        role = (edge.get("role") or "").lower()
-                        if any(k in role for k in ["story", "art", "author", "original creator", "writer", "mangaka", "director"]):
-                            name = (edge.get("node") or {}).get("name", {}).get("full")
-                            if name and name not in authors:
-                                authors.append(name)
-                    for studio in (media.get("studios") or {}).get("nodes") or []:
-                        sname = studio.get("name")
-                        if sname and sname not in authors:
-                            authors.append(sname)
+                    authors = extract_creators(media)
                     author_str = ", ".join(authors) if authors else None
 
                     # Rating / popularity
