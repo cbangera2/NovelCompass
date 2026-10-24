@@ -93,6 +93,7 @@ query ($page: Int = 1, $perPage: Int = 20, $search: String, $id: Int, $type: Med
         nodes {
           id
           name
+          isAnimationStudio
         }
       }
       recommendations(perPage: 10, sort: [RATING_DESC]) {

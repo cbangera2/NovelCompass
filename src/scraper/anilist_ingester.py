@@ -8,6 +8,7 @@ import sqlite3
 from typing import Any, Dict, List, Optional
 from src.db.repository import Repository
 from src.scraper.anilist_client import AniListClient
+from src.scraper.anilist_credits import extract_creators
 from src.engine.normalization import normalize_anilist_rating
 
 ANILIST_ID_OFFSET = 2_000_000
@@ -64,21 +65,7 @@ def map_anilist_media(media: Dict[str, Any]) -> Dict[str, Any]:
             associated_names.append(syn)
 
     # Authors / Artists / Studios
-    authors = []
-    staff_edges = (media.get("staff") or {}).get("edges") or []
-    for edge in staff_edges:
-        role = (edge.get("role") or "").lower()
-        if any(keyword in role for keyword in ["story", "art", "author", "original creator", "writer", "mangaka", "director", "producer"]):
-            node = edge.get("node") or {}
-            name = (node.get("name") or {}).get("full")
-            if name and name not in authors:
-                authors.append(name)
-
-    studios = (media.get("studios") or {}).get("nodes") or []
-    for studio in studios:
-        sname = studio.get("name")
-        if sname and sname not in authors:
-            authors.append(sname)
+    authors = extract_creators(media)
 
     author_str = ", ".join(authors) if authors else "Unknown"
 
