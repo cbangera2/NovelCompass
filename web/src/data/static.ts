@@ -13,6 +13,7 @@ import {
   SeedNovel
 } from '../types';
 import { idle } from '../idle';
+import { getSelectedSources, matchesSourceParam, sourceInScope, sourcesQueryParam } from '../sourceFilterState';
 import type { AnalyticsCorpus } from '../novelStats';
 import {
   bucketForNovel,
@@ -404,6 +405,7 @@ export class StaticDataSource implements RecommendationDataSource {
     const needle = normalize(query);
     if (!needle) return [];
     const tokens = needle.split(/\s+/).filter(Boolean);
+    const selectedSources = getSelectedSources();
     let selectedTypes: string[] = [];
     try {
       const { getSelectedMediaTypes } = await import('../mediaFilterState');
@@ -415,6 +417,7 @@ export class StaticDataSource implements RecommendationDataSource {
       .map((card) => {
         const cardType = inferMediaType(card.id, card.media_type);
         if (!matchesMediaFilter(cardType, selectedTypes)) return { card, score: Infinity };
+        if (!sourceInScope(card.id, card.source, selectedSources)) return { card, score: Infinity };
         const title = normalize(card.title);
         const author = normalize(card.author);
         const aliases = (this.aliases.get(card.id) || []).map(normalize);
@@ -792,6 +795,7 @@ export class StaticDataSource implements RecommendationDataSource {
     const items = [...this.cards.values()].filter((card) => {
       const cardType = inferMediaType(card.id, card.media_type);
       if (!matchesMediaFilter(cardType, reqMediaTypes)) return false;
+      if (!matchesSourceParam(card.id, card.source, request.source ?? sourcesQueryParam())) return false;
       if (query && !normalize(`${card.title} ${card.author} ${(this.aliases.get(card.id) || []).join(' ')}`).includes(query)) return false;
       if (request.language && normalize(card.language) !== normalize(request.language)) return false;
       if (request.author && normalize(card.author) !== normalize(request.author)) return false;
@@ -863,6 +867,7 @@ function passesFilters(
   const tagSet = new Set(tags);
   const has = (values: string[], needle: string) => values.some((value) => value.includes(needle));
   if (request.exclude_novel_ids?.length && request.exclude_novel_ids.includes(card.id)) return false;
+  if (!matchesSourceParam(card.id, card.source, request.source ?? sourcesQueryParam())) return false;
   if (request.language && normalize(card.language) !== normalize(request.language)) return false;
   if ((request.min_rating || 0) > card.rating) return false;
   if ((request.min_rating_votes || 0) > card.rating_votes) return false;

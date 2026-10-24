@@ -13,6 +13,14 @@ import {
   RecommendResponse
 } from '../types';
 import { DataSourceError, RecommendationDataSource } from './source';
+import { sourcesQueryParam } from '../sourceFilterState';
+
+/** Apply the user's enabled catalog sources unless the caller already set `source`. */
+function withSourceScope<T>(request: T): T {
+  if (!request || typeof request !== 'object' || (request as { source?: unknown }).source != null) return request;
+  const source = sourcesQueryParam();
+  return source ? { ...request, source } : request;
+}
 
 const SUPPORTED_SCHEMA = 1;
 const SUPPORTED_ALGORITHM = 1;
@@ -60,8 +68,9 @@ export class ApiDataSource implements RecommendationDataSource {
   async searchNovels(query: string, limit: number, signal?: AbortSignal): Promise<NovelSearchResult[]> {
     const { mediaTypesQueryParam } = await import('../mediaFilterState');
     const mediaType = mediaTypesQueryParam() || 'all';
+    const source = sourcesQueryParam() || 'all';
     const body = await apiFetch<{ results: NovelSearchResult[] }>(
-      `/api/search?q=${encodeURIComponent(query)}&limit=${limit}&media_type=${encodeURIComponent(mediaType)}`,
+      `/api/search?q=${encodeURIComponent(query)}&limit=${limit}&media_type=${encodeURIComponent(mediaType)}&source=${encodeURIComponent(source)}`,
       { signal }
     );
     return body.results || [];
@@ -139,7 +148,7 @@ export class ApiDataSource implements RecommendationDataSource {
     return apiFetch('/api/recommend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request)
+      body: JSON.stringify(withSourceScope(request))
     });
   }
 
@@ -151,13 +160,13 @@ export class ApiDataSource implements RecommendationDataSource {
     return apiFetch('/api/recommend/for-you', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(withSourceScope(body)),
     });
   }
 
   browseNovels(request: BrowseRequest): Promise<BrowseResponse> {
     const params = new URLSearchParams();
-    Object.entries(request).forEach(([key, value]) => {
+    Object.entries(withSourceScope(request)).forEach(([key, value]) => {
       if (value !== '' && value != null) params.set(key, String(value));
     });
     return apiFetch<BrowseResponse>(`/api/browse?${params}`).catch((error) => {
@@ -173,7 +182,7 @@ export class ApiDataSource implements RecommendationDataSource {
 
   async getRandomNovel(request: BrowseRequest, randomValue = Math.random()): Promise<BrowseNovel> {
     const params = new URLSearchParams();
-    Object.entries(request).forEach(([key, value]) => {
+    Object.entries(withSourceScope(request)).forEach(([key, value]) => {
       if (!['page', 'page_size'].includes(key) && value !== '' && value != null) params.set(key, String(value));
     });
     // Supplying a seed makes adapter tests reproducible. Normal UI use leaves

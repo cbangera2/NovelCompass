@@ -97,6 +97,7 @@ export async function staticListRow(
       title: card.title,
       cover_url: card.cover_url,
       media_type: card.media_type,
+      source: card.source,
       rating: card.rating,
       rating_votes: card.rating_votes,
       status_trans: '',

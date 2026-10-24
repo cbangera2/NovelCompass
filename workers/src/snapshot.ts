@@ -7,6 +7,7 @@
 // each recommendation; every consumer here falls back to D1 when the snapshot
 // is absent (for example `wrangler dev --local` without a built web/dist).
 
+import { sourceMatches } from "./sources";
 import type {
   CatalogDistributions,
   CohortIndexes,
@@ -208,10 +209,7 @@ export function searchCards(
       if (Number.isFinite(score)) scored.push({ card, score });
     }
   }
-  const filtered =
-    !source || source === "all"
-      ? scored
-      : scored.filter(({ card }) => card.source === source);
+  const filtered = scored.filter(({ card }) => sourceMatches(card.source, source));
   return filtered
     .sort(
       (a, b) =>
@@ -285,7 +283,7 @@ export function browseCards(
   for (const card of snap.cards.values()) {
     const type = card.media_type.toLowerCase();
     if (!matchesMedia(type, f.media_type)) continue;
-    if (f.source && f.source !== "all" && card.source !== f.source) continue;
+    if (!sourceMatches(card.source, f.source)) continue;
     if (excludedIds.has(card.id)) continue;
     if (query) {
       const haystack = normalize(

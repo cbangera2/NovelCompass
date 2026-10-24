@@ -54,6 +54,7 @@ const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((modul
 import { parseMediaTypesFromUrl, useMediaFilterState } from './mediaFilterState';
 import { loadFilterSnapshot, loadResultLayout, saveFilterSnapshot, saveResultLayout, type ResultLayout } from './preferences';
 import { ResultLayoutToggle } from './components/ResultLayoutToggle';
+import { useSourceFilterState } from './sourceFilterState';
 import { discoverSearchParams, parseDiscoverRoute, stableRouteUrl } from './routeState';
 import { FormatScopeChip } from './components/FormatScopeChip';
 
@@ -117,6 +118,7 @@ export default function App(): JSX.Element {
     isAllSelected,
     setTypes,
   } = useMediaFilterState();
+  const { sourceParam } = useSourceFilterState();
   const savedFilters = loadFilterSnapshot('discover', {
     hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
     requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
@@ -309,6 +311,7 @@ export default function App(): JSX.Element {
       },
       hidden_gem_strength: hiddenGemStrength,
       media_type: includeOtherFormats || !mediaParam ? 'all' : mediaParam,
+      source: sourceParam || 'all',
       exclude_novel_ids: libraryExcludeIds,
     };
 
@@ -527,7 +530,7 @@ export default function App(): JSX.Element {
   }, [dataSource, forYouMode, hideLibraryTitles, libraryExcludeIds, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
     minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
     excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength,
-    maxResults, routeRevision, mediaParam, includeOtherFormats]);
+    maxResults, routeRevision, mediaParam, sourceParam, includeOtherFormats]);
 
   const chooseNovel = (novel: NovelSearchResult) => {
     setForYouMode(false);

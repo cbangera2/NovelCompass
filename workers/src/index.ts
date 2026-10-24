@@ -39,6 +39,7 @@ import {
   parseAssociatedNames,
   searchTokenClause,
 } from "./db";
+import { sourceMatches, sourceSqlFilter } from "./sources";
 import {
   browseCards,
   cohortsFromCards,
@@ -315,9 +316,10 @@ app.get("/api/search", async (c) => {
     where.push(clause);
     params.push(mp);
   }
-  if (source && source !== "all") {
-    where.push("COALESCE(source, 'novelupdates') = ?");
-    params.push(source);
+  const sourceFilter = sourceSqlFilter(source);
+  if (sourceFilter.clause) {
+    where.push(sourceFilter.clause);
+    params.push(...sourceFilter.params);
   }
   params.push(limit);
   const rows = await db
@@ -389,9 +391,10 @@ function browseWhere(f: BrowseFilters): { joins: string[]; where: string[]; para
   if (f.language) { where.push("LOWER(n.language) = LOWER(?)"); params.push(f.language); }
   const { clause, params: mp } = mediaTypeSqlFilter(f.media_type, "COALESCE(n.media_type, 'novel')");
   if (clause) { where.push(clause); params.push(...mp); }
-  if (f.source && f.source !== "all") {
-    where.push("COALESCE(n.source, 'novelupdates') = LOWER(?)");
-    params.push(f.source);
+  const sourceFilter = sourceSqlFilter(f.source, "COALESCE(n.source, 'novelupdates')");
+  if (sourceFilter.clause) {
+    where.push(sourceFilter.clause);
+    params.push(...sourceFilter.params);
   }
   if (f.author) { where.push("LOWER(n.author) = LOWER(?)"); params.push(f.author); }
   if (f.genre) {
@@ -970,6 +973,7 @@ async function filterCandidatesSnapshot(
       if (includeTags.size && ![...includeTags].every((t) => tags?.has(t) ?? false))
         continue;
     }
+    if (!sourceMatches(card.source, prefs.source)) continue;
     if (mediaTypes.length && !mediaTypes.includes("all")) {
       const aliases =
         { manga: ["manga", "manhwa", "manhua", "comic"], novel: ["novel", "light_novel", "web_novel"], anime: ["anime"] }[

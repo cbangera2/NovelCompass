@@ -2,6 +2,8 @@
 // Algorithm contract: SCHEMA_VERSION=1, ALGORITHM_VERSION=1, RRF_K=60.
 // Keep these in sync with src/engine/ranking_contract.py.
 
+import { sourceMatches } from "./sources";
+
 export const SCHEMA_VERSION = 1;
 export const ALGORITHM_VERSION = 1;
 export const RRF_K = 60;
@@ -364,7 +366,7 @@ export async function filterCandidates(
       .map((m) => m.trim().toLowerCase())
       .filter(Boolean),
   );
-  const source = (prefs.source ?? "").trim().toLowerCase();
+  const sourceFilter = prefs.source ?? "";
   const excludeIds = new Set(prefs.exclude_novel_ids ?? []);
 
   const traitMap = new Map<number, NovelTraits>();
@@ -437,7 +439,7 @@ export async function filterCandidates(
       }
       if (!matched) continue;
     }
-    if (source && source !== "all" && traits.source !== source) continue;
+    if (!sourceMatches(traits.source, sourceFilter)) continue;
     if ([...excludeTags].some((t) => allTagsGenres.has(t))) continue;
     if (includeTags.size > 0 && ![...includeTags].every((t) => traits.tags.has(t)))
       continue;

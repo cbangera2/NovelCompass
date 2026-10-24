@@ -91,6 +91,21 @@ def media_type_sql_filter(
     return f"({' OR '.join(conditions)})", params
 
 
+def source_sql_filter(
+    source: str,
+    column: str = "COALESCE(source, 'novelupdates')",
+) -> tuple[Optional[str], list[Any]]:
+    """Parse a comma-separated source filter (``novelupdates,anilist``) into a SQL clause.
+
+    ``all`` or an empty value means unfiltered. A single value behaves as before.
+    """
+    requested = [t.strip().lower() for t in (source or "").split(",") if t.strip()]
+    if not requested or "all" in requested:
+        return None, []
+    placeholders = ", ".join("?" for _ in requested)
+    return f"{column} IN ({placeholders})", requested
+
+
 def normalize_search_query(query: str) -> str:
     """Lowercase and strip punctuation so ``Too Many Losing Heroines!`` matches aliases."""
     text = (query or "").casefold()
@@ -408,9 +423,10 @@ def search_novels(
         if type_clause:
             where.append(type_clause)
             params.extend(type_params)
-        if source and source != "all":
-            where.append("COALESCE(source, 'novelupdates') = ?")
-            params.append(source)
+        source_clause, source_params = source_sql_filter(source)
+        if source_clause:
+            where.append(source_clause)
+            params.extend(source_params)
 
         params.append(limit)
         cur.execute(f"""
@@ -523,9 +539,10 @@ def browse_novels(
         if type_clause:
             where.append(type_clause)
             params.extend(type_params)
-        if source and source != "all":
-            where.append("COALESCE(n.source, 'novelupdates') = LOWER(?)")
-            params.append(source)
+        source_clause, source_params = source_sql_filter(source, "COALESCE(n.source, 'novelupdates')")
+        if source_clause:
+            where.append(source_clause)
+            params.extend(source_params)
         if author:
             where.append("LOWER(n.author) = LOWER(?)")
             params.append(author)
@@ -1034,6 +1051,7 @@ class ForYouRowRequest(BaseModel):
     seeds_per_list: int = Field(default=12, ge=1, le=20)
     limit: int = Field(default=20, ge=1, le=150)  # 150 backs the "See all" grid
     media_type: str = "novel"
+    source: str = "all"  # comma-separated allowed sources, e.g. "novelupdates,anilist"
     hide_known: bool = False  # drop titles that appear on any of list_ids
     exclude_novel_ids: List[int] = Field(default_factory=list, max_length=5000)  # e.g. the user's library
     list_titles: Dict[int, str] = Field(default_factory=dict)  # display names that override stale DB titles
@@ -1151,6 +1169,7 @@ def for_you_row(req: ForYouRowRequest):
             seeds=seeds,
             limit=req.limit,
             media_type=req.media_type,
+            source=req.source,
             channel_weights=req.channel_weights,
             exclude_novel_ids=sorted(exclude)[:5000],
         )
