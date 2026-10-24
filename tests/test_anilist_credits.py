@@ -25,14 +25,26 @@ def test_anime_keeps_creator_director_and_animation_studio_only():
     assert extract_creators(media) == ["Hajime Yatate", "Shinichirou Watanabe", "Sunrise"]
 
 
-def test_manga_story_and_art_roles_in_order():
+def test_manga_credits_keep_anilist_order():
     media = {"staff": staff(("Art", "Artist"), ("Story", "Writer"), ("Translator", "Skip Me"))}
-    assert extract_creators(media) == ["Writer", "Artist"]
+    assert extract_creators(media) == ["Artist", "Writer"]
 
 
 def test_role_suffixes_are_ignored_and_names_deduplicated():
     media = {"staff": staff(("Story & Art (ch 1-20)", "Same Person"), ("Original Creator", "Same Person"))}
     assert extract_creators(media) == ["Same Person"]
+
+
+def test_dub_and_localisation_directors_are_ignored():
+    media = {
+        "staff": staff(
+            ("Director (English; Netflix)", "Dub Director"),
+            ("Director (Brazilian Portuguese; 3ª dub)", "Another Dub Director"),
+            ("Director", "Hideaki Anno"),
+            ("Episode Director (ep 9)", "Seiji Mizushima"),
+        )
+    }
+    assert extract_creators(media) == ["Hideaki Anno"]
 
 
 def test_people_and_studios_are_capped():

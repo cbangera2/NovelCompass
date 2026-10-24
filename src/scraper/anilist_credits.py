@@ -10,30 +10,33 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-# Normalised role (lowercase, no "(eps 1-3)" suffix) -> sort priority. Lower sorts first.
+# Normalised role (lowercase, no "(eps 1-3)" suffix) -> sort tier. Creators come before directors;
+# AniList's own order is kept within a tier.
 CREATOR_ROLES: Dict[str, int] = {
     "original creator": 0,
     "original story": 0,
     "original work": 0,
-    "story": 1,
-    "story & art": 1,
-    "story and art": 1,
-    "art": 2,
-    "illustration": 2,
-    "illustrator": 2,
-    "director": 3,
-    "series director": 3,
-    "chief director": 3,
+    "story": 0,
+    "story & art": 0,
+    "story and art": 0,
+    "art": 0,
+    "illustration": 0,
+    "illustrator": 0,
+    "director": 1,
+    "series director": 1,
+    "chief director": 1,
 }
 
 MAX_PEOPLE = 3
 MAX_STUDIOS = 2
 
-_PARENTHETICAL = re.compile(r"\s*\(.*?\)\s*")
+# "(eps 1-3)" or "(ch 12)" only say where in the work a credit applies. Other notes such as
+# "(English; Netflix)" mark dub and localisation credits, which are not the work's creators.
+_COVERAGE_NOTE = re.compile(r"\s*\((?:eps?|chs?|chapters?|vols?|op|ed)\b[^)]*\)\s*", re.IGNORECASE)
 
 
 def _normalise_role(role: str) -> str:
-    return _PARENTHETICAL.sub(" ", role or "").strip().lower()
+    return _COVERAGE_NOTE.sub(" ", role or "").strip().lower()
 
 
 def extract_creators(media: Dict[str, Any]) -> List[str]:
