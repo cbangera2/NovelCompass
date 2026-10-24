@@ -9,7 +9,7 @@ const cohortChartConfig = {
   rating: { label: 'Rating', color: 'var(--chart-2)' }
 } satisfies ChartConfig;
 
-export default function NovelCohortChart({ novel, insights }: { novel: NovelDetail; insights: NovelInsights }) {
+export default function NovelCohortChart({ novel, insights, noun = 'titles' }: { novel: NovelDetail; insights: NovelInsights; noun?: string }) {
   const points = [
     ...insights.peers.slice(0, 10).map((peer) => ({
       id: peer.id, title: peer.title, rating: peer.rating, readers: peer.reading_list_count,
@@ -53,7 +53,7 @@ export default function NovelCohortChart({ novel, insights }: { novel: NovelDeta
     return readers.toLocaleString();
   };
   return <section className="cohort-chart-card" aria-labelledby={`cohort-chart-${novel.id}`}>
-    <div><h4 id={`cohort-chart-${novel.id}`}>Rating and popularity cohort</h4><p>This title against its {Math.max(0, points.length - 1)} closest peers. Bubble size is shared tags; dashed lines are the cohort medians. List count uses a log scale.</p></div>
+    <div><h4 id={`cohort-chart-${novel.id}`}>Rating vs popularity</h4><p>This title against the {Math.max(0, points.length - 1)} similar {noun} above. Bubble size is shared tags; dashed lines are the medians of the group. List count uses a log scale.</p></div>
     <div className="cohort-chart-wrap">
     <span className="quad q-tl">Hidden gems</span><span className="quad q-tr">Crowd favorites</span>
     <span className="quad q-bl">Niche</span><span className="quad q-br">Popular, divisive</span>
