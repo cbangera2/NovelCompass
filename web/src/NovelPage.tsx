@@ -43,6 +43,9 @@ export default function NovelPage(): JSX.Element {
   const [profile, setProfile] = useState<LocalUserProfile | null>(null);
   const [error, setError] = useState('');
   const [synopsisOpen, setSynopsisOpen] = useState(false);
+  const [coverLoaded, setCoverLoaded] = useState(false);
+  const coverImg = useRef<HTMLImageElement | null>(null);
+  const glowCanvas = useRef<HTMLCanvasElement>(null);
   const [hideKnown, setHideKnown] = useState(false);
   const [series, setSeries] = useState<RelatedSeriesItem[]>([]);
   const [curatedLists, setCuratedLists] = useState<CuratedListSummary[]>([]);
@@ -166,6 +169,13 @@ export default function NovelPage(): JSX.Element {
     setProfile(updated);
   };
 
+  useEffect(() => {
+    if (!coverLoaded) return;
+    const img = coverImg.current;
+    const context = glowCanvas.current?.getContext('2d');
+    if (img && context) context.drawImage(img, 0, 0, 16, 24);
+  }, [coverLoaded]);
+
   const heroRef = useRef<HTMLElement>(null);
   const [heroGone, setHeroGone] = useState(false);
   useEffect(() => {
@@ -207,9 +217,20 @@ export default function NovelPage(): JSX.Element {
       <span>/</span><span aria-current="page">{title}</span>
     </nav>
 
-    <section className="novel-hero" ref={heroRef} style={hasUsableCover(detail.cover_url) ? ({ ["--hero-cover" as string]: `url("${detail.cover_url}")` }) : undefined}>
+    <section
+      className={`novel-hero${!hasUsableCover(detail.cover_url) || coverLoaded ? ' splash-ready' : ''}`}
+      ref={heroRef}
+      style={hasUsableCover(detail.cover_url) ? ({ ["--hero-cover" as string]: `url("${detail.cover_url}")` }) : undefined}
+    >
       <div className="novel-cover-shell">
-        {hasUsableCover(detail.cover_url) ? <img src={detail.cover_url} alt={`Cover of ${title}`} /> : <BookOpen aria-label="No cover available" />}
+        {/* The halo under the cover: the cover drawn tiny, then blurred and scaled up by CSS. Unlike a real image it
+            needs no second download and no CORS, and it is not a largest-contentful-paint candidate. */}
+        {hasUsableCover(detail.cover_url) && <canvas ref={glowCanvas} className="novel-cover-glow" width={16} height={24} aria-hidden="true" />}
+        {hasUsableCover(detail.cover_url)
+          // The splash backdrop waits for the cover so it never competes with it for first paint. A cached cover can
+          // finish before React attaches onLoad, hence the ref check.
+          ? <img src={detail.cover_url} alt={`Cover of ${title}`} onLoad={() => setCoverLoaded(true)} ref={(img) => { coverImg.current = img; if (img?.complete && img.naturalWidth) setCoverLoaded(true); }} />
+          : <BookOpen aria-label="No cover available" />}
       </div>
       <div className="novel-hero-copy">
         <div className="novel-eyebrow">

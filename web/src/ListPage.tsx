@@ -6,7 +6,7 @@ import { cleanListTitle } from './forYouNames';
 import { loadListFile, staticLists } from './forYouStatic';
 import type { ListSummary } from './ForYouPage';
 import { NovelCard } from './components/NovelCard';
-import { novelPageUrl } from './novelLinks';
+import { hasUsableCover, novelPageUrl } from './novelLinks';
 import type { NovelSearchResult } from './types';
 import './for-you.css';
 import './list-page.css';
@@ -15,6 +15,16 @@ type State =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; summary?: ListSummary; title: string; seeds: number; titles: NovelSearchResult[]; missing: number };
+
+/** A blurred strip of the list's first covers behind the header, the list-page twin of the title-page splash. */
+function SplashCollage({ covers }: { covers: string[] }) {
+  if (!covers.length) return null;
+  return (
+    <div className="splash-collage" aria-hidden="true">
+      {covers.map((src) => <img key={src} src={src} alt="" decoding="async" />)}
+    </div>
+  );
+}
 
 export default function ListPage(): JSX.Element {
   const id = Number(new URLSearchParams(window.location.search).get('id'));
@@ -71,6 +81,7 @@ export default function ListPage(): JSX.Element {
       {state.status === 'ready' && (
         <>
           <header className="list-page-head">
+            <SplashCollage covers={state.titles.filter((novel) => hasUsableCover(novel.cover_url)).slice(0, 6).map((novel) => novel.cover_url!)} />
             <span className="eyebrow">Curated list</span>
             <h1>{state.title}</h1>
             <p>
