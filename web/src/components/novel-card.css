@@ -34,6 +34,7 @@
 .nc-tile:hover .nc-cover,.nc-tile:focus-visible .nc-cover{border-color:var(--accent);transform:translateY(-2px)}
 .nc-tile:hover .nc-title{color:var(--accent-bright)}
 .nc-tile .nc-cover-fallback{font-size:2rem}
+.nc-cover-format{background:rgba(0,0,0,.72);border-radius:999px;color:#fff;font-size:.58rem;font-weight:750;letter-spacing:.03em;padding:.15rem .42rem;position:absolute;right:.4rem;text-transform:uppercase;top:.4rem;transition:opacity .12s}
 .nc-cover-note{background:rgba(0,0,0,.72);border-radius:999px;bottom:2rem;color:#fff;font-size:.62rem;left:.4rem;padding:.15rem .5rem;position:absolute}
 .nc-cover-stats{align-items:center;background:linear-gradient(transparent,rgba(0,0,0,.85));bottom:0;color:#fff;display:flex;font-size:.64rem;font-weight:700;gap:.4rem;left:0;padding:1.6rem .5rem .45rem;position:absolute;right:0}
 .nc-cover-stats .rating-chip{color:var(--chart-3)}
@@ -45,6 +46,20 @@
 .nc-strength{background:var(--surface-soft);border-radius:2px;display:block;height:3px;overflow:hidden}
 .nc-strength i{background:var(--accent);display:block;height:100%}
 .nc-caption{-webkit-box-orient:vertical;-webkit-line-clamp:3;color:var(--muted);display:-webkit-box;font-size:.7rem;line-height:1.35;overflow:hidden}
+
+/* Compact result grid (Browse, Discover): the tile in an auto-fill grid, with actions over the cover. */
+.nc-grid{display:grid;gap:1.1rem .85rem;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.nc-tile-wrap{min-width:0;position:relative}
+.nc-tile-wrap>.nc-tile{height:100%}
+.nc-tile-actions{display:flex;flex-direction:column;gap:.3rem;opacity:0;pointer-events:none;position:absolute;right:.4rem;top:.4rem;transition:opacity .12s}
+.nc-tile-wrap:hover .nc-tile-actions,.nc-tile-wrap:focus-within .nc-tile-actions,.nc-tile-wrap:has(.nc-tile-actions [aria-expanded="true"]) .nc-tile-actions{opacity:1;pointer-events:auto}
+.nc-tile-wrap:hover .nc-cover-format,.nc-tile-wrap:focus-within .nc-cover-format{opacity:0}
+.nc-tile-actions .ui-tooltip{display:flex}
+:root .nc-tile-wrap .nc-tile-actions :is(a,button){align-items:center;box-sizing:border-box;min-height:0;min-width:0;background:rgba(0,0,0,.74);border:1px solid rgba(255,255,255,.22);border-radius:999px;color:#fff;cursor:pointer;display:inline-flex;flex:none;height:28px;justify-content:center;padding:0;width:28px}
+:root .nc-tile-wrap .nc-tile-actions :is(a,button):hover,:root .nc-tile-wrap .nc-tile-actions :is(a,button):focus-visible{background:var(--accent);border-color:var(--accent-bright);color:#fff}
+:root .nc-tile-wrap .nc-tile-actions .btn-feedback.selected{background:var(--accent);color:#fff}
+@media(hover:none){.nc-tile-actions{opacity:1;pointer-events:auto}.nc-tile-wrap .nc-cover-format{opacity:0}}
+@media(max-width:680px){.nc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* ---------- Row + detailed: cover left, summary right ---------- */
 .nc-row,.nc-detailed{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;display:flex;flex-direction:column;gap:.6rem;overflow:hidden;padding:.8rem;transition:border-color .15s,box-shadow .15s,transform .15s}
@@ -95,3 +110,6 @@ a.nc-chip:hover,.nc-chips a:hover{border-color:var(--accent);color:var(--text)}
   .nc-cover-link{flex-basis:72px}
   .nc-head .nc-cover{height:108px;width:72px}
 }
+
+.result-layout-toggle{display:flex;gap:.3rem}
+.result-layout-toggle .ds-button{height:36px;padding:0;width:36px}

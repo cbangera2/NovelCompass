@@ -45,6 +45,8 @@ interface NovelCardProps {
   caption?: string;
   /** Tile: cover image priority for above-the-fold rows. */
   eager?: boolean;
+  /** Tile: show the format (Manga, Anime, LN…) on the cover for mixed-format lists. */
+  coverFormat?: boolean;
   /** Row: chips under the meta (genres). */
   chips?: ReactNode;
   /** Row: muted text at the start of the footer (year, chapters). */
@@ -54,9 +56,9 @@ interface NovelCardProps {
   /** Detailed: shared tags, collapsed behind a count. */
   sharedTags?: string[];
   tagHref?: (tag: string) => string;
-  /** Row/detailed: buttons in the footer. */
+  /** Row/detailed: buttons in the footer. Tile: icon buttons revealed over the cover on hover or focus. */
   actions?: ReactNode;
-  /** Row/detailed: click on empty card space. Defaults to following item.href. */
+  /** Row/detailed: click on empty card space. Tile: plain click. Defaults to following item.href. */
   onActivate?: () => void;
   /** Extra content at the end of the card body (e.g. signal bars on related tiles). */
   children?: ReactNode;
@@ -133,7 +135,7 @@ const VISIBLE_TAGS = 4;
 
 /**
  * One card for every title list in the app.
- * - `tile`: cover-first, for horizontal rows (For You, related titles).
+ * - `tile`: cover-first with stats overlaid on the image. For You rows, related titles, and the compact Browse/Discover grids.
  * - `row`: cover on the left, compact metadata and actions (Browse grid/list).
  * - `detailed`: row plus match evidence and shared tags (Discover results).
  * Covers and titles carry `data-preview-id` so the global hover card works; row/detailed cards are its anchor.
@@ -142,11 +144,20 @@ export function NovelCard(props: NovelCardProps) {
   const { variant, item, libraryStatus, libraryRating, className = '' } = props;
 
   if (variant === 'tile') {
-    const { matchPercent, coverNote, strengthPercent, caption, eager, children } = props;
-    return (
-      <a className={`nc nc-tile ${className}`.trim()} href={item.href} data-preview-id={item.id}>
+    const { matchPercent, coverNote, strengthPercent, caption, eager, coverFormat, actions, onActivate, children } = props;
+    const format = coverFormat ? getMediaBadgeInfo({ id: item.id, media_type: item.mediaType, source: item.source }) : null;
+    const onTileClick = onActivate
+      ? (event: MouseEvent<HTMLAnchorElement>) => {
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          onActivate();
+        }
+      : undefined;
+    const tile = (
+      <a className={`nc nc-tile ${actions ? '' : className}`.trim()} href={item.href} data-preview-id={item.id} onClick={onTileClick}>
         <Cover item={item} eager={eager}>
           {libraryStatus && <StatusBadge status={libraryStatus} variant="overlay" />}
+          {format && <span className={`nc-cover-format format-${format.formatKey}`}>{format.formatLabel}</span>}
           {coverNote && <span className="nc-cover-note" title={coverNote.title}>{coverNote.label}</span>}
           <span className="nc-cover-stats">
             <RatingChip rating={item.rating} votes={item.ratingVotes} showVotes={false} variant="overlay" size={12} />
@@ -164,6 +175,13 @@ export function NovelCard(props: NovelCardProps) {
         {caption && <small className="nc-caption">{caption}</small>}
         {children}
       </a>
+    );
+    if (!actions) return tile;
+    return (
+      <div className={`nc-tile-wrap ${className}`.trim()}>
+        {tile}
+        <div className="nc-tile-actions">{actions}</div>
+      </div>
     );
   }
 

@@ -3,8 +3,6 @@ import {
   ArrowDownUp,
   BookOpen,
   ExternalLink,
-  LayoutGrid,
-  List,
   Search,
   Shuffle,
   SlidersHorizontal,
@@ -29,7 +27,8 @@ import { Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
 import { loadLocalProfile } from './profile/store';
-import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
+import { loadFilterSnapshot, loadResultLayout, parseResultLayout, saveFilterSnapshot, saveResultLayout, type ResultLayout } from './preferences';
+import { ResultLayoutToggle } from './components/ResultLayoutToggle';
 
 import { parseMediaTypesFromUrl, useMediaFilterState, MediaTypeChoice } from './mediaFilterState';
 import { Palette, Film } from 'lucide-react';
@@ -96,7 +95,6 @@ export default function BrowsePage({
     includeTags: '',
     excludeTags: '',
     excludeLibrary: false,
-    density: 'grid',
   };
   const saved = persistPreferences ? loadFilterSnapshot('browse', defaults) : defaults;
   const savedSort: BrowseSort = ['popular', 'rating', 'votes', 'title', 'newest'].includes(
@@ -105,7 +103,6 @@ export default function BrowsePage({
     ? (saved.sort as BrowseSort)
     : 'popular';
   const savedDirection: BrowseSortDirection = saved.direction === 'asc' ? 'asc' : 'desc';
-  const savedDensity: 'grid' | 'list' = saved.density === 'list' ? 'list' : 'grid';
   const initialString = (urlKey: string, savedKey: keyof typeof saved) =>
     initialParams.has(urlKey) ? initialParams.get(urlKey) || '' : String(saved[savedKey] || '');
   const initialNumber = (key: string, savedKey: keyof typeof saved) =>
@@ -159,13 +156,13 @@ export default function BrowsePage({
       : Boolean(saved.excludeLibrary),
   );
   const [libraryIds, setLibraryIds] = useState<number[]>([]);
-  const [density, setDensity] = useState<'grid' | 'list'>(
-    initialParams.has('density')
-      ? initialParams.get('density') === 'list'
-        ? 'list'
-        : 'grid'
-      : savedDensity,
+  const [layout, setLayoutState] = useState<ResultLayout>(
+    initialParams.has('density') ? parseResultLayout(initialParams.get('density')) : loadResultLayout(),
   );
+  const setLayout = (next: ResultLayout) => {
+    setLayoutState(next);
+    if (persistPreferences) saveResultLayout(next);
+  };
   const [page, setPage] = useState(1);
   const [retryToken, setRetryToken] = useState(0);
   const [total, setTotal] = useState(0);
@@ -243,7 +240,6 @@ export default function BrowsePage({
       includeTags,
       excludeTags,
       excludeLibrary,
-      density,
       mediaType: selectedTypes.join(','),
     });
   }, [
@@ -270,7 +266,6 @@ export default function BrowsePage({
     includeTags,
     excludeTags,
     excludeLibrary,
-    density,
     selectedTypes,
   ]);
 
@@ -443,11 +438,11 @@ export default function BrowsePage({
       include_tags: includeTags,
       exclude_tags: excludeTags,
       exclude_library: excludeLibrary,
-      density,
+      density: layout === 'detailed' ? 'detailed' : '',
     };
     writeCoreFilterParams(params, { language, minRating });
     Object.entries(values).forEach(([key, value]) => {
-      if (value && value !== 'desc' && value !== 'grid')
+      if (value && value !== 'desc')
         params.set(key, value === true ? '1' : String(value));
     });
     if (!isAllSelected && selectedTypes.length > 0) {
@@ -478,7 +473,7 @@ export default function BrowsePage({
     includeTags,
     excludeTags,
     excludeLibrary,
-    density,
+    layout,
     selectedTypes,
     isAllSelected,
   ]);
@@ -504,7 +499,7 @@ export default function BrowsePage({
           : 'popular',
       );
       setDirection(text('direction') === 'asc' ? 'asc' : 'desc');
-      setDensity(text('density') === 'list' ? 'list' : 'grid');
+      setLayoutState(params.has('density') ? parseResultLayout(params.get('density')) : loadResultLayout());
       setMinRating(core.minRating);
       setMaxRating(number('max_rating', 5));
       setMinVotes(number('min_votes'));
@@ -919,31 +914,17 @@ export default function BrowsePage({
               : 'Loading catalog status'
           }
           action={
-            <div className="browse-density" aria-label="Result density">
-              <DSButton
-                variant={density === 'grid' ? 'primary' : 'ghost'}
-                onClick={() => setDensity('grid')}
-                aria-label="Grid view"
-              >
-                <LayoutGrid size={16} />
-              </DSButton>
-              <DSButton
-                variant={density === 'list' ? 'primary' : 'ghost'}
-                onClick={() => setDensity('list')}
-                aria-label="List view"
-              >
-                <List size={16} />
-              </DSButton>
-            </div>
+            <ResultLayoutToggle value={layout} onChange={setLayout} />
           }
         />
       </div>
       {error && <p className="browse-error">{error}</p>}
-      <section className={`browse-grid density-${density}`} aria-busy={loading && page === 1}>
+      <section className={`browse-grid ${layout === 'compact' ? 'nc-grid' : 'density-detailed'}`} aria-busy={loading && page === 1}>
         {items.map((novel) => (
           <BrowseCard
             key={novel.id}
             novel={novel}
+            layout={layout}
             novelUrl={novelUrl}
             similarUrl={similarUrl}
             persistDisplaySettings={persistPreferences}
@@ -955,7 +936,7 @@ export default function BrowsePage({
         {loading &&
           page === 1 &&
           Array.from({ length: 6 }, (_, index) => (
-            <Card className="browse-card browse-card-skeleton" key={index}>
+            <Card className={layout === 'compact' ? 'browse-tile-skeleton' : 'browse-card browse-card-skeleton'} key={index}>
               <Skeleton />
               <div>
                 <Skeleton />
@@ -1006,6 +987,7 @@ export default function BrowsePage({
 
 function BrowseCard({
   novel,
+  layout,
   novelUrl,
   similarUrl,
   onSelectAuthor,
@@ -1014,6 +996,7 @@ function BrowseCard({
   persistDisplaySettings,
 }: {
   novel: BrowseNovel;
+  layout: ResultLayout;
   novelUrl: (novel: BrowseNovel) => string;
   similarUrl: (novel: BrowseNovel) => string | null;
   onSelectAuthor: (author: string) => void;
@@ -1033,24 +1016,62 @@ function BrowseCard({
         }
       : undefined;
   const sourceName = sourceDisplayName(novel.source, novel.id);
+  const item = {
+    id: novel.id,
+    title,
+    href,
+    coverUrl: novel.cover_url,
+    mediaType: novel.media_type,
+    source: novel.source,
+    author: novel.author,
+    authorHref: novel.author ? (embedded ? '#' : browseFacetUrl('author', novel.author)) : undefined,
+    onAuthorClick: novel.author ? facetClick(onSelectAuthor, novel.author) : undefined,
+    rating: novel.rating,
+    ratingVotes: novel.rating_votes,
+    readers: novel.reading_list_count,
+  };
+  const actions = (
+    <>
+      {recommendationHref && (
+        <Tooltip content="Find similar titles">
+          <DSButton
+            as="a"
+            variant="ghost"
+            className="browse-icon-action"
+            href={recommendationHref}
+            aria-label={`Find titles similar to ${title}`}
+          >
+            <Sparkles size={16} aria-hidden="true" />
+          </DSButton>
+        </Tooltip>
+      )}
+      <Tooltip content={`Open on ${sourceName}`}>
+        <DSButton
+          as="a"
+          variant="ghost"
+          className="browse-icon-action"
+          href={
+            novel.external_url ||
+            externalMediaUrl(novel.id, novel.source, novel.external_id, novel.media_type) ||
+            novel.novelupdates_url
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open ${title} on ${sourceName}`}
+        >
+          <ExternalLink size={16} aria-hidden="true" />
+        </DSButton>
+      </Tooltip>
+    </>
+  );
+  if (layout === 'compact') {
+    return <NovelCard variant="tile" item={item} coverFormat actions={actions} />;
+  }
   return (
     <NovelCard
       variant="row"
       className="browse-result"
-      item={{
-        id: novel.id,
-        title,
-        href,
-        coverUrl: novel.cover_url,
-        mediaType: novel.media_type,
-        source: novel.source,
-        author: novel.author,
-        authorHref: novel.author ? (embedded ? '#' : browseFacetUrl('author', novel.author)) : undefined,
-        onAuthorClick: novel.author ? facetClick(onSelectAuthor, novel.author) : undefined,
-        rating: novel.rating,
-        ratingVotes: novel.rating_votes,
-        readers: novel.reading_list_count,
-      }}
+      item={item}
       chips={novel.genres?.slice(0, 3).map((item) => (
         <a key={item} href={embedded ? '#' : browseFacetUrl('genre', item)} onClick={facetClick(onSelectGenre, item)}>
           {item}
@@ -1062,40 +1083,7 @@ function BrowseCard({
           {novel.chapters_trans ? ` · ${novel.chapters_trans} ${progressUnitLabel(novel.id, novel.media_type, true)}` : ''}
         </>
       }
-      actions={
-        <>
-          {recommendationHref && (
-            <Tooltip content="Find similar titles">
-              <DSButton
-                as="a"
-                variant="ghost"
-                className="browse-icon-action"
-                href={recommendationHref}
-                aria-label={`Find titles similar to ${title}`}
-              >
-                <Sparkles size={16} aria-hidden="true" />
-              </DSButton>
-            </Tooltip>
-          )}
-          <Tooltip content={`Open on ${sourceName}`}>
-            <DSButton
-              as="a"
-              variant="ghost"
-              className="browse-icon-action"
-              href={
-                novel.external_url ||
-                externalMediaUrl(novel.id, novel.source, novel.external_id, novel.media_type) ||
-                novel.novelupdates_url
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Open ${title} on ${sourceName}`}
-            >
-              <ExternalLink size={16} aria-hidden="true" />
-            </DSButton>
-          </Tooltip>
-        </>
-      }
+      actions={actions}
     />
   );
 }
