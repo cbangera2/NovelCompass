@@ -3,6 +3,23 @@ export type HomeView = 'foryou' | 'discover' | 'browse';
 const NAVIGATION_KEY = 'novel-compass:navigation:v1';
 const FILTER_CONTROL_KEY = 'novel-compass:filter-control:v1';
 const FILTER_PREFIX = 'novel-compass:filters:v1:';
+const RESULT_LAYOUT_KEY = 'novel-compass:result-layout:v1';
+
+/** Browse and Discover share one layout: compact poster tiles (default) or detailed cards. */
+export type ResultLayout = 'compact' | 'detailed';
+
+/** Accepts the old Browse `density` values: `list` meant the detailed card. */
+export function parseResultLayout(value: unknown): ResultLayout {
+  return value === 'detailed' || value === 'list' ? 'detailed' : 'compact';
+}
+
+export function loadResultLayout(): ResultLayout {
+  try { return parseResultLayout(localStorage.getItem(RESULT_LAYOUT_KEY)); } catch { return 'compact'; }
+}
+
+export function saveResultLayout(layout: ResultLayout): void {
+  try { localStorage.setItem(RESULT_LAYOUT_KEY, layout); } catch { /* storage unavailable */ }
+}
 
 export interface NavigationPreferences { version: 1; homeView: HomeView; }
 export interface FilterControlPreferences { version: 1; rememberFilters: boolean; }

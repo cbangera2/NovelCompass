@@ -52,7 +52,8 @@ const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((modul
   default: module.NovelInsightsPanel
 })));
 import { parseMediaTypesFromUrl, useMediaFilterState } from './mediaFilterState';
-import { loadFilterSnapshot, saveFilterSnapshot } from './preferences';
+import { loadFilterSnapshot, loadResultLayout, saveFilterSnapshot, saveResultLayout, type ResultLayout } from './preferences';
+import { ResultLayoutToggle } from './components/ResultLayoutToggle';
 import { discoverSearchParams, parseDiscoverRoute, stableRouteUrl } from './routeState';
 import { FormatScopeChip } from './components/FormatScopeChip';
 
@@ -136,6 +137,11 @@ export default function App(): JSX.Element {
   const autoRefreshReadyRef = useRef(false);
   const detailRequestRef = useRef(0);
   const dataSourceRef = useRef<RecommendationDataSource | null>(null);
+  const [resultLayout, setResultLayoutState] = useState<ResultLayout>(loadResultLayout);
+  const setResultLayout = (next: ResultLayout) => {
+    setResultLayoutState(next);
+    saveResultLayout(next);
+  };
   const [dataSource, setDataSource] = useState<RecommendationDataSource | null>(null);
   const { mode: dataMode, forcedMode, setMode: setDataMode } = useDataModePreference();
   const [dataset, setDataset] = useState<DatasetManifest | null>(null);
@@ -1089,52 +1095,34 @@ export default function App(): JSX.Element {
                 </details>
               )}
             </div>
+            <ResultLayoutToggle value={resultLayout} onChange={setResultLayout} />
           </Card>
 
-          <div className="results-grid">
+          <div className={resultLayout === 'compact' ? 'results-grid nc-grid' : 'results-grid'}>
             {filteredRecommendations.slice(0, visibleCount).map((rec, index) => {
               const entry = profileEntries.get(rec.target_id);
               const sourceName = sourceDisplayName(rec.source, rec.target_id);
-              return (
-                <NovelCard
-                  key={rec.target_id || index}
-                  variant="detailed"
-                  className="discover-card"
-                  item={{
-                    id: rec.target_id,
-                    title: displayNovelTitle(rec.title, undefined, settings.titlePreference),
-                    href: novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type),
-                    coverUrl: rec.cover_url,
-                    mediaType: rec.media_type,
-                    source: rec.source,
-                    author: rec.author,
-                    authorHref: rec.author ? browseFacetUrl('author', rec.author) : undefined,
-                    rating: rec.rating,
-                    ratingVotes: rec.rating_votes,
-                    readers: rec.reading_list_count,
-                    language: rec.language,
-                    languageHref: rec.language ? browseFacetUrl('language', rec.language) : undefined,
-                    statusTrans: rec.status_trans,
-                    externalUrl: rec.external_url || externalMediaUrl(rec.target_id, rec.source, rec.external_id, rec.media_type) || rec.novelupdates_url,
-                    externalLabel: sourceName,
-                  }}
-                  rank={index + 1}
-                  matchPercent={rec.match_score_percent}
-                  libraryStatus={entry?.status}
-                  libraryRating={entry?.rating}
-                  evidence={rec.evidence_bullets}
-                  sharedTags={rec.shared_tags}
-                  tagHref={(tag: string) => browseFacetUrl('tag', tag)}
-                  onActivate={() => void openNovelDetail(rec)}
-                  actions={
+              const compact = resultLayout === 'compact';
+              const findSimilar = () => useProfileEntryAsSeed({
+                novel_id: rec.target_id,
+                slug: rec.slug,
+                imported_title: rec.title,
+                status: profileEntries.get(rec.target_id)?.status || 'reading',
+                source_file: 'recommendation'
+              });
+              const actions = (
                     <>
-                    <Button variant="primary" className="card-primary-action" onClick={() => useProfileEntryAsSeed({
-                      novel_id: rec.target_id,
-                      slug: rec.slug,
-                      imported_title: rec.title,
-                      status: profileEntries.get(rec.target_id)?.status || 'reading',
-                      source_file: 'recommendation'
-                    })}><Sparkles size={14} aria-hidden="true" /> Similar</Button>
+                    {compact ? (
+                      <Tooltip content="Find similar titles">
+                        <Button variant="ghost" aria-label={`Find titles similar to ${rec.title}`} onClick={findSimilar}>
+                          <Sparkles size={14} aria-hidden="true" />
+                        </Button>
+                      </Tooltip>
+                    ) : (
+                      <Button variant="primary" className="card-primary-action" onClick={findSimilar}>
+                        <Sparkles size={14} aria-hidden="true" /> Similar
+                      </Button>
+                    )}
                     <Menu.Root>
                       <Tooltip content="Set reading status">
                         <Menu.Trigger className="card-icon-action"
@@ -1164,6 +1152,18 @@ export default function App(): JSX.Element {
                         </Menu.Positioner>
                       </Menu.Portal>
                     </Menu.Root>
+                    {compact ? <>
+                      <Tooltip content="Love this recommendation">
+                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`}
+                          aria-label={`Love ${rec.title}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'}
+                          onClick={() => setNovelFeedback(rec, 'love')}><Heart size={16} aria-hidden="true" /></Button>
+                      </Tooltip>
+                      <Tooltip content="Hide recommendations like this">
+                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'not_for_me' ? 'selected' : ''}`}
+                          aria-label={`${rec.title} is not for me`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'not_for_me'}
+                          onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={16} aria-hidden="true" /></Button>
+                      </Tooltip>
+                    </> : (
                     <div className="card-preference-actions">
                       <Tooltip content="Love this recommendation">
                         <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`}
@@ -1176,8 +1176,43 @@ export default function App(): JSX.Element {
                           onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={16} aria-hidden="true" /></Button>
                       </Tooltip>
                     </div>
-                    </>
-                  }
+                    )}
+                                        </>
+              );
+              return (
+                <NovelCard
+                  key={rec.target_id || index}
+                  variant={compact ? 'tile' : 'detailed'}
+                  className="discover-card"
+                  coverFormat
+                  caption={compact ? rec.evidence_bullets?.[0] : undefined}
+                  item={{
+                    id: rec.target_id,
+                    title: displayNovelTitle(rec.title, undefined, settings.titlePreference),
+                    href: novelPageUrl(rec.target_id, data.seed_novel.id || undefined, rec.media_type),
+                    coverUrl: rec.cover_url,
+                    mediaType: rec.media_type,
+                    source: rec.source,
+                    author: rec.author,
+                    authorHref: rec.author ? browseFacetUrl('author', rec.author) : undefined,
+                    rating: rec.rating,
+                    ratingVotes: rec.rating_votes,
+                    readers: rec.reading_list_count,
+                    language: rec.language,
+                    languageHref: rec.language ? browseFacetUrl('language', rec.language) : undefined,
+                    statusTrans: rec.status_trans,
+                    externalUrl: rec.external_url || externalMediaUrl(rec.target_id, rec.source, rec.external_id, rec.media_type) || rec.novelupdates_url,
+                    externalLabel: sourceName,
+                  }}
+                  rank={index + 1}
+                  matchPercent={rec.match_score_percent}
+                  libraryStatus={entry?.status}
+                  libraryRating={entry?.rating}
+                  evidence={rec.evidence_bullets}
+                  sharedTags={rec.shared_tags}
+                  tagHref={(tag: string) => browseFacetUrl('tag', tag)}
+                  onActivate={() => void openNovelDetail(rec)}
+                  actions={actions}
                 />
               );
             })}
