@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Search, Sparkles } from 'lucide-react';
 import type { RecommendationDataSource } from '../data';
 import type { NovelSearchResult } from '../types';
-import { Card } from '../design-system';
+import { Card, DSButton } from '../design-system';
+import { Tooltip } from '../ui';
 import { novelPageUrl } from '../novelLinks';
+import { NovelCard } from '../components/NovelCard';
+import { StatusBadge } from '../components/StatusBadge';
+import { ResultLayoutToggle } from '../components/ResultLayoutToggle';
+import { loadResultLayout, saveResultLayout, type ResultLayout } from '../preferences';
 import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
 
 export const STATUS_LABELS: Record<ReadingStatus, string> = {
@@ -32,6 +37,11 @@ export function ProfileLibrary({
   const [rating, setRating] = useState(0);
   const [visibleCount, setVisibleCount] = useState(60);
   const [catalog, setCatalog] = useState<Map<string, NovelSearchResult>>(new Map());
+  const [layout, setLayoutState] = useState<ResultLayout>(loadResultLayout);
+  const setLayout = (next: ResultLayout) => {
+    setLayoutState(next);
+    saveResultLayout(next);
+  };
 
   const entries = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -77,7 +87,10 @@ export function ProfileLibrary({
     <Card className="profile-library-section">
       <div className="profile-library-heading">
         <div><span className="eyebrow">Personal shelf</span><h2>Library</h2></div>
-        <span>{entries.length.toLocaleString()} shown</span>
+        <div className="profile-library-heading-actions">
+          <span className="profile-library-count">{entries.length.toLocaleString()} shown</span>
+          <ResultLayoutToggle value={layout} onChange={setLayout} />
+        </div>
       </div>
       <div className="profile-status-chips" role="group" aria-label="Filter by status">
         {statusChips.map(([value, label, count]) => (
@@ -101,38 +114,90 @@ export function ProfileLibrary({
           <option value="5">5★ only</option>
         </select>
       </div>
-      <div className="profile-entry-grid">
-        {visibleEntries.map((entry) => {
-          const meta = catalog.get(entry.slug);
-          const body = (
-            <>
-              <div className="profile-entry-cover">
-                {meta?.cover_url
-                  ? <img src={meta.cover_url} alt="" loading="lazy" />
-                  : <BookOpen size={18} aria-hidden="true" />}
-              </div>
-              <div>
-                <span className={`profile-status status-${entry.status}`}>{STATUS_LABELS[entry.status]}</span>
-                <h3>{entry.imported_title}</h3>
-                <p>
-                  {entry.rating ? `${entry.rating}★` : 'No personal rating'}
-                  {entry.progress ? ` · ${entry.progress}` : ''}
-                </p>
-              </div>
-            </>
-          );
-          return (
-            <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`} data-preview-id={entry.novel_id ?? undefined}>
-              {entry.novel_id != null
-                ? <button className="profile-entry-open" onClick={() => open(entry)} aria-label={`Open details for ${entry.imported_title}`}>{body}</button>
-                : <div className="profile-entry-open">{body}</div>}
-              {entry.novel_id != null
-                ? <a href={appUrl(`?seed=${entry.novel_id}`)}><Sparkles size={14} /> Find similar</a>
-                : <span className="profile-unmatched">Not in this snapshot</span>}
-            </article>
-          );
-        })}
-      </div>
+      {layout === 'compact' ? (
+        <div className="nc-grid profile-library-tiles">
+          {visibleEntries.map((entry) => {
+            const meta = catalog.get(entry.slug);
+            if (entry.novel_id == null) {
+              return (
+                <article key={entry.slug} className="nc nc-tile profile-tile-unmatched">
+                  <span className="nc-cover">
+                    <span className="nc-cover-fallback" aria-hidden="true">{entry.imported_title.slice(0, 1) || <BookOpen />}</span>
+                    <StatusBadge status={entry.status} variant="overlay" />
+                  </span>
+                  <strong className="nc-title" title={entry.imported_title}>{entry.imported_title}</strong>
+                  <small className="nc-caption">Not in this snapshot</small>
+                </article>
+              );
+            }
+            return (
+              <NovelCard
+                key={entry.slug}
+                variant="tile"
+                item={{
+                  id: entry.novel_id,
+                  title: entry.imported_title,
+                  href: novelPageUrl(entry.novel_id),
+                  coverUrl: meta?.cover_url,
+                  mediaType: meta?.media_type,
+                  source: meta?.source,
+                  author: meta?.author,
+                  rating: entry.rating,
+                }}
+                libraryStatus={entry.status}
+                coverFormat
+                caption={entry.progress || undefined}
+                actions={(
+                  <Tooltip content="Find similar titles">
+                    <DSButton
+                      as="a"
+                      variant="ghost"
+                      className="browse-icon-action"
+                      href={appUrl(`?seed=${entry.novel_id}`)}
+                      aria-label={`Find titles similar to ${entry.imported_title}`}
+                    >
+                      <Sparkles size={16} aria-hidden="true" />
+                    </DSButton>
+                  </Tooltip>
+                )}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div className="profile-entry-grid">
+          {visibleEntries.map((entry) => {
+            const meta = catalog.get(entry.slug);
+            const body = (
+              <>
+                <div className="profile-entry-cover">
+                  {meta?.cover_url
+                    ? <img src={meta.cover_url} alt="" loading="lazy" />
+                    : <BookOpen size={18} aria-hidden="true" />}
+                </div>
+                <div>
+                  <span className={`profile-status status-${entry.status}`}>{STATUS_LABELS[entry.status]}</span>
+                  <h3>{entry.imported_title}</h3>
+                  <p>
+                    {entry.rating ? `${entry.rating}★` : 'No personal rating'}
+                    {entry.progress ? ` · ${entry.progress}` : ''}
+                  </p>
+                </div>
+              </>
+            );
+            return (
+              <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`} data-preview-id={entry.novel_id ?? undefined}>
+                {entry.novel_id != null
+                  ? <button className="profile-entry-open" onClick={() => open(entry)} aria-label={`Open details for ${entry.imported_title}`}>{body}</button>
+                  : <div className="profile-entry-open">{body}</div>}
+                {entry.novel_id != null
+                  ? <a href={appUrl(`?seed=${entry.novel_id}`)}><Sparkles size={14} /> Find similar</a>
+                  : <span className="profile-unmatched">Not in this snapshot</span>}
+              </article>
+            );
+          })}
+        </div>
+      )}
       {!entries.length && <p className="profile-no-results">No library titles match those filters.</p>}
       {visibleCount < entries.length && <button className="profile-load-more" onClick={() => setVisibleCount((count) => count + 60)}>Show 60 more</button>}
     </Card>

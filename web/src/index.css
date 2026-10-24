@@ -306,6 +306,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .profile-library-heading { align-items: flex-end; display: flex; justify-content: space-between; margin-bottom: .9rem; }
 .profile-library-heading h2 { font-size: 1.65rem; }
 .profile-library-heading > span { color: var(--dim); font-size: .75rem; }
+.profile-library-heading-actions { align-items: center; display: flex; gap: .75rem; }
+.profile-library-count { color: var(--dim); font-size: .75rem; }
+.profile-library-tiles { margin-top: .15rem; }
+.profile-tile-unmatched { opacity: .72; }
 .profile-library-controls { display: grid; gap: .6rem; grid-template-columns: minmax(220px, 1fr) auto auto; margin-bottom: .85rem; }
 .profile-library-controls label { align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; color: var(--dim); display: flex; gap: .45rem; padding: .55rem .7rem; }
 .profile-library-controls input { background: transparent; border: 0; color: var(--text); outline: none; width: 100%; }
