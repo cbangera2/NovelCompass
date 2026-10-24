@@ -33,7 +33,7 @@ export function itemPageUrl(id: number, from?: number, mediaType?: string): stri
 export interface MediaBadgeInfo {
   formatKey: 'novel' | 'manga' | 'anime';
   formatLabel: string;
-  sourceKey: 'novelupdates' | 'anilist';
+  sourceKey: 'novelupdates' | 'anilist' | 'novelphoenix';
   sourceLabel: string;
 }
 
@@ -44,9 +44,10 @@ export function getMediaBadgeInfo(item: { id: number; media_type?: string; sourc
   const formatLabel =
     formatKey === 'anime' ? 'Anime' : formatKey === 'manga' ? 'Manga' : isLN ? 'LN' : 'Novel';
 
-  const isAniList = item.source === 'anilist' || item.id >= 2_000_000;
-  const sourceKey = isAniList ? 'anilist' : 'novelupdates';
-  const sourceLabel = isAniList ? 'AniList' : 'NovelUpdates';
+  const isNovelPhoenix = item.source === 'novelphoenix';
+  const isAniList = !isNovelPhoenix && (item.source === 'anilist' || item.id >= 2_000_000);
+  const sourceKey = isNovelPhoenix ? 'novelphoenix' : isAniList ? 'anilist' : 'novelupdates';
+  const sourceLabel = isNovelPhoenix ? 'Novel Phoenix' : isAniList ? 'AniList' : 'NovelUpdates';
 
   return { formatKey, formatLabel, sourceKey, sourceLabel };
 }

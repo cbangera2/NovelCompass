@@ -75,7 +75,7 @@ class HardFilterEngine:
         else:
             target_types = {m.strip().lower() for m in str(raw_media).split(',') if m.strip()}
 
-        source = preferences.get('source', '').strip().lower()
+        target_sources = {t.strip().lower() for t in str(preferences.get('source', '') or '').split(',') if t.strip()}
 
         valid_candidates = []
         self.prefetch_traits([n for n in candidate_ids if n not in exclude_ids])
@@ -103,7 +103,7 @@ class HardFilterEngine:
                 if not matched:
                     continue
 
-            if source and source != 'all' and traits['source'] != source:
+            if target_sources and 'all' not in target_sources and traits['source'] not in target_sources:
                 continue
 
             # 1. Exclusion check

@@ -599,6 +599,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .format-badge.anime { background: rgba(167,139,250,.12); border: 1px solid rgba(167,139,250,.32); color: #c084fc; }
 .source-badge.novelupdates { background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.28); color: #4ade80; }
 .source-badge.anilist { background: rgba(56,189,248,.1); border: 1px solid rgba(56,189,248,.28); color: #38bdf8; }
+.source-badge.novelphoenix { background: rgba(251,146,60,.1); border: 1px solid rgba(251,146,60,.28); color: #fb923c; }
 
 .filter-panel { background: color-mix(in srgb,var(--surface) 82%,transparent); border: 1px solid var(--border); border-radius: 14px; margin: 0 auto 1rem; max-width: 1120px; overflow: hidden; padding: .8rem 1rem; }
 .filter-panel-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: .65rem; }

@@ -29,6 +29,7 @@ import { NovelCard } from './components/NovelCard';
 import { loadLocalProfile } from './profile/store';
 import { loadFilterSnapshot, loadResultLayout, parseResultLayout, saveFilterSnapshot, saveResultLayout, type ResultLayout } from './preferences';
 import { ResultLayoutToggle } from './components/ResultLayoutToggle';
+import { useSourceFilterState } from './sourceFilterState';
 
 import { parseMediaTypesFromUrl, useMediaFilterState, MediaTypeChoice } from './mediaFilterState';
 import { Palette, Film } from 'lucide-react';
@@ -70,6 +71,7 @@ export default function BrowsePage({
 }: BrowsePageProps = {}): JSX.Element {
   const { selectedTypes, toggleType, setTypes, isAllSelected, scopeSentence } =
     useMediaFilterState();
+  const { sourceParam } = useSourceFilterState();
   const { mode: dataMode } = useDataModePreference();
   const initialParams = new URLSearchParams(window.location.search);
   const defaults = {
@@ -317,6 +319,7 @@ export default function BrowsePage({
             exclude_ids: excludeLibrary ? libraryIds.join(',') : '',
             direction,
             media_type: fixedMediaType || selectedTypes.join(','),
+            source: sourceParam,
             page,
             page_size: PAGE_SIZE,
           });
@@ -370,6 +373,7 @@ export default function BrowsePage({
     page,
     retryToken,
     selectedTypes,
+    sourceParam,
     fixedMediaType,
   ]);
 
@@ -549,6 +553,7 @@ export default function BrowsePage({
     exclude_ids: excludeLibrary ? libraryIds.join(',') : '',
     direction,
     media_type: fixedMediaType || selectedTypes.join(','),
+    source: sourceParam,
   });
 
   const clearAll = () =>

@@ -8,6 +8,7 @@ import type { LocalUserProfile, ReadingStatus } from './profile/types';
 import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { createDataSource } from './data';
+import { sourceInScope, useSourceFilterState } from './sourceFilterState';
 import { mediaTypeInScope, useMediaFilterState, type MediaTypeChoice } from './mediaFilterState';
 import { MIN_GENRE_ROW_TITLES, pickGenreRows, rowTitle, type BrowseFormat } from './forYouGenres';
 import { customRowKey, useForYouRowPrefs } from './forYouRowPrefs';
@@ -33,6 +34,7 @@ export interface RowRec {
   title: string;
   cover_url?: string;
   media_type?: string;
+  source?: string;
   rating: number;
   rating_votes: number;
   status_trans: string;
@@ -227,6 +229,7 @@ async function fetchBrowseRow(opts: {
       title: item.title,
       cover_url: item.cover_url,
       media_type: item.media_type,
+      source: item.source,
       rating: item.rating,
       rating_votes: item.rating_votes,
       status_trans: item.status_trans ?? '',
@@ -424,10 +427,12 @@ export default function ForYouPage(): JSX.Element {
   const [lists, setLists] = useState<ListSummary[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const { selectedTypes } = useMediaFilterState();
+  const { selectedSources } = useSourceFilterState();
   const { prefs, setHidden, removeCustom } = useForYouRowPrefs();
   const prefsKey = JSON.stringify(prefs);
   const novelsOn = selectedTypes.includes('novel');
   const typesKey = selectedTypes.join(',');
+  const sourcesKey = selectedSources.join(',');
   const [hideKnown, setHideKnown] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [shelvesOpen, setShelvesOpen] = useState(false);
@@ -490,7 +495,8 @@ export default function ForYouPage(): JSX.Element {
     const exclude = hideKnown ? seenIds : [];
     const inScope = (row: RowData): RowData => ({
       ...row,
-      recommendations: row.recommendations.filter((r) => mediaTypeInScope(r.target_id, r.media_type, selectedTypes)),
+      recommendations: row.recommendations.filter((r) =>
+        mediaTypeInScope(r.target_id, r.media_type, selectedTypes) && sourceInScope(r.target_id, r.source, selectedSources)),
     });
     const libraryJobs: Array<{ key: string; title: string; subtitle: string; seeds: LibrarySeed[] }> = [
       { key: 'lib-rated', title: 'Because you rated highly', subtitle: 'Seeded by your top-rated titles', seeds: plan.rated },
@@ -608,7 +614,7 @@ export default function ForYouPage(): JSX.Element {
     return out;
     // plan/profile are covered by planKey; seenIds by seenKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey, typesKey, prefsKey]);
+  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey, typesKey, sourcesKey, prefsKey]);
 
   const [epoch, setEpoch] = useState(0); // bumped when jobs change so rows remount and re-arm their visibility trigger
   // Rows load when they near the viewport, so a visit only pays for what is actually scrolled to.

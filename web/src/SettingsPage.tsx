@@ -1,4 +1,4 @@
-import { Bug, Code2, Compass, Database, ExternalLink, FilterX, Info, Monitor, Moon, Sun, Type } from 'lucide-react';
+import { Bug, Code2, Compass, Database, ExternalLink, FilterX, Info, Library, Monitor, Moon, Sun, Type } from 'lucide-react';
 import { useDisplaySettings } from './settings';
 import { Badge, Card, CardHeader } from './design-system';
 import { loadFilterControlPreferences, loadNavigationPreferences, resetSavedFilters, saveFilterControlPreferences, saveNavigationPreferences } from './preferences';
@@ -8,6 +8,7 @@ import { useDataModePreference } from './dataModePreference';
 
 import { Select } from './ui';
 import ForYouRowSettings from './ForYouRowSettings';
+import { ALL_SOURCES, SOURCE_DESCRIPTIONS, SOURCE_LABELS, useSourceFilterState } from './sourceFilterState';
 
 const HOME_COPY = {
   foryou: { title: 'For You home', note: 'Start from shelves picked from your lists' },
@@ -21,6 +22,7 @@ export default function SettingsPage(): JSX.Element {
   const [rememberFilters, setRememberFilters] = useState(() => loadFilterControlPreferences().rememberFilters);
   const [resetMessage, setResetMessage] = useState('');
   const { mode: dataMode, forcedMode, setMode: setDataMode } = useDataModePreference();
+  const { isSelected: isSourceOn, toggleSource, selectedSources } = useSourceFilterState();
   return (
     <main className="settings-page">
       <header>
@@ -56,6 +58,26 @@ export default function SettingsPage(): JSX.Element {
         </label>
         <button className="settings-reset-button" onClick={() => { resetSavedFilters(); setResetMessage('Saved filter snapshots cleared.'); }}><FilterX size={15} />Reset saved filters</button>
         {resetMessage && <p className="settings-disclosure" role="status">{resetMessage}</p>}
+      </Card>
+      <Card className="settings-card">
+        <CardHeader title="Catalog sources" description="Choose which catalogs feed search, Browse, Discover and For You. Turning a source off hides its titles everywhere; your library is untouched." action={<Library size={19} />} />
+        {ALL_SOURCES.map((source) => {
+          const on = isSourceOn(source);
+          const lastOne = on && selectedSources.length === 1;
+          return (
+            <label key={source} className="settings-toggle">
+              <input type="checkbox" checked={on} disabled={lastOne} onChange={() => toggleSource(source)} />
+              <span>
+                <strong>{SOURCE_LABELS[source]}</strong>
+                <small>
+                  {SOURCE_DESCRIPTIONS[source]}
+                  {source === 'novelphoenix' && ' · off by default until reviewed'}
+                  {lastOne && ' · at least one source must stay on'}
+                </small>
+              </span>
+            </label>
+          );
+        })}
       </Card>
       <ForYouRowSettings />
       <Card className="settings-card">
