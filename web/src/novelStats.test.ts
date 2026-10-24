@@ -73,6 +73,55 @@ describe('trustAnalysis', () => {
   });
 });
 
+describe('trust interval', () => {
+  const thinHigh = { id: 3_999_001, mediaType: 'anime', rating: 5, votes: 3, readers: 1, units: 12, genres: [0], tags: [2] };
+  const thinLow = { id: 3_999_002, mediaType: 'anime', rating: 2, votes: 3, readers: 1, units: 12, genres: [0], tags: [2] };
+  const corpus = animeCorpus([thinHigh, thinLow]);
+
+  it('widens for thin samples and narrows for well-voted ones, always inside 1-5', () => {
+    const thin = trustAnalysis(corpus, thinHigh.id)!;
+    const solid = trustAnalysis(corpus, 3_000_120)!; // 1290 votes
+    expect(thin.high - thin.low).toBeGreaterThan(0.4);
+    expect(solid.high - solid.low).toBeLessThan(thin.high - thin.low);
+    for (const t of [thin, solid]) {
+      expect(t.low).toBeGreaterThanOrEqual(1);
+      expect(t.high).toBeLessThanOrEqual(5);
+      expect(t.low).toBeLessThanOrEqual(t.adjusted);
+      expect(t.high).toBeGreaterThanOrEqual(t.adjusted);
+    }
+  });
+
+  it('works in both directions: thin high ratings are pulled down, thin low ratings up', () => {
+    const high = trustAnalysis(corpus, thinHigh.id)!;
+    const low = trustAnalysis(corpus, thinLow.id)!;
+    expect(high.adjusted).toBeLessThan(high.rating);
+    expect(low.adjusted).toBeGreaterThan(low.rating);
+    expect(high.adjustmentMatters).toBe(true);
+    expect(low.adjustmentMatters).toBe(true);
+    // The raw 5.0 is well above what the votes support, the raw 2.0 well below: that is what the card says out loud.
+    expect(high.rating - high.adjusted).toBeGreaterThan(0.5);
+    expect(low.adjusted - low.rating).toBeGreaterThan(0.5);
+    expect(high.high).toBeLessThanOrEqual(5);
+  });
+
+  it('does not call a negligible adjustment meaningful', () => {
+    const solid = trustAnalysis(corpus, 3_000_120)!;
+    expect(Math.abs(solid.adjusted - solid.rating)).toBeLessThan(0.1);
+    expect(solid.adjustmentMatters).toBe(false);
+  });
+
+  it('measures the vote spread from the star histogram when there is one, and assumes it otherwise', () => {
+    const assumed = trustAnalysis(corpus, 3_000_001)!;
+    expect(assumed.voteSpread).toEqual({ sd: 1.33, source: 'assumed' });
+    const tight = trustAnalysis(corpus, 3_000_001, { '1': 0, '2': 0, '3': 2, '4': 90, '5': 8 })!;
+    expect(tight.voteSpread.source).toBe('histogram');
+    expect(tight.voteSpread.sd).toBeLessThan(0.7);
+    expect(tight.high - tight.low).toBeLessThan(assumed.high - assumed.low);
+    // Too few star votes to measure: back to the assumption.
+    expect(trustAnalysis(corpus, 3_000_001, { '1': 1, '2': 0, '3': 0, '4': 1, '5': 1 })!.voteSpread.source).toBe('assumed');
+  });
+});
+
 describe('facetAnalysis', () => {
   it('finds rare tags, skips tiny niches, and compares only within the format', () => {
     // A novel sharing the "Rare Thing" tag must not count toward the anime cohort.
