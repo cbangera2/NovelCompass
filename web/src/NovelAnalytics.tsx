@@ -4,6 +4,7 @@ import { browseFacetUrl } from './metadataLinks';
 import {
   BUCKET_NOUN,
   FIT_LABEL,
+  MEANINGFUL_ADJUSTMENT,
   type FacetCohort,
   type FitResult,
   type TrustAnalysis,
@@ -19,38 +20,74 @@ function Eyebrow({ icon, children }: { icon: JSX.Element; children: string }) {
   return <span className="na-eyebrow">{icon}{children}</span>;
 }
 
+const UNCERTAIN_WIDTH = 0.6; // a range wider than this (about 65 votes or fewer on a novel) means the rating is shaky
+const SOLID_WIDTH = 0.3;
+
 function TrustCard({ trust }: { trust: TrustAnalysis }) {
   const noun = BUCKET_NOUN[trust.bucket];
-  const scale = (value: number) => `${Math.max(0, Math.min(100, ((value - 1) / 4) * 100))}%`;
-  const moved = trust.adjustedRank - trust.rawRank;
+  const at = (value: number) => `${Math.max(0, Math.min(100, ((value - 1) / 4) * 100))}%`;
+  const width = trust.high - trust.low;
+  const uncertain = width >= UNCERTAIN_WIDTH;
+  // Judged against the best estimate, not the range's edge: a raw 5.0 can never sit above a range capped at 5.
+  const flattering = uncertain && trust.rating - trust.adjusted >= MEANINGFUL_ADJUSTMENT;
+  const harsh = uncertain && trust.adjusted - trust.rating >= MEANINGFUL_ADJUSTMENT;
+  const digits = width < 0.1 ? 2 : 1; // a very tight range reads better with a second decimal
+  const low = trust.low.toFixed(digits);
+  const high = trust.high.toFixed(digits);
+  // Nothing to explain: a well-voted rating needs one line, not a diagram.
+  if (!uncertain && !trust.adjustmentMatters) {
+    return (
+      <Card className="na-card na-trust na-trust-compact">
+        <Eyebrow icon={<Gauge size={13} />}>Rating confidence</Eyebrow>
+        <h3>{trust.rating.toFixed(2)} from {trust.votes.toLocaleString()} votes</h3>
+        <p>
+          {width < SOLID_WIDTH ? 'Well supported' : 'Solid sample'}: the true rating is very likely between {low} and {high}.
+        </p>
+        {trust.positive && (
+          <p className="na-note">
+            {pct(trust.positive.share)} of {trust.positive.votes.toLocaleString()} voters gave 4–5★ (95% interval {pct(trust.positive.low)}–{pct(trust.positive.high)}).
+          </p>
+        )}
+      </Card>
+    );
+  }
   return (
     <Card className="na-card na-trust">
       <Eyebrow icon={<Gauge size={13} />}>Rating confidence</Eyebrow>
-      <h3>Rating, adjusted for sample size</h3>
+      <h3>How much to trust the rating</h3>
       <div className="na-trust-scores">
-        <div><strong>{trust.adjusted.toFixed(2)}</strong><span>Adjusted</span></div>
-        <div className="muted"><strong>{trust.rating.toFixed(2)}</strong><span>Raw · {trust.votes.toLocaleString()} votes</span></div>
-        <span className={`na-chip sample-${trust.sample}`}>
-          {{ thin: 'Thin sample', typical: 'Typical sample', large: 'Large sample' }[trust.sample]}
+        <div><strong>{trust.rating.toFixed(2)}</strong><span>{trust.votes.toLocaleString()} votes</span></div>
+        <span className={`na-chip sample-${uncertain ? 'thin' : width < SOLID_WIDTH ? 'large' : 'typical'}`}>
+          {uncertain ? 'Few votes' : width < SOLID_WIDTH ? 'Well supported' : 'Solid sample'}
         </span>
       </div>
       <div className="na-scale" aria-hidden="true">
-        <i className="mean" style={{ left: scale(trust.priorMean) }} title={`${noun} average ${trust.priorMean.toFixed(2)}`} />
-        <i className="raw" style={{ left: scale(trust.rating) }} />
-        <i className="adjusted" style={{ left: scale(trust.adjusted) }} />
+        <i className="band" style={{ left: at(trust.low), width: `calc(${at(trust.high)} - ${at(trust.low)})` }} />
+        <i className="mean" style={{ left: at(trust.priorMean) }} title={`${noun} average ${trust.priorMean.toFixed(2)}`} />
+        {trust.adjustmentMatters && <i className="adjusted" style={{ left: at(trust.adjusted) }} />}
+        <i className="raw" style={{ left: at(trust.rating) }} />
       </div>
-      <p className="na-legend"><b className="raw" />Raw <b className="adjusted" />Adjusted <b className="mean" />{noun} average {trust.priorMean.toFixed(2)}</p>
-      <p>
-        Pulled toward the {noun} average as if it had {Math.round(trust.priorVotes).toLocaleString()} more votes, so a few enthusiastic
-        early ratings can&apos;t inflate it.
-        {Math.abs(moved) >= 3
-          ? ` Among ${trust.population.toLocaleString()} rated ${noun} it ranks #${trust.rawRank.toLocaleString()} by raw rating and #${trust.adjustedRank.toLocaleString()} once adjusted.`
-          : ` It ranks #${trust.adjustedRank.toLocaleString()} of ${trust.population.toLocaleString()} rated ${noun} either way.`}
+      <p className="na-legend">
+        <b className="raw" />Raw rating <b className="band" />Plausible range <b className="mean" />{noun} average {trust.priorMean.toFixed(2)}
       </p>
+      <p>
+        {uncertain
+          ? `Only ${trust.votes.toLocaleString()} votes, so the true rating could plausibly be anywhere from ${low} to ${high}.${flattering ? ` The raw ${trust.rating.toFixed(1)} is probably flattering.` : harsh ? ` The raw ${trust.rating.toFixed(1)} is probably too harsh.` : ''}`
+          : `${trust.votes.toLocaleString()} votes is enough to be confident: the true rating is very likely between ${low} and ${high}.`}
+      </p>
+      {trust.adjustmentMatters && (
+        <p>
+          Best estimate <b>{trust.adjusted.toFixed(2)}</b>, pulled toward the {noun} average because {trust.votes.toLocaleString()} votes is still a small sample.
+          {uncertain && ` By raw rating it ranks #${trust.rawRank.toLocaleString()} of ${trust.population.toLocaleString()}; with the number of votes taken into account, #${trust.adjustedRank.toLocaleString()}.`}
+        </p>
+      )}
       {trust.positive && (
         <p className="na-note">
           {pct(trust.positive.share)} of {trust.positive.votes.toLocaleString()} voters gave 4–5★ (95% interval {pct(trust.positive.low)}–{pct(trust.positive.high)}).
         </p>
+      )}
+      {trust.voteSpread.source === 'assumed' && (
+        <p className="na-note">The range assumes votes spread like a typical novel (about ±{trust.voteSpread.sd.toFixed(1)} stars); this title has no per-star breakdown.</p>
       )}
     </Card>
   );

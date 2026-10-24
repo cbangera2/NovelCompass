@@ -69,6 +69,30 @@ interface BucketStats {
 
 const statsCache = new WeakMap<AnalyticsCorpus, Map<Bucket, BucketStats>>();
 
+/** Median spread of individual star votes across 1,404 novels with 100+ votes (p10 0.97, p90 1.61). */
+export const ASSUMED_VOTE_SD = 1.33;
+const SOLID_VOTES = 100; // titles with at least this many votes are well enough measured to learn the prior from
+const MIN_TAU_SQUARED = 0.04; // true ratings never differ between titles by less than 0.2 stars (sd)
+const MIN_PRIOR_VOTES = 3;
+const MAX_PRIOR_VOTES = 300;
+
+/**
+ * How many "average votes" of prior to mix in, from how much true ratings really differ between titles of a
+ * format (empirical Bayes): the variance of well-voted titles' ratings minus the noise their own votes add
+ * gives the between-title variance tau^2, and the prior is worth sigma^2 / tau^2 votes. It comes out near 10
+ * to 25 votes, far below the median vote count, so only genuinely thin titles move noticeably.
+ */
+function priorStrength(rated: CorpusItem[]): number {
+  let solid = rated.filter((item) => item.votes >= SOLID_VOTES);
+  if (solid.length < 30) solid = rated;
+  if (solid.length < 2) return 20;
+  const mean = solid.reduce((sum, item) => sum + item.rating, 0) / solid.length;
+  const variance = solid.reduce((sum, item) => sum + (item.rating - mean) ** 2, 0) / (solid.length - 1);
+  const noise = solid.reduce((sum, item) => sum + ASSUMED_VOTE_SD ** 2 / item.votes, 0) / solid.length;
+  const tauSquared = Math.max(MIN_TAU_SQUARED, variance - noise);
+  return Math.min(MAX_PRIOR_VOTES, Math.max(MIN_PRIOR_VOTES, ASSUMED_VOTE_SD ** 2 / tauSquared));
+}
+
 const isRated = (item: CorpusItem) => item.votes > 0 && item.rating > 0;
 
 function median(sorted: ArrayLike<number>): number {
@@ -97,17 +121,18 @@ function bucketStats(corpus: AnalyticsCorpus, bucket: Bucket): BucketStats {
 
   const items = corpus.items.filter((item) => item.bucket === bucket);
   const votes = new Float64Array(items.length);
-  let ratedCount = 0;
+  const rated: CorpusItem[] = [];
   let ratingSum = 0;
   for (const item of items) {
     if (!isRated(item)) continue;
     ratingSum += item.rating;
-    votes[ratedCount++] = item.votes;
+    votes[rated.length] = item.votes;
+    rated.push(item);
   }
+  const ratedCount = rated.length;
   const votesSorted = votes.subarray(0, ratedCount).sort();
   const priorMean = ratedCount ? ratingSum / ratedCount : 0;
-  // The prior is "as if every title had the typical number of votes already at the typical rating".
-  const priorVotes = Math.max(1, median(votesSorted));
+  const priorVotes = priorStrength(rated);
   const adjusted = new Float64Array(items.length).fill(NaN);
   items.forEach((item, index) => {
     if (isRated(item)) adjusted[index] = shrink(item.rating, item.votes, priorMean, priorVotes);
@@ -146,8 +171,34 @@ export interface TrustAnalysis {
   adjustedRank: number;
   votesPercentile: number;
   sample: 'thin' | 'typical' | 'large';
+  /**
+   * Where the true rating plausibly sits (95% credible interval around the adjusted estimate), on the 1-5 scale.
+   * This is the headline: it widens for thin samples and narrows for well-voted titles, in both directions.
+   */
+  low: number;
+  high: number;
+  /** Spread of individual votes behind the interval: measured from the star histogram, or assumed. */
+  voteSpread: { sd: number; source: 'histogram' | 'assumed' };
+  /** True when the adjusted estimate differs from the raw rating enough to be worth saying out loud. */
+  adjustmentMatters: boolean;
   /** Share of voters giving 4-5 stars with a 95% interval; only where the snapshot has the star histogram. */
   positive?: { share: number; low: number; high: number; votes: number };
+}
+
+/** An adjustment smaller than this is noise, so the UI doesn't show an "adjusted" number at all. */
+export const MEANINGFUL_ADJUSTMENT = 0.1;
+
+function voteSpread(dist: NovelDetail['rating_dist'] | undefined): TrustAnalysis['voteSpread'] {
+  if (dist) {
+    const counts = (['1', '2', '3', '4', '5'] as const).map((star) => dist[star] || 0);
+    const total = counts.reduce((sum, count) => sum + count, 0);
+    if (total >= 30) {
+      const mean = counts.reduce((sum, count, i) => sum + count * (i + 1), 0) / total;
+      const variance = counts.reduce((sum, count, i) => sum + count * (i + 1 - mean) ** 2, 0) / total;
+      return { sd: Math.min(2, Math.max(0.5, Math.sqrt(variance))), source: 'histogram' };
+    }
+  }
+  return { sd: ASSUMED_VOTE_SD, source: 'assumed' };
 }
 
 export function trustAnalysis(
@@ -167,6 +218,9 @@ export function trustAnalysis(
     if (stats.adjusted[index] > mine) adjustedBetter += 1;
   });
   const votesPercentile = Math.round(1000 * (stats.votesSorted.length - countGreater(stats.votesSorted, item.votes)) / stats.votesSorted.length) / 10;
+  const spread = voteSpread(dist);
+  // The adjusted estimate behaves like a mean over (votes + prior votes) observations.
+  const margin = (1.96 * spread.sd) / Math.sqrt(item.votes + stats.priorVotes);
   const result: TrustAnalysis = {
     bucket: item.bucket,
     rating: item.rating,
@@ -179,6 +233,10 @@ export function trustAnalysis(
     adjustedRank: adjustedBetter + 1,
     votesPercentile,
     sample: votesPercentile < 25 ? 'thin' : votesPercentile > 75 ? 'large' : 'typical',
+    low: Math.max(1, mine - margin),
+    high: Math.min(5, mine + margin),
+    voteSpread: spread,
+    adjustmentMatters: Math.abs(mine - item.rating) >= MEANINGFUL_ADJUSTMENT,
   };
   if (dist) {
     const total = (['1', '2', '3', '4', '5'] as const).reduce((sum, star) => sum + (dist[star] || 0), 0);
