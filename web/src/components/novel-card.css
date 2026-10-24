@@ -55,9 +55,9 @@
 .nc-tile-wrap:hover .nc-tile-actions,.nc-tile-wrap:focus-within .nc-tile-actions,.nc-tile-wrap:has(.nc-tile-actions [aria-expanded="true"]) .nc-tile-actions{opacity:1;pointer-events:auto}
 .nc-tile-wrap:hover .nc-cover-format,.nc-tile-wrap:focus-within .nc-cover-format{opacity:0}
 .nc-tile-actions .ui-tooltip{display:flex}
-.nc-tile-actions :is(a,button){align-items:center;background:rgba(0,0,0,.74);border:1px solid rgba(255,255,255,.22);border-radius:999px;color:#fff;cursor:pointer;display:inline-flex;flex:none;height:28px;justify-content:center;padding:0;width:28px}
-.nc-tile-actions :is(a,button):hover,.nc-tile-actions :is(a,button):focus-visible{background:var(--accent);border-color:var(--accent-bright);color:#fff}
-.nc-tile-actions .btn-feedback.selected{background:var(--accent);color:#fff}
+:root .nc-tile-wrap .nc-tile-actions :is(a,button){align-items:center;box-sizing:border-box;min-height:0;min-width:0;background:rgba(0,0,0,.74);border:1px solid rgba(255,255,255,.22);border-radius:999px;color:#fff;cursor:pointer;display:inline-flex;flex:none;height:28px;justify-content:center;padding:0;width:28px}
+:root .nc-tile-wrap .nc-tile-actions :is(a,button):hover,:root .nc-tile-wrap .nc-tile-actions :is(a,button):focus-visible{background:var(--accent);border-color:var(--accent-bright);color:#fff}
+:root .nc-tile-wrap .nc-tile-actions .btn-feedback.selected{background:var(--accent);color:#fff}
 @media(hover:none){.nc-tile-actions{opacity:1;pointer-events:auto}.nc-tile-wrap .nc-cover-format{opacity:0}}
 @media(max-width:680px){.nc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
