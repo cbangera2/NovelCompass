@@ -111,6 +111,9 @@ export default function NovelPage(): JSX.Element {
     return map;
   }, [profile]);
   const knownCount = related.slice(0, 10).filter((item) => libraryIds.has(item.target_id)).length;
+  // A novel's related titles are usually all novels; the format pill only helps when they mix formats.
+  const relatedMixedFormats =
+    new Set(related.slice(0, 10).map((item) => getMediaBadgeInfo({ id: item.target_id, media_type: item.media_type, source: item.source }).formatKey)).size > 1;
   const title = detail ? displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference) : '';
   useEffect(() => {
     if (title) document.title = `${title} - Novel Compass`;
@@ -382,11 +385,14 @@ export default function NovelPage(): JSX.Element {
                 title: displayNovelTitle(item.title, undefined, settings.titlePreference),
                 href: novelPageUrl(item.target_id, novelId),
                 coverUrl: item.cover_url,
+                mediaType: item.media_type,
+                source: item.source,
                 author: item.author || item.language,
                 rating: item.rating,
                 ratingVotes: item.rating_votes,
                 statusTrans: item.status_trans,
               }}
+              coverFormat={relatedMixedFormats}
               libraryStatus={entry?.status}
               matchPercent={item.match_score_percent}
               caption={item.shared_tags.slice(0, 2).length ? `Shares ${item.shared_tags.slice(0, 2).join(', ')}` : (item.evidence_bullets[0] || '')}
