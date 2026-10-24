@@ -12,7 +12,7 @@
 
 /* ---- Redesign pass ---- */
 .insight-peers>div:last-child.peer-table,.peer-table{display:block;padding:.3rem}
-.peer-row{align-items:center;border-radius:9px;color:var(--text);display:grid;gap:.75rem;grid-template-columns:18px 34px minmax(0,1.6fr) minmax(70px,.7fr) minmax(90px,.9fr) 118px;padding:.45rem .55rem;text-decoration:none}
+.peer-row{align-items:center;border:1px solid transparent;border-radius:9px;color:var(--text);display:grid;gap:.75rem;grid-template-columns:24px 34px minmax(0,1.7fr) 74px minmax(110px,1fr) 118px;padding:.45rem .55rem;text-decoration:none}
 .peer-row:hover{background:var(--surface-raised)}
 .peer-rank{color:var(--dim);font-size:.65rem;font-weight:700;text-align:center}
 .peer-row img,.peer-row .peer-cover-fallback{border-radius:5px;height:48px;object-fit:cover;width:34px}
@@ -29,3 +29,19 @@
 .cohort-data{margin-top:.5rem}.cohort-data summary{color:var(--accent-bright);cursor:pointer;font-size:.68rem;font-weight:600}
 @media(max-width:800px){.peer-row{grid-template-columns:18px 34px minmax(0,1fr) 80px}.peer-metric.readers,.peer-overlap{display:none}}
 .cohort-data[open] tbody{display:table-row-group}
+
+.peer-head{color:var(--dim);display:grid;font-size:.58rem;font-weight:700;gap:.75rem;grid-template-columns:24px 34px minmax(0,1.7fr) 74px minmax(110px,1fr) 118px;letter-spacing:.08em;padding:.45rem .55rem .3rem;text-transform:uppercase}
+.peer-head>span:first-child{text-align:center}.peer-head-overlap{text-align:right}
+.peer-row.self{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.peer-row.self:hover{background:var(--accent-soft)}
+.peer-row.self .peer-name small{color:var(--accent-bright);font-weight:700}
+.peer-rating{align-items:baseline;display:flex;gap:.35rem;white-space:nowrap}
+.peer-rating b{color:var(--chart-3);font-size:.78rem;font-variant-numeric:tabular-nums}
+.peer-rating small{color:var(--dim);font-size:.6rem;font-variant-numeric:tabular-nums}
+.insight-section-heading p a{color:var(--accent-bright)}
+@media(max-width:800px){.peer-head{grid-template-columns:24px 34px minmax(0,1fr) 74px}.peer-head-readers,.peer-head-overlap{display:none}.peer-row{grid-template-columns:24px 34px minmax(0,1fr) 74px}.peer-rating{justify-content:flex-end}}
+.insight-section-heading .ds-badge{flex:none;white-space:nowrap}
+.insight-section-heading p+p{margin-top:.3rem}
+.peer-summary{color:var(--text)!important;font-size:.78rem!important;font-weight:650}
+.peer-pointer{font-style:italic}
+@media(max-width:650px){.insight-section-heading{flex-direction:column;gap:.5rem}}
