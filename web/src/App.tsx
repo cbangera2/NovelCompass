@@ -726,6 +726,11 @@ export default function App(): JSX.Element {
     .filter((rec) => !hideLibraryTitles || !profileEntries.has(rec.target_id))
     .filter((rec) => passesMinRecRating(rec, settings.minRecRating))
     .slice(0, maxResults), [data, feedbackByNovel, hideLibraryTitles, maxResults, profileEntries, settings.minRecRating]);
+  // The format pill only earns its space when the result set actually mixes formats.
+  const discoverMixedFormats = useMemo(
+    () => new Set(filteredRecommendations.map((rec) => getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type, source: rec.source }).formatKey)).size > 1,
+    [filteredRecommendations],
+  );
 
   const loadNextRecommendationBatch = () => {
     if (loading || !data) return;
@@ -1067,7 +1072,7 @@ export default function App(): JSX.Element {
                   key={rec.target_id || index}
                   variant={compact ? 'tile' : 'detailed'}
                   className="discover-card"
-                  coverFormat
+                  coverFormat={discoverMixedFormats}
                   caption={compact ? rec.evidence_bullets?.[0] : undefined}
                   item={{
                     id: rec.target_id,

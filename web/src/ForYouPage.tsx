@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { DSButton, Skeleton } from './design-system';
-import { novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
@@ -259,7 +259,13 @@ function previewFor(rec: RowRec): PreviewData {
   };
 }
 
-function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean }) {
+/** The format pill only earns its space when a row actually mixes formats. */
+function hasMixedFormats(recs: RowRec[]): boolean {
+  const formats = new Set(recs.map((rec) => getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type }).formatKey));
+  return formats.size > 1;
+}
+
+function RecCard({ rec, library, eager, coverFormat = false }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean; coverFormat?: boolean }) {
   const { feedback } = useLocalProfile();
   // "Hide recommendations like this" drops the card from every row right away.
   if (feedback.get(rec.target_id) === 'not_for_me') return null;
@@ -279,7 +285,7 @@ function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, Re
         ratingVotes: rec.rating_votes,
         statusTrans: rec.status_trans,
       }}
-      coverFormat
+      coverFormat={coverFormat}
       libraryStatus={library.get(rec.target_id)}
       matchPercent={rec.match_score_percent}
       coverNote={onList.length > 0 ? { label: 'On your list', title: `On your list: ${onList.join(', ')}` } : undefined}
@@ -357,6 +363,7 @@ function Row({
   }, []);
   const scroll = (direction: number) =>
     track.current?.scrollBy({ left: direction * track.current.clientWidth * 0.85, behavior: 'smooth' });
+  const mixedFormats = state.status === 'ready' && hasMixedFormats(state.recommendations);
 
   return (
     <section className="fy-row" ref={section}>
@@ -382,7 +389,7 @@ function Row({
       <div className="fy-track" ref={track}>
         {state.status === 'loading' &&
           Array.from({ length: 7 }, (_, i) => <Skeleton key={i} className="fy-card-skeleton" />)}
-        {state.status === 'ready' && state.recommendations.map((rec, i) => <RecCard key={rec.target_id} rec={rec} library={library} eager={i < 7} />)}
+        {state.status === 'ready' && state.recommendations.map((rec, i) => <RecCard key={rec.target_id} rec={rec} library={library} eager={i < 7} coverFormat={mixedFormats} />)}
         {state.status === 'ready' && state.recommendations.length === 0 && <p className="fy-empty">Nothing left to show after filtering.</p>}
       </div>
     </section>
@@ -416,6 +423,7 @@ function RowGrid({
   }, [job]);
 
   const total = state.status === 'ready' ? state.recommendations.length : 0;
+  const mixedFormats = state.status === 'ready' && hasMixedFormats(state.recommendations);
   useEffect(() => {
     const node = sentinel.current;
     if (!node || shown >= total) return;
@@ -439,7 +447,7 @@ function RowGrid({
       {state.status === 'error' && <p className="fy-error">Couldn't load this row: {state.message}</p>}
       <div className="fy-grid">
         {state.status === 'loading' && Array.from({ length: 12 }, (_, i) => <Skeleton key={i} className="fy-card-skeleton" />)}
-        {state.status === 'ready' && state.recommendations.slice(0, shown).map((rec) => <RecCard key={rec.target_id} rec={rec} library={library} />)}
+        {state.status === 'ready' && state.recommendations.slice(0, shown).map((rec) => <RecCard key={rec.target_id} rec={rec} library={library} coverFormat={mixedFormats} />)}
       </div>
       {state.status === 'ready' && shown < total && <div ref={sentinel} className="fy-sentinel" aria-hidden="true" />}
       {state.status === 'ready' && !fullyLoaded && <p className="fy-end">Loading more picks…</p>}
