@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { DSButton, Skeleton } from './design-system';
 import { novelPageUrl } from './novelLinks';
@@ -283,7 +283,17 @@ function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, Re
 
 /** Shelves built from a curated list link to that list's page. */
 const listHref = (key: string) => (key.startsWith('list-') ? listPageUrl(Number(key.slice(5))) : undefined);
-const withLink = (text: string, href?: string) => (href ? <a className="fy-list-link" href={href}>{text}</a> : text);
+const withLink = (text: string, href?: string, onClick?: (event: MouseEvent<HTMLAnchorElement>) => void) =>
+  (href ? <a className="fy-list-link" href={href} onClick={onClick}>{text}</a> : text);
+
+/** `?row=<key>` is the "See all" grid, so it can be linked to and the back button leaves it. */
+const rowUrl = (key: string | null) => {
+  const params = new URLSearchParams(window.location.search);
+  if (key) params.set('row', key);
+  else params.delete('row');
+  return `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+};
+const rowFromUrl = () => new URLSearchParams(window.location.search).get('row');
 
 function seedLine(data: RowData) {
   if (!data.seeds.length) return data.subtitle;
@@ -297,6 +307,7 @@ function Row({
   heading,
   blurb,
   href,
+  seeAllHref,
   library,
   onSeeAll,
   onHide,
@@ -307,6 +318,7 @@ function Row({
   heading?: string;
   blurb?: string;
   href?: string;
+  seeAllHref: string;
   library: Map<number, ReadingStatus>;
   onSeeAll: () => void;
   onHide?: () => void;
@@ -333,7 +345,11 @@ function Row({
     <section className="fy-row" ref={section}>
       <header>
         <div>
-          <h2>{withLink(heading ?? (state.status === 'ready' ? state.title : fallbackTitle), href)}</h2>
+          <h2>{withLink(heading ?? (state.status === 'ready' ? state.title : fallbackTitle), href ?? seeAllHref, href ? undefined : (event) => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            onSeeAll();
+          })}</h2>
           {state.status === 'ready' && <p title={state.seeds.map((s) => s.title).join(', ')}>{blurb ?? seedLine(state)}</p>}
         </div>
         {state.status === 'ready' && (
@@ -440,7 +456,21 @@ export default function ForYouPage(): JSX.Element {
   const [profileChecked, setProfileChecked] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [listError, setListError] = useState('');
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(rowFromUrl);
+  useEffect(() => {
+    const restore = () => setExpanded(rowFromUrl());
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
+  const openRow = (key: string) => {
+    setExpanded(key);
+    window.history.pushState({ fyRow: key }, '', rowUrl(key));
+  };
+  const closeRow = () => {
+    if (window.history.state?.fyRow) { window.history.back(); return; } // we pushed this entry, so Back is the way out
+    window.history.replaceState(null, '', rowUrl(null));
+    setExpanded(null);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -676,7 +706,7 @@ export default function ForYouPage(): JSX.Element {
           job={{ ...expandedJob, fallbackTitle: fallbackTitle(expandedJob), heading: headingFor(expandedJob), blurb: blurbFor(expandedJob) }}
           preview={rows[expandedJob.key] ?? { status: 'loading' }}
           library={library}
-          onBack={() => setExpanded(null)}
+          onBack={closeRow}
         />
       </main>
     );
@@ -747,8 +777,9 @@ export default function ForYouPage(): JSX.Element {
           heading={headingFor(job)}
           blurb={blurbFor(job)}
           href={listHref(job.key)}
+          seeAllHref={rowUrl(job.key)}
           library={library}
-          onSeeAll={() => setExpanded(job.key)}
+          onSeeAll={() => openRow(job.key)}
           onHide={hideJob(job)}
           onVisible={() => requestRow(job)}
         />
