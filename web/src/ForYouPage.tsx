@@ -273,10 +273,13 @@ function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, Re
         title: rec.title,
         href: novelPageUrl(rec.target_id, undefined, rec.media_type),
         coverUrl: rec.cover_url,
+        mediaType: rec.media_type,
+        source: rec.source,
         rating: rec.rating,
         ratingVotes: rec.rating_votes,
         statusTrans: rec.status_trans,
       }}
+      coverFormat
       libraryStatus={library.get(rec.target_id)}
       matchPercent={rec.match_score_percent}
       coverNote={onList.length > 0 ? { label: 'On your list', title: `On your list: ${onList.join(', ')}` } : undefined}
