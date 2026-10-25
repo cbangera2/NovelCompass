@@ -2,7 +2,7 @@ import { readCoreFilterParams, writeCoreFilterParams } from './components/coreFi
 export const DISCOVER_DEFAULTS = {
   hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
   requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
-  minYear: 0, maxYear: 0, includeTagsText: '', excludeTagsText: '', tagWeight: .8,
+  minYear: 0, maxYear: 0, minChapters: 0, includeTagsText: '', excludeTagsText: '', tagWeight: .8,
   directRecWeight: 1.2, listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60,
   types: '',
   genreStates: {} as Record<string, 'include' | 'exclude'>
@@ -45,6 +45,7 @@ export function parseDiscoverRoute(params: URLSearchParams, fallback: DiscoverRo
     maxReaders: numberValue(params, 'mr', fallback.maxReaders),
     minYear: numberValue(params, 'y0', fallback.minYear),
     maxYear: numberValue(params, 'y1', fallback.maxYear),
+    minChapters: numberValue(params, 'mc', fallback.minChapters),
     genreStates: params.has('g') ? genreStates : fallback.genreStates,
     includeTagsText: params.has('ti') ? params.get('ti') || '' : fallback.includeTagsText,
     excludeTagsText: params.has('tx') ? params.get('tx') || '' : fallback.excludeTagsText,
@@ -68,7 +69,7 @@ export function discoverSearchParams(state: DiscoverRouteState): URLSearchParams
   set('hg', state.hiddenGemMode, false); set('xh', state.excludeHarem, false);
   set('xb', state.excludeBL, false); set('xy', state.excludeYuri, false); set('done', state.requireCompleted, false);
   writeCoreFilterParams(params, state); set('v', state.minRatingVotes, 0);
-  set('mr', state.maxReaders, 0); set('y0', state.minYear, 0); set('y1', state.maxYear, 0);
+  set('mr', state.maxReaders, 0); set('y0', state.minYear, 0); set('y1', state.maxYear, 0); set('mc', state.minChapters, 0);
   const genres = Object.entries(state.genreStates || {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([name, value]) => `${value === 'include' ? '+' : '-'}${name}`).join(',');
   if (genres) params.set('g', genres);
