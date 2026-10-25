@@ -18,7 +18,7 @@ import { cleanListTitle } from './forYouNames';
 import { listPageUrl } from './listPageUrl';
 import { ForYouOnboarding } from './ForYouOnboarding';
 import { registerPreviews } from './CoverPreview';
-import type { PreviewData } from './previewData';
+import { evidenceBullets, type PreviewData } from './previewData';
 import { NovelCard } from './components/NovelCard';
 import { CardActions } from './components/CardActions';
 import { useLocalProfile } from './profile/useLocalProfile';
@@ -253,7 +253,7 @@ function previewFor(rec: RowRec): PreviewData {
     status_trans: rec.status_trans || undefined,
     matchPercent: rec.match_score_percent,
     sharedTags: rec.shared_tags,
-    bullets: rec.evidence_bullets,
+    bullets: evidenceBullets(rec.evidence_bullets),
     onYourLists: rec.on_lists,
   };
 }

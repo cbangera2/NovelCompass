@@ -41,6 +41,21 @@ export function mergeDefined<T extends object>(base: T | undefined, patch: Parti
   return merged as T;
 }
 
+/** Fields that describe why a title surfaced on one particular surface, so they never carry over to another. */
+const CONTEXT_FIELDS = ['matchPercent', 'signals', 'sharedTags', 'bullets', 'curatedListCount', 'onYourLists'] as const;
+
+/** Fold a surface's registration into what is known: stable facts accumulate, the previous surface's context is replaced. */
+export function layerPreview(known: PreviewData | undefined, incoming: PreviewData): PreviewData {
+  const base = { ...known };
+  for (const field of CONTEXT_FIELDS) delete base[field];
+  return mergeDefined<PreviewData>(base as PreviewData, incoming);
+}
+
+/** The reasons worth showing: the trope and co-occurrence lines repeat the tag list, so they are dropped. */
+export function evidenceBullets(bullets: string[] | undefined): string[] {
+  return (bullets ?? []).filter((bullet) => !/^(Shared key tropes|Co-occurs on)/i.test(bullet)).slice(0, 3);
+}
+
 export function previewFromRecommendation(item: Recommendation): PreviewData {
   const signals = Object.entries(CHANNEL_LABELS)
     .map(([channel, label]) => ({ label, rank: item.channel_ranks?.[channel] }))
@@ -50,7 +65,7 @@ export function previewFromRecommendation(item: Recommendation): PreviewData {
     id: item.target_id, title: item.title, author: item.author, language: item.language,
     reading_list_count: item.reading_list_count, chapters_trans: item.chapters_trans,
     status_trans: item.status_trans, media_type: item.media_type, matchPercent: item.match_score_percent, signals,
-    sharedTags: item.shared_tags, bullets: item.evidence_bullets?.filter((bullet) => !/^(Shared key tropes|Co-occurs on)/i.test(bullet)).slice(0, 3),
+    sharedTags: item.shared_tags, bullets: evidenceBullets(item.evidence_bullets),
     curatedListCount: item.curated_lists?.length
   };
 }
@@ -90,7 +105,7 @@ export function previewFromDetail(detail: NovelDetail): PreviewData {
   };
 }
 
-export const SYNOPSIS_CHARS = 320;
+const SYNOPSIS_CHARS = 320;
 export const TAG_LIMIT = 8;
 
 export function compactText(text: string, max = SYNOPSIS_CHARS) {

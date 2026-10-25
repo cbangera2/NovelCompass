@@ -71,7 +71,7 @@ function Cover({ item, eager, children }: { item: NovelCardItem; eager?: boolean
   const [loaded, setLoaded] = useState(false);
   const usable = hasUsableCover(item.coverUrl) && !failed;
   return (
-    <span className="nc-cover" data-preview-id={item.id} data-loaded={loaded || undefined}>
+    <span className="nc-cover" data-cover-id={item.id} data-loaded={loaded || undefined}>
       {usable ? (
         <img
           src={item.coverUrl}

@@ -132,7 +132,7 @@ export function ProfileLibrary({
                     <span className="nc-cover-fallback" aria-hidden="true">{entry.imported_title.slice(0, 1) || <BookOpen />}</span>
                     <StatusBadge status={entry.status} variant="overlay" />
                   </span>
-                  <strong className="nc-title">{entry.imported_title}</strong>
+                  <strong className="nc-title" title={entry.imported_title}>{entry.imported_title}</strong>
                   <small className="nc-caption">Not in this snapshot</small>
                 </article>
               );

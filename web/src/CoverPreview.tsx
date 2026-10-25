@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { configuredDataMode, createDataSource, DataMode } from './data';
 import { useDataModePreference } from './dataModePreference';
-import { compactText, mergeDefined, previewFacts, previewFromDetail, previewTags, signalStrength, TAG_LIMIT, type PreviewData } from './previewData';
+import { compactText, layerPreview, mergeDefined, previewFacts, previewFromDetail, previewTags, signalStrength, TAG_LIMIT, type PreviewData } from './previewData';
 import './cover-preview.css';
 
 /**
@@ -24,13 +24,13 @@ const previewKey = (mode: DataMode, id: number) => `${mode}:${id}`;
 const registry = new Map<string, PreviewData>();
 const detailCache = new Map<string, Promise<PreviewData | null>>();
 
-/** Make already-loaded data available to the card so it opens instantly without a fetch. Undefined fields never overwrite. */
+/** Make already-loaded data available to the card so it opens instantly without a fetch. Undefined fields never overwrite stable facts; per-surface context is replaced. */
 export function registerPreviews(items: Array<PreviewData | null | undefined>) {
   const mode = configuredDataMode();
   for (const item of items) {
     if (!item) continue;
     const key = previewKey(mode, item.id);
-    registry.set(key, mergeDefined(registry.get(key), item));
+    registry.set(key, layerPreview(registry.get(key), item));
   }
 }
 
@@ -73,7 +73,7 @@ function triggerOf(target: EventTarget | null, wide: boolean): HTMLElement | nul
 }
 
 /** Registered data plus the lazily fetched detail, remembered so the second hover is instant. */
-function ensureDetail(id: number, mode: DataMode): Promise<PreviewData | null> {
+export function ensureDetail(id: number, mode: DataMode): Promise<PreviewData | null> {
   const key = previewKey(mode, id);
   const known = registry.get(key);
   if (known?.synopsis) return Promise.resolve(known);
@@ -109,7 +109,6 @@ export function CoverPreviewHost() {
       const id = Number(trigger.dataset.previewId);
       if (!Number.isFinite(id)) return;
       pending.current = trigger;
-      void ensureDetail(id, modeRef.current);
       showTimer.current = window.setTimeout(() => { setPos(null); setActive({ id, trigger }); }, activeRef.current ? SWITCH_DELAY : SHOW_DELAY);
     };
     const close = () => {

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   compactText,
+  evidenceBullets,
+  layerPreview,
   mergeDefined,
   previewFacts,
   previewFromBrowse,
-  previewFromPeer,
   previewFromProfile,
   previewFromRecommendation,
   previewFromSearch,
@@ -81,8 +82,25 @@ describe('preview mappers', () => {
     expect(previewFromProfile({ novel_id: 42, imported_title: 'Imported name' }, search)).toMatchObject({ id: 42, title: 'Shadow Slave', author: 'Guiltythree' });
   });
 
-  it('maps a peer row, using readers as the reading-list count', () => {
-    expect(previewFromPeer({ id: 3, title: 'P', author: 'a', year: 2019, readers: 1200 })).toMatchObject({ id: 3, reading_list_count: 1200, year: 2019 });
+});
+
+describe('layerPreview', () => {
+  it('accumulates stable facts but replaces the previous surface\'s context', () => {
+    const discover: PreviewData = { id: 1, title: 'A', author: 'x', matchPercent: 85, signals: [{ label: 'Tags', rank: 2 }], sharedTags: ['Magic'], bullets: ['why'], curatedListCount: 2, onYourLists: ['Mine'] };
+    const browse: PreviewData = { id: 1, title: 'A', year: 2020, tags: ['t'] };
+    expect(layerPreview(discover, browse)).toEqual({ id: 1, title: 'A', author: 'x', year: 2020, tags: ['t'] });
+  });
+
+  it('lets the new surface\'s context win and keeps an existing synopsis', () => {
+    const known: PreviewData = { id: 1, title: 'A', synopsis: 'kept', matchPercent: 85 };
+    expect(layerPreview(known, { id: 1, title: 'A', matchPercent: 70, synopsis: undefined })).toMatchObject({ synopsis: 'kept', matchPercent: 70 });
+  });
+});
+
+describe('evidenceBullets', () => {
+  it('drops the lines that repeat the tag list and caps the rest at three', () => {
+    expect(evidenceBullets(['Shared key tropes: Magic', 'Co-occurs on 3 lists', 'a', 'b', 'c', 'd'])).toEqual(['a', 'b', 'c']);
+    expect(evidenceBullets(undefined)).toEqual([]);
   });
 });
 
