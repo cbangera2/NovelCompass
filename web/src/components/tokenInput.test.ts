@@ -35,9 +35,18 @@ describe('parsing', () => {
     expect(dedupe(['a', 'A', 'b'])).toEqual(['a', 'b']);
   });
 
-  it('emits the same comma-separated string the data layer splits on', () => {
-    expect(formatList(['Time Loop', 'Isekai'])).toBe('Time Loop,Isekai');
-    expect(parseList(formatList(['Time Loop', 'Isekai']))).toEqual(['Time Loop', 'Isekai']);
+  it('survives a pasted list with stray, trailing and repeated commas', () => {
+    expect(parseTokens(',,Isekai,, Harem,')).toEqual(['Isekai', 'Harem']);
+    expect(parseTokens(' , ,\n')).toEqual([]);
+  });
+
+  it('keeps non-ASCII and quoted names intact', () => {
+    expect(parseTokens('転生, 重生,"Quoted Tag"')).toEqual(['転生', '重生', '"Quoted Tag"']);
+  });
+
+  it('round-trips through the comma string the URL and data layer use', () => {
+    const values = ['Time Loop', 'Isekai', '転生'];
+    expect(parseList(formatList(values))).toEqual(values);
   });
 });
 

@@ -16,7 +16,6 @@
 .advanced-section { border-bottom: 1px solid var(--border); padding: 1rem 0; }
 .advanced-section:last-child { border-bottom: 0; }
 .advanced-section .section-heading { align-items: flex-start; display: flex; gap: .5rem 1rem; justify-content: space-between; margin-bottom: .75rem; }
-.advanced-section .section-heading h3 { font-size: .9rem; }
 :root[data-theme="light"] .advanced-panel { background: rgba(255,255,255,.9); }
 .advanced-filters { overflow: visible; }
 .advanced-pair { display: grid; gap: .65rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }

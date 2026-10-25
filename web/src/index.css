@@ -858,12 +858,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 :root[data-theme="light"] .profile-panel,
 :root[data-theme="light"] .search-input-wrapper,
-:root[data-theme="light"] .controls,
+:root[data-theme="light"] .controls { background: rgba(255,255,255,.9); }
 :root[data-theme="light"] .detail-dialog { background: linear-gradient(145deg, #fff, #f4f2f9); }
 :root[data-theme="light"] .taste-snapshot { background: linear-gradient(145deg, rgba(102,72,200,.07), #fff); }
 :root[data-theme="light"] .taste-chips span,
 :root[data-theme="light"] .btn-feedback,
-:root[data-theme="light"] .weight-control,
+:root[data-theme="light"] .weight-control { background: rgba(48,35,75,.035); }
 :root[data-theme="light"] .evidence-item,
 :root[data-theme="light"] .detail-section > p,
 :root[data-theme="light"] .taste-chips span { color: #4c4657; }

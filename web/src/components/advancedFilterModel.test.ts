@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advancedActiveFilters, genreListsFrom, genreStatesFrom, listPatch, type AdvancedFilterValues } from './advancedFilterModel';
+import { advancedActiveFilters, genreListsFrom, genreStatesFrom, listPatch, parseLimit, type AdvancedFilterValues } from './advancedFilterModel';
 import { discoverSearchParams, parseDiscoverRoute, DISCOVER_DEFAULTS } from '../routeState';
 import { parseList } from './tokenInput';
 
@@ -14,6 +14,18 @@ describe('listPatch', () => {
   it('leaves the other list alone when nothing overlaps, and never touches tags', () => {
     expect(listPatch({ ...base, excludeGenres: ['Harem'] }, 'includeGenres', ['Action'])).toEqual({ includeGenres: ['Action'] });
     expect(listPatch({ ...base, excludeTags: ['x'] }, 'includeTags', ['x'])).toEqual({ includeTags: ['x'] });
+  });
+});
+
+describe('parseLimit', () => {
+  it('treats empty, invalid, infinite and negative input as no limit', () => {
+    expect(['', 'abc', '-5', '0', '1e999'].map((raw) => parseLimit(raw))).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it('keeps valid values and caps them at the field maximum', () => {
+    expect(parseLimit('2010')).toBe(2010);
+    expect(parseLimit('4.5', 5)).toBe(4.5);
+    expect(parseLimit('9', 5)).toBe(5);
   });
 });
 
@@ -51,6 +63,11 @@ describe('Discover URL compatibility', () => {
     const route = parseDiscoverRoute(new URLSearchParams('ti=cunning protagonist, time loop&tx=netorare&g=%2BAction,-Harem'), DISCOVER_DEFAULTS);
     expect(parseList(route.includeTagsText)).toEqual(['cunning protagonist', 'time loop']);
     expect(route.genreStates).toEqual({ Action: 'include', Harem: 'exclude' });
+  });
+
+  it('ignores malformed or negative numeric params instead of filtering on them', () => {
+    const route = parseDiscoverRoute(new URLSearchParams('mc=-5&v=abc&y0=2010&y1=-1'), DISCOVER_DEFAULTS);
+    expect(route).toMatchObject({ minChapters: 0, minRatingVotes: 0, minYear: 2010, maxYear: 0 });
   });
 
   it('keeps every existing param and adds minimum chapters', () => {

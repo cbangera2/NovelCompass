@@ -40,6 +40,13 @@ const OPPOSITE: Record<'includeGenres' | 'excludeGenres', 'includeGenres' | 'exc
   excludeGenres: 'includeGenres',
 };
 
+/** Number input text to a limit: empty, invalid, infinite or negative input means "no limit" (0); `max` caps the value. */
+export function parseLimit(raw: string, max?: number): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return max === undefined ? value : Math.min(max, value);
+}
+
 /** A genre cannot be both required and excluded: picking it on one side removes it from the other. */
 export function listPatch(values: AdvancedFilterValues, key: ListKey, next: string[]): Partial<AdvancedFilterValues> {
   if (key !== 'includeGenres' && key !== 'excludeGenres') return { [key]: next };

@@ -101,6 +101,8 @@ export function TagCombobox({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // Enter and comma inside an IME composition confirm the candidate, not the filter value.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     switch (event.key) {
       case 'ArrowDown':
       case 'ArrowUp': {
@@ -187,7 +189,7 @@ export function TagCombobox({
           type="text"
           role="combobox"
           aria-expanded={open}
-          aria-controls={listId}
+          aria-controls={open ? listId : undefined}
           aria-autocomplete="list"
           aria-activedescendant={activeId}
           autoComplete="off"

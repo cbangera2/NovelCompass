@@ -1,6 +1,6 @@
 import { SlidersHorizontal } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { NUMERIC_FILTERS, listPatch, type AdvancedFilterValues } from './advancedFilterModel';
+import { NUMERIC_FILTERS, listPatch, parseLimit, type AdvancedFilterValues } from './advancedFilterModel';
 import { TagCombobox } from './TagCombobox';
 import './advanced-filters.css';
 
@@ -65,7 +65,7 @@ export function AdvancedFilters({ values, onChange, genres, tags, children, summ
                     step={'step' in field ? field.step : 1}
                     value={values[field.key] || ''}
                     placeholder="Any"
-                    onChange={(event) => onChange({ [field.key]: Math.max(0, Number(event.target.value) || 0) })}
+                    onChange={(event) => onChange({ [field.key]: parseLimit(event.target.value, 'max' in field ? field.max : undefined) })}
                   />
                 </label>
               ))}
