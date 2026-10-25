@@ -47,7 +47,7 @@ function inViewport(el: Element) {
     && rect.top < window.innerHeight && rect.left < window.innerWidth;
 }
 
-/** The element to fly for something carrying `data-preview-id`: its cover frame, else the image itself. */
+/** The element to fly for something carrying `data-cover-id` (a cover) or `data-preview-id` (its title link): its cover frame, else the image itself. */
 function coverElement(el: Element): HTMLElement | null {
   const img = coverImage(el);
   return img ? (img.closest<HTMLElement>('.nc-cover') ?? img) : null;
@@ -56,7 +56,7 @@ function coverElement(el: Element): HTMLElement | null {
 /** The on-screen cover for `id`, preferring the one that was just pressed. */
 function pickCover(id: number): HTMLElement | null {
   const candidates = Array.from(new Set(
-    Array.from(document.querySelectorAll(`[data-preview-id="${id}"]`)).map(coverElement)
+    Array.from(document.querySelectorAll(`[data-cover-id="${id}"], [data-preview-id="${id}"]`)).map(coverElement)
   )).filter((el): el is HTMLElement => Boolean(el) && inViewport(el as HTMLElement));
   const card = lastPressed?.closest('.nc, .nc-tile-wrap, .nc-tile');
   const pressed = lastPressed && candidates.find((el) => el.contains(lastPressed) || card?.contains(el));
@@ -130,7 +130,7 @@ function swapRoute(update: () => void, { from, returnTo, scrollY = 0 }: SwapOpti
       await waitFor(() => Boolean(document.querySelector('.novel-cover-shell img')), SETTLE_MS);
       window.scrollTo(0, scrollY);
     } else if (returnTo) {
-      await waitFor(() => Boolean(document.querySelector(`.nc-cover[data-preview-id="${returnTo}"] img`)), RETURN_SETTLE_MS);
+      await waitFor(() => Boolean(document.querySelector(`.nc-cover[data-cover-id="${returnTo}"] img`)), RETURN_SETTLE_MS);
       window.scrollTo(0, scrollY);
       await nextFrame();
       const home = pickCover(returnTo);

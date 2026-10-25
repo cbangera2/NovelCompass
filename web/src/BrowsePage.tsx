@@ -2,15 +2,13 @@ import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowDownUp,
   BookOpen,
-  ExternalLink,
   Search,
   Shuffle,
 } from 'lucide-react';
 import {
   createDataSource,
-  externalMediaUrl,
   RecommendationDataSource,
-  sourceDisplayName,
+  sourceLink,
 } from './data';
 import { useDataModePreference } from './dataModePreference';
 import { stableRouteUrl } from './routeState';
@@ -23,10 +21,12 @@ import { advancedActiveFilters, type AdvancedFilterValues } from './components/a
 import { formatList, parseList } from './components/tokenInput';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { Select, Tooltip } from './ui';
+import { Select } from './ui';
 import { Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { hasMixedFormats, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
+import { registerPreviews } from './CoverPreview';
+import { previewFromBrowse } from './previewData';
 import { CardActions } from './components/CardActions';
 import { loadLocalProfile } from './profile/store';
 import { useLocalProfile } from './profile/useLocalProfile';
@@ -116,6 +116,7 @@ export default function BrowsePage({
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
+  useEffect(() => registerPreviews(items.map(previewFromBrowse)), [items]);
   // The format pill only earns its space when the result set actually mixes formats.
   const mixedFormats = hasMixedFormats(items);
   const [query, setQuery] = useState(initialString('q', 'query'));
@@ -933,7 +934,6 @@ function BrowseCard({
           handler(value);
         }
       : undefined;
-  const sourceName = sourceDisplayName(novel.source, novel.id);
   const item = {
     id: novel.id,
     title,
@@ -959,25 +959,8 @@ function BrowseCard({
       label={title}
       similar={recommendationHref ? { href: recommendationHref } : undefined}
       profileActions={persistDisplaySettings}
-    >
-      <Tooltip content={`Open on ${sourceName}`}>
-        <DSButton
-          as="a"
-          variant="ghost"
-          className="browse-icon-action"
-          href={
-            novel.external_url ||
-            externalMediaUrl(novel.id, novel.source, novel.external_id, novel.media_type) ||
-            novel.novelupdates_url
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Open ${title} on ${sourceName}`}
-        >
-          <ExternalLink size={16} aria-hidden="true" />
-        </DSButton>
-      </Tooltip>
-    </CardActions>
+      external={sourceLink(novel)}
+    />
   );
   if (layout === 'compact') {
     return <NovelCard variant="tile" className={dimmed ? 'nc-hidden-pick' : ''} item={item} libraryStatus={profileEntry?.status} libraryRating={profileEntry?.rating} coverFormat={coverFormat} actions={actions} />;

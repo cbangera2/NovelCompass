@@ -23,6 +23,7 @@
   --radius-md: 9px;
   --radius-lg: 14px;
   --ring: #b8a8ff;
+  --overlay-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
 }
 
 :root[data-theme="light"] {
@@ -47,6 +48,7 @@
   --chart-3: #b56b00;
   --chart-grid: rgba(37,27,64,.1);
   --ring: #6648c8;
+  --overlay-shadow: 0 18px 50px rgba(37, 27, 64, 0.22);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -648,7 +650,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .ui-button-ghost:hover { background: var(--surface-raised); color: var(--text); }
 .ui-button-primary { background: var(--accent-solid); border-color: transparent; color: white; }
 .ui-tooltip { display: inline-flex; position: relative; }
-.ui-tooltip-content { background: #111522; border: 1px solid var(--border-strong); border-radius: 8px; bottom: calc(100% + 7px); box-shadow: 0 10px 30px rgba(0,0,0,.5); color: #e5e1f8; font-size: .66rem; font-weight: 500; left: 50%; line-height: 1.35; max-width: 220px; opacity: 0; padding: .4rem .55rem; pointer-events: none; position: absolute; text-align: center; transform: translate(-50%,4px); display: none; white-space: normal; width: max-content; z-index: 100; }
+.ui-tooltip-content { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; bottom: calc(100% + 7px); box-shadow: var(--overlay-shadow); color: var(--text); font-size: .66rem; font-weight: 500; left: 50%; line-height: 1.35; max-width: 220px; opacity: 0; padding: .4rem .55rem; pointer-events: none; position: absolute; text-align: center; transform: translate(-50%,4px); display: none; white-space: normal; width: max-content; z-index: 100; }
 .ui-tooltip-bottom .ui-tooltip-content { bottom: auto; top: calc(100% + 7px); transform: translate(-50%,-4px); }
 /* display:none (not visibility:hidden) so a closed tooltip is not laid out and cannot widen the page on mobile. */
 .ui-tooltip:hover .ui-tooltip-content,.ui-tooltip:focus-within .ui-tooltip-content { animation: ui-tooltip-in .15s ease-out forwards; display: block; }

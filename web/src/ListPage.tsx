@@ -6,6 +6,8 @@ import { cleanListTitle } from './forYouNames';
 import { loadListFile, staticLists } from './forYouStatic';
 import type { ListSummary } from './ForYouPage';
 import { NovelCard } from './components/NovelCard';
+import { registerPreviews } from './CoverPreview';
+import { previewFromSearch } from './previewData';
 import { hasUsableCover, novelPageUrl } from './novelLinks';
 import type { NovelSearchResult } from './types';
 import './for-you.css';
@@ -41,6 +43,7 @@ export default function ListPage(): JSX.Element {
       const cards = await (await createDataSource()).resolveNovelIds(file.members);
       const titles = file.members.flatMap((member) => (cards.has(member) ? [cards.get(member)!] : []));
       if (cancelled) return;
+      registerPreviews(titles.map(previewFromSearch));
       setState({
         status: 'ready',
         summary: lists.find((list) => list.id === id),

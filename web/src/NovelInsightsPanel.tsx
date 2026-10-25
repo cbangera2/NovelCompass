@@ -3,7 +3,9 @@ import { BookOpen } from 'lucide-react';
 import { RecommendationDataSource } from './data';
 import { NovelDetail, NovelInsights } from './types';
 import { browseFacetUrl } from './metadataLinks';
+import { registerPreviews } from './CoverPreview';
 import { novelPageUrl } from './novelLinks';
+import { previewFromPeer } from './previewData';
 import { buildComparison } from './peerComparison';
 import { Badge, Card } from './design-system';
 import './novel-insights.css';
@@ -41,6 +43,7 @@ export function NovelInsightsPanel({
     };
   }, [novelId, providedInsights, source]);
   const comparison = useMemo(() => (insights ? buildComparison(insights, currentNovel, novelId) : null), [insights, currentNovel, novelId]);
+  useEffect(() => { if (comparison) registerPreviews(comparison.rows.filter((row) => !row.self).map(previewFromPeer)); }, [comparison]);
   if (error) return <p className="insights-unavailable">{error}</p>;
   if (!insights)
     return (
@@ -108,13 +111,13 @@ export function NovelInsightsPanel({
                     <strong>{row.title}</strong>
                     <small>{row.self ? 'This title' : [row.author, row.language, row.year].filter(Boolean).join(' · ')}</small>
                   </span>
-                  <span className="peer-rating" title="Rating">
+                  <span className="peer-rating">
                     <b>{row.rating.toFixed(1)}★</b>
                     {!row.self && comparison.selfRating != null && Math.abs(row.rating - comparison.selfRating) >= 0.05 && (
                       <small>{row.rating > comparison.selfRating ? '+' : '−'}{Math.abs(row.rating - comparison.selfRating).toFixed(1)}</small>
                     )}
                   </span>
-                  <span className="peer-metric readers" title="On reading lists">
+                  <span className="peer-metric readers">
                     <i style={{ width: `${Math.max(3, (Math.log10(row.readers + 1) / Math.log10(comparison.maxReaders + 1)) * 100)}%` }} />
                     <b>{row.readers.toLocaleString()}</b>
                   </span>
@@ -123,7 +126,7 @@ export function NovelInsightsPanel({
               );
               return row.self
                 ? <div key={row.id} className="peer-row self" aria-current="true">{content}</div>
-                : <a key={row.id} className="peer-row" data-preview-id={row.id} href={novelPageUrl(row.id, novelId)}>{content}</a>;
+                : <a key={row.id} className="peer-row" data-preview-id={row.id} data-preview-card href={novelPageUrl(row.id, novelId)}>{content}</a>;
             })}
           </Card>
         </div>

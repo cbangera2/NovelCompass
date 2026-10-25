@@ -7,7 +7,7 @@ import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
 import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
-import { createDataSource } from './data';
+import { createDataSource, sourceLink } from './data';
 import { sourceInScope, useSourceFilterState } from './sourceFilterState';
 import { passesMinRecRating, useDisplaySettings } from './settings';
 import { mediaTypeInScope, useMediaFilterState, type MediaTypeChoice } from './mediaFilterState';
@@ -17,7 +17,8 @@ import { isStaticSource, staticLibraryRow, staticListRow, rankListsByLibrary, st
 import { cleanListTitle } from './forYouNames';
 import { listPageUrl } from './listPageUrl';
 import { ForYouOnboarding } from './ForYouOnboarding';
-import { registerPreviews, type PreviewData } from './CoverPreview';
+import { registerPreviews } from './CoverPreview';
+import { evidenceBullets, type PreviewData } from './previewData';
 import { NovelCard } from './components/NovelCard';
 import { CardActions } from './components/CardActions';
 import { useLocalProfile } from './profile/useLocalProfile';
@@ -248,14 +249,12 @@ function previewFor(rec: RowRec): PreviewData {
   return {
     id: rec.target_id,
     title: rec.title,
-    rating: rec.rating,
-    rating_votes: rec.rating_votes,
     media_type: rec.media_type,
-    status_trans: rec.status_trans,
-    statsOnCover: true,
+    status_trans: rec.status_trans || undefined,
     matchPercent: rec.match_score_percent,
     sharedTags: rec.shared_tags,
-    bullets: rec.evidence_bullets,
+    bullets: evidenceBullets(rec.evidence_bullets),
+    onYourLists: rec.on_lists,
   };
 }
 
@@ -291,7 +290,7 @@ function RecCard({ rec, library, eager, coverFormat = false }: { rec: RowRec; li
       coverFormat={coverFormat}
       libraryStatus={library.get(rec.target_id)}
       matchPercent={rec.match_score_percent}
-      coverNote={onList.length > 0 ? { label: 'On your list', title: `On your list: ${onList.join(', ')}` } : undefined}
+      coverNote={onList.length > 0 ? 'On your list' : undefined}
       strengthPercent={rec.match_score_percent}
       caption={rec.evidence_bullets[0]}
       eager={eager}
@@ -301,6 +300,7 @@ function RecCard({ rec, library, eager, coverFormat = false }: { rec: RowRec; li
           novel={{ id: rec.target_id, title: rec.title }}
           label={rec.title}
           similar={{ href: `${import.meta.env.BASE_URL}?seed=${rec.target_id}` }}
+          external={sourceLink({ id: rec.target_id, source: rec.source, media_type: rec.media_type })}
         />
       }
     />
@@ -422,7 +422,11 @@ function RowGrid({
     window.scrollTo({ top: 0 });
     const controller = new AbortController();
     job.load(GRID_LIMIT, controller.signal)
-      .then((data) => { setState({ status: 'ready', ...data }); setFullyLoaded(true); })
+      .then((data) => {
+        registerPreviews(data.recommendations.map(previewFor));
+        setState({ status: 'ready', ...data });
+        setFullyLoaded(true);
+      })
       .catch((error) => { if (!controller.signal.aborted) setState({ status: 'error', message: error.message }); });
     return () => controller.abort();
   }, [job]);

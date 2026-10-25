@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Search, Sparkles } from 'lucide-react';
-import type { RecommendationDataSource } from '../data';
+import { sourceLink, type RecommendationDataSource } from '../data';
 import type { NovelSearchResult } from '../types';
 import { Card, DSButton } from '../design-system';
+import { SourceLinkButton } from '../components/CardActions';
 import { Tooltip } from '../ui';
+import { registerPreviews } from '../CoverPreview';
 import { hasMixedFormats, novelPageUrl } from '../novelLinks';
+import { previewFromProfile } from '../previewData';
 import { NovelCard } from '../components/NovelCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { ResultLayoutToggle } from '../components/ResultLayoutToggle';
@@ -82,6 +85,10 @@ export function ProfileLibrary({
     return () => { cancelled = true; };
   }, [source, visibleEntries]);
 
+  useEffect(() => {
+    registerPreviews(visibleEntries.map((entry) => previewFromProfile(entry, catalog.get(entry.slug))));
+  }, [visibleEntries, catalog]);
+
   const open = (entry: ProfileEntry) => {
     if (entry.novel_id != null) navigateTo(novelPageUrl(entry.novel_id));
   };
@@ -138,6 +145,7 @@ export function ProfileLibrary({
                 </article>
               );
             }
+            const source = sourceLink({ id: entry.novel_id, source: meta?.source, media_type: meta?.media_type });
             return (
               <NovelCard
                 key={entry.slug}
@@ -156,6 +164,7 @@ export function ProfileLibrary({
                 coverFormat={mixedFormats}
                 caption={entry.progress || undefined}
                 actions={(
+                  <>
                   <Tooltip content="Find similar titles">
                     <DSButton
                       as="a"
@@ -167,6 +176,8 @@ export function ProfileLibrary({
                       <Sparkles size={16} aria-hidden="true" />
                     </DSButton>
                   </Tooltip>
+                  {source && <SourceLinkButton link={source} label={entry.imported_title} className="browse-icon-action" />}
+                </>
                 )}
               />
             );
@@ -194,9 +205,9 @@ export function ProfileLibrary({
               </>
             );
             return (
-              <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`} data-preview-id={entry.novel_id ?? undefined}>
+              <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`} data-preview-card={entry.novel_id != null ? '' : undefined}>
                 {entry.novel_id != null
-                  ? <button className="profile-entry-open" onClick={() => open(entry)} aria-label={`Open details for ${entry.imported_title}`}>{body}</button>
+                  ? <button className="profile-entry-open" data-preview-id={entry.novel_id} onClick={() => open(entry)} aria-label={`Open details for ${entry.imported_title}`}>{body}</button>
                   : <div className="profile-entry-open">{body}</div>}
                 {entry.novel_id != null
                   ? <a href={appUrl(`?seed=${entry.novel_id}`)}><Sparkles size={14} /> Find similar</a>

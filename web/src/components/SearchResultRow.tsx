@@ -1,7 +1,11 @@
 import { ArrowRight, BookOpen, Sparkles } from 'lucide-react';
+import { useEffect } from 'react';
+import { registerPreviews } from '../CoverPreview';
 import { hasUsableCover, novelPageUrl } from '../novelLinks';
+import { previewFromSearch } from '../previewData';
 import type { NovelSearchResult } from '../types';
 import { MediaBadges } from './NovelCard';
+import { Tooltip } from '../ui';
 import { RatingChip } from './RatingChip';
 import './novel-card.css';
 import './search-row.css';
@@ -17,6 +21,7 @@ export function SearchResultRow({ novel, title, onSelect, onNavigate }: {
   onSelect?: () => void;
   onNavigate?: () => void;
 }) {
+  useEffect(() => registerPreviews([previewFromSearch(novel)]), [novel]);
   const body = (
     <>
       {hasUsableCover(novel.cover_url)
@@ -33,8 +38,8 @@ export function SearchResultRow({ novel, title, onSelect, onNavigate }: {
   );
   if (onSelect) {
     return (
-      <div className="search-row" data-preview-id={novel.id}>
-        <button type="button" className="search-row-main" onClick={onSelect}>
+      <div className="search-row" data-preview-card>
+        <button type="button" className="search-row-main" data-preview-id={novel.id} onClick={onSelect}>
           {body}
           <span className="search-row-action"><Sparkles size={14} aria-hidden="true" /> Use as seed</span>
         </button>
@@ -42,15 +47,17 @@ export function SearchResultRow({ novel, title, onSelect, onNavigate }: {
     );
   }
   return (
-    <div className="search-row" data-preview-id={novel.id}>
-      <a className="search-row-main" href={novelPageUrl(novel.id)} onClick={onNavigate}>
+    <div className="search-row" data-preview-card>
+      <a className="search-row-main" href={novelPageUrl(novel.id)} data-preview-id={novel.id} onClick={onNavigate}>
         {body}
         <ArrowRight size={15} aria-hidden="true" />
       </a>
-      <a className="search-row-related" href={`${import.meta.env.BASE_URL}?view=discover&seed=${novel.id}`}
-        aria-label={`Find titles related to ${novel.title}`} title="Find related titles" onClick={onNavigate}>
-        <Sparkles size={15} aria-hidden="true" />
-      </a>
+      <Tooltip content="Find related titles">
+        <a className="search-row-related" href={`${import.meta.env.BASE_URL}?view=discover&seed=${novel.id}`}
+          aria-label={`Find titles related to ${novel.title}`} onClick={onNavigate}>
+          <Sparkles size={15} aria-hidden="true" />
+        </a>
+      </Tooltip>
     </div>
   );
 }

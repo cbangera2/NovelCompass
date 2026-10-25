@@ -18,7 +18,8 @@ import { CuratedListSummary, NovelDetail, NovelInsights, Recommendation, Related
 import { catalogVerdicts, CuratedListsCard, RatingDistributionCard, SeriesCard, summarizeRatings } from './NovelReaderSignals';
 import { audienceLabel, formatStatusLabel, getMediaBadgeInfo, hasMixedFormats, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
-import { CHANNEL_LABELS, previewFromRecommendation, registerPreviews, signalStrength } from './CoverPreview';
+import { registerPreviews } from './CoverPreview';
+import { CHANNEL_LABELS, previewFromRecommendation, signalStrength } from './previewData';
 import { NovelCard } from './components/NovelCard';
 import { NovelCoverGhost } from './components/NovelCoverGhost';
 import './novel-page.css';

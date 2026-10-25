@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BookOpen, Check, Heart, Sparkles, X } from 'lucide-react';
+import { BookOpen, Check, ExternalLink, Heart, Sparkles, X } from 'lucide-react';
 import { Menu } from '@base-ui/react/menu';
 import { DSButton as Button } from '../design-system';
 import { useLocalProfile } from '../profile/useLocalProfile';
@@ -24,6 +24,23 @@ export type CardActionsVariant =
   /** Compact icon footer for Browse's row cards. */
   | 'row';
 
+export interface SourceLink {
+  href: string;
+  /** Display name of the site, e.g. "AniList". */
+  name: string;
+}
+
+/** Icon button that opens a title on its source site in a new tab. */
+export function SourceLinkButton({ link, label, className = '' }: { link: SourceLink; label: string; className?: string }) {
+  return (
+    <Tooltip content={`Open on ${link.name}`}>
+      <Button as="a" variant="ghost" className={className} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={`Open ${label} on ${link.name}`}>
+        <ExternalLink size={16} aria-hidden="true" />
+      </Button>
+    </Tooltip>
+  );
+}
+
 interface CardActionsProps {
   variant: CardActionsVariant;
   /** The title as stored in the catalog; this is what gets written to the profile. */
@@ -35,7 +52,9 @@ interface CardActionsProps {
   /** Set false to leave out the status and love / hide buttons (e.g. the embedded extension page). */
   profileActions?: boolean;
   datasetVersion?: string;
-  /** Extra buttons after the shared ones (Browse adds "Open on <source>"). */
+  /** "Open on <source>" button, for the tile and row variants (the detailed footer has its own link). */
+  external?: SourceLink;
+  /** Extra buttons after the shared ones . */
   children?: ReactNode;
 }
 
@@ -44,7 +63,7 @@ interface CardActionsProps {
  * hide picks like it. Status and feedback are written straight to the local profile, so every
  * surface (Discover, Browse, For You) behaves the same and badges follow the profile.
  */
-export function CardActions({ variant, novel, label, similar, profileActions = true, datasetVersion, children }: CardActionsProps) {
+export function CardActions({ variant, novel, label, similar, profileActions = true, datasetVersion, external, children }: CardActionsProps) {
   const { entries, feedback, setReadingStatus, setFeedback } = useLocalProfile(datasetVersion);
   const status = entries.get(novel.id)?.status;
   const signal = feedback.get(novel.id);
@@ -118,6 +137,7 @@ export function CardActions({ variant, novel, label, similar, profileActions = t
       {similarButton}
       {profileActions && statusMenu}
       {profileActions && (variant === 'detailed' ? <div className="card-preference-actions">{feedbackButtons}</div> : feedbackButtons)}
+      {external && variant !== 'detailed' && <SourceLinkButton link={external} label={label} className={iconClass} />}
       {children}
     </>
   );

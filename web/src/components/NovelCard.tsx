@@ -38,8 +38,8 @@ interface NovelCardProps {
   matchPercent?: number;
   /** Detailed: list position shown on the cover. */
   rank?: number;
-  /** Tile: overlay pill such as "On your list". */
-  coverNote?: { label: string; title?: string };
+  /** Tile: overlay pill such as "On your list". The hover card carries the detail. */
+  coverNote?: string;
   /** Tile: thin strength bar under the title. */
   strengthPercent?: number;
   /** Tile: one muted line under the title (the main reason it was picked). */
@@ -71,7 +71,7 @@ function Cover({ item, eager, children }: { item: NovelCardItem; eager?: boolean
   const [loaded, setLoaded] = useState(false);
   const usable = hasUsableCover(item.coverUrl) && !failed;
   return (
-    <span className="nc-cover" data-preview-id={item.id} data-loaded={loaded || undefined}>
+    <span className="nc-cover" data-cover-id={item.id} data-loaded={loaded || undefined}>
       {usable ? (
         <img
           src={item.coverUrl}
@@ -125,7 +125,7 @@ export function MediaBadges({ id, mediaType, source }: { id: number; mediaType?:
 function Author({ item }: { item: NovelCardItem }) {
   if (!item.author) return <p className="nc-author">Unknown author</p>;
   return (
-    <p className="nc-author" title={item.author}>
+    <p className="nc-author">
       {item.authorHref || item.onAuthorClick
         ? <a href={item.authorHref || '#'} onClick={item.onAuthorClick}>{item.author}</a>
         : item.author}
@@ -162,7 +162,8 @@ const VISIBLE_TAGS = 4;
  * - `tile`: cover-first with stats overlaid on the image. For You rows, related titles, and the compact Browse/Discover grids.
  * - `row`: cover on the left, compact metadata and actions (Browse grid/list).
  * - `detailed`: row plus match evidence and shared tags (Discover results).
- * Covers and titles carry `data-preview-id` so the global hover card works; row/detailed cards are its anchor.
+ * The global hover card (CoverPreview) opens from the one focusable title link (`data-preview-id`) and anchors to the
+ * whole tile or row (`data-preview-card`); the cover is decorative and titles carry no native `title` tooltips.
  */
 export function NovelCard(props: NovelCardProps) {
   const { variant, item, libraryStatus, libraryRating, className = '' } = props;
@@ -182,6 +183,7 @@ export function NovelCard(props: NovelCardProps) {
         className={`nc nc-tile ${actions ? '' : className}`.trim()}
         href={item.href}
         data-preview-id={item.id}
+        data-preview-card
         onClick={onTileClick}
         onPointerMove={trackPointer}
         onPointerLeave={resetPointer}
@@ -191,17 +193,17 @@ export function NovelCard(props: NovelCardProps) {
         <Cover item={item} eager={eager}>
           {libraryStatus && <StatusBadge status={libraryStatus} variant="overlay" />}
           {format && <span className={`nc-cover-format format-${format.formatKey}`}>{format.formatLabel}</span>}
-          {coverNote && <span className="nc-cover-note" title={coverNote.title}>{coverNote.label}</span>}
+          {coverNote && <span className="nc-cover-note">{coverNote}</span>}
           <span className="nc-cover-stats">
-            <RatingChip rating={item.rating} votes={item.ratingVotes} showVotes={false} variant="overlay" size={12} />
+            <RatingChip rating={item.rating} votes={item.ratingVotes} showVotes={false} variant="overlay" size={12} hint={false} />
             {item.statusTrans && <span className="nc-cover-status">{formatStatusLabel(item.statusTrans)}</span>}
             {matchPercent != null && <span className="nc-match-pill">{Math.round(matchPercent)}%</span>}
           </span>
         </Cover>
-        <strong className="nc-title" title={item.title}>{item.title}</strong>
+        <strong className="nc-title">{item.title}</strong>
         {item.author && <span className="nc-tile-author">{item.author}</span>}
         {strengthPercent != null && (
-          <span className="nc-strength" title={`${Math.round(strengthPercent)}% of this row's strongest match`}>
+          <span className="nc-strength" aria-hidden="true">
             <i style={{ width: `${Math.max(6, strengthPercent)}%` }} />
           </span>
         )}
@@ -248,9 +250,9 @@ export function NovelCard(props: NovelCardProps) {
         </h3>
         <Author item={item} />
         <div className="nc-meta">
-          <RatingChip rating={item.rating} votes={item.ratingVotes} />
+          <RatingChip rating={item.rating} votes={item.ratingVotes} hint={false} />
           {item.readers != null && (
-            <span className="nc-readers" title={`${item.readers.toLocaleString()} readers`}>
+            <span className="nc-readers">
               <Users size={13} aria-hidden="true" /> {Math.max(0, item.readers).toLocaleString()}
             </span>
           )}
