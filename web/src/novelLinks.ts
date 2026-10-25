@@ -52,6 +52,15 @@ export function getMediaBadgeInfo(item: { id: number; media_type?: string; sourc
   return { formatKey, formatLabel, sourceKey, sourceLabel };
 }
 
+/**
+ * True when a result set spans more than one format (novel / manga / anime). The cover format pill
+ * means "this one is not the default", so it is only shown on sets that actually mix formats.
+ * Light novels and web novels share the "novel" format, so they do not count as mixed.
+ */
+export function hasMixedFormats(items: ReadonlyArray<{ id: number; media_type?: string; source?: string }>): boolean {
+  return new Set(items.map((item) => getMediaBadgeInfo(item).formatKey)).size > 1;
+}
+
 export function novelPageUrl(id: number, from?: number, mediaType?: string): string {
   return itemPageUrl(id, from, mediaType);
 }

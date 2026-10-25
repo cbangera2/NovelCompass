@@ -6,7 +6,7 @@ import { Card, DSButton } from '../design-system';
 import { SourceLinkButton } from '../components/CardActions';
 import { Tooltip } from '../ui';
 import { registerPreviews } from '../CoverPreview';
-import { novelPageUrl } from '../novelLinks';
+import { hasMixedFormats, novelPageUrl } from '../novelLinks';
 import { previewFromProfile } from '../previewData';
 import { NovelCard } from '../components/NovelCard';
 import { StatusBadge } from '../components/StatusBadge';
@@ -56,6 +56,13 @@ export function ProfileLibrary({
       .sort((a, b) => (b.rating || 0) - (a.rating || 0) || a.imported_title.localeCompare(b.imported_title));
   }, [profile, query, rating, status]);
   const visibleEntries = useMemo(() => entries.slice(0, visibleCount), [entries, visibleCount]);
+  const mixedFormats = useMemo(() => hasMixedFormats(
+    visibleEntries.flatMap((entry) => (entry.novel_id == null ? [] : [{
+      id: entry.novel_id,
+      media_type: catalog.get(entry.slug)?.media_type,
+      source: catalog.get(entry.slug)?.source,
+    }])),
+  ), [visibleEntries, catalog]);
 
   useEffect(() => {
     setVisibleCount(60);
@@ -154,7 +161,7 @@ export function ProfileLibrary({
                   rating: entry.rating,
                 }}
                 libraryStatus={entry.status}
-                coverFormat
+                coverFormat={mixedFormats}
                 caption={entry.progress || undefined}
                 actions={(
                   <>

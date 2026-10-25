@@ -4,7 +4,6 @@ import {
   BookOpen,
   Search,
   Shuffle,
-  SlidersHorizontal,
 } from 'lucide-react';
 import {
   createDataSource,
@@ -17,11 +16,14 @@ import { BrowseNovel, BrowseSort, BrowseSortDirection, FilterOptions } from './t
 import { browseFacetUrl } from './metadataLinks';
 import { ActiveFilterChips, CoreFilters } from './components/CoreFilters';
 import { formatMinRating, readCoreFilterParams, writeCoreFilterParams } from './components/coreFilterParams';
+import { AdvancedFilters } from './components/AdvancedFilters';
+import { advancedActiveFilters, type AdvancedFilterValues } from './components/advancedFilterModel';
+import { formatList, parseList } from './components/tokenInput';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { FieldGroup, Select } from './ui';
+import { Select } from './ui';
 import { Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { novelPageUrl, progressUnitLabel } from './novelLinks';
+import { hasMixedFormats, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
 import { registerPreviews } from './CoverPreview';
 import { previewFromBrowse } from './previewData';
@@ -115,6 +117,8 @@ export default function BrowsePage({
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
   useEffect(() => registerPreviews(items.map(previewFromBrowse)), [items]);
+  // The format pill only earns its space when the result set actually mixes formats.
+  const mixedFormats = hasMixedFormats(items);
   const [query, setQuery] = useState(initialString('q', 'query'));
   const [sort, setSort] = useState<BrowseSort>(
     initialParams.has('sort') &&
@@ -621,6 +625,29 @@ export default function BrowsePage({
     }
   };
 
+  const advancedValues: AdvancedFilterValues = {
+    includeGenres: parseList(includeGenres),
+    excludeGenres: parseList(excludeGenres),
+    includeTags: parseList(includeTags),
+    excludeTags: parseList(excludeTags),
+    maxRating, minVotes, minYear, maxYear, minChapters, maxChapters, minReaders, maxReaders,
+  };
+  const applyAdvanced = (patch: Partial<AdvancedFilterValues>) =>
+    resetPage(() => {
+      if (patch.includeGenres) setIncludeGenres(formatList(patch.includeGenres));
+      if (patch.excludeGenres) setExcludeGenres(formatList(patch.excludeGenres));
+      if (patch.includeTags) setIncludeTags(formatList(patch.includeTags));
+      if (patch.excludeTags) setExcludeTags(formatList(patch.excludeTags));
+      if (patch.maxRating !== undefined) setMaxRating(patch.maxRating);
+      if (patch.minVotes !== undefined) setMinVotes(patch.minVotes);
+      if (patch.minYear !== undefined) setMinYear(patch.minYear);
+      if (patch.maxYear !== undefined) setMaxYear(patch.maxYear);
+      if (patch.minChapters !== undefined) setMinChapters(patch.minChapters);
+      if (patch.maxChapters !== undefined) setMaxChapters(patch.maxChapters);
+      if (patch.minReaders !== undefined) setMinReaders(patch.minReaders);
+      if (patch.maxReaders !== undefined) setMaxReaders(patch.maxReaders);
+    });
+
   const activeFilters = [
     query && { label: `Search: ${query}`, clear: () => setQuery('') },
     author && { label: `Author: ${author}`, clear: () => setAuthor('') },
@@ -628,30 +655,10 @@ export default function BrowsePage({
     tag && { label: `Tag: ${tag}`, clear: () => setTag('') },
     language && { label: `Language: ${language}`, clear: () => setLanguage('') },
     minRating > 0 && { label: `Rating: ${formatMinRating(minRating)}`, clear: () => setMinRating(0) },
-    maxRating > 0 && { label: `Rating ≤ ${maxRating}★`, clear: () => setMaxRating(0) },
-    minVotes > 0 && { label: `Votes: ${minVotes.toLocaleString()}+`, clear: () => setMinVotes(0) },
-    minYear > 0 && { label: `From ${minYear}`, clear: () => setMinYear(0) },
-    maxYear > 0 && { label: `Through ${maxYear}`, clear: () => setMaxYear(0) },
     status && { label: `Status: ${status}`, clear: () => setStatus('') },
-    minChapters > 0 && { label: `${minChapters}+ chapters`, clear: () => setMinChapters(0) },
-    maxChapters > 0 && { label: `≤ ${maxChapters} chapters`, clear: () => setMaxChapters(0) },
-    minReaders > 0 && {
-      label: `${minReaders.toLocaleString()}+ readers`,
-      clear: () => setMinReaders(0),
-    },
-    maxReaders > 0 && {
-      label: `≤ ${maxReaders.toLocaleString()} readers`,
-      clear: () => setMaxReaders(0),
-    },
-    includeGenres && { label: `Genres: ${includeGenres}`, clear: () => setIncludeGenres('') },
-    excludeGenres && {
-      label: `Without genres: ${excludeGenres}`,
-      clear: () => setExcludeGenres(''),
-    },
-    includeTags && { label: `Tags: ${includeTags}`, clear: () => setIncludeTags('') },
-    excludeTags && { label: `Without tags: ${excludeTags}`, clear: () => setExcludeTags('') },
     excludeLibrary && { label: 'Not in my library', clear: () => setExcludeLibrary(false) },
   ].filter(Boolean) as Array<{ label: string; clear: () => void }>;
+  activeFilters.push(...advancedActiveFilters(advancedValues, applyAdvanced));
 
   return (
     <main className="browse-shell">
@@ -768,45 +775,22 @@ export default function BrowsePage({
         >
           <Shuffle size={16} /> {luckyLoading ? 'Choosing…' : 'Feeling lucky'}
         </DSButton>
-        <details className="browse-advanced">
-          <summary>
-            <SlidersHorizontal size={16} /> More filters
-          </summary>
-          <FieldGroup label="Catalog metadata">
-            <BrowseSelect
-              native={nativeControls}
-              label="Genre"
-              value={genre}
-              onChange={(value) => resetPage(() => setGenre(value))}
-            >
-              <option value="">All genres</option>
-              {options.genres.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </BrowseSelect>
-            <BrowseSelect
-              native={nativeControls}
-              label="Tag"
-              value={tag}
-              disabled={!options.tags?.length}
-              onChange={(value) => resetPage(() => setTag(value))}
-            >
-              <option value="">All tags</option>
-              {options.tags?.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </BrowseSelect>
-            <BrowseSelect
-              native={nativeControls}
-              label="Minimum votes"
-              value={minVotes}
-              onChange={(value) => resetPage(() => setMinVotes(Number(value)))}
-            >
-              <option value="0">Any vote count</option>
-              <option value="10">10+ votes</option>
-              <option value="100">100+ votes</option>
-              <option value="1000">1,000+ votes</option>
-            </BrowseSelect>
+      </Card>
+      <ActiveFilterChips
+        className="filter-active-row"
+        filters={activeFilters.map((filter) => ({ label: filter.label, clear: () => resetPage(filter.clear) }))}
+        onClearAll={clearAll}
+      />
+      <AdvancedFilters
+        values={advancedValues}
+        onChange={applyAdvanced}
+        genres={options.genres}
+        tags={options.tags || []}
+        summaryExtra="status and library"
+      >
+        <section className="advanced-section">
+          <div className="section-heading"><div><h3>Status and library</h3><p>Translation progress and your local library.</p></div></div>
+          <div className="advanced-extra">
             <BrowseSelect
               native={nativeControls}
               label="Translation status"
@@ -818,77 +802,6 @@ export default function BrowsePage({
               <option value="ongoing">Ongoing</option>
               <option value="hiatus">Hiatus</option>
             </BrowseSelect>
-            <NumberFilter
-              label="Earliest year"
-              value={minYear}
-              onChange={(value) => resetPage(() => setMinYear(value))}
-            />
-            <NumberFilter
-              label="Latest year"
-              value={maxYear}
-              onChange={(value) => resetPage(() => setMaxYear(value))}
-            />
-            <NumberFilter
-              label="Maximum rating"
-              value={maxRating}
-              max={5}
-              step={0.1}
-              onChange={(value) => resetPage(() => setMaxRating(value))}
-            />
-            <NumberFilter
-              label="Minimum chapters"
-              value={minChapters}
-              onChange={(value) => resetPage(() => setMinChapters(value))}
-            />
-            <NumberFilter
-              label="Maximum chapters"
-              value={maxChapters}
-              onChange={(value) => resetPage(() => setMaxChapters(value))}
-            />
-            <NumberFilter
-              label="Minimum readers"
-              value={minReaders}
-              onChange={(value) => resetPage(() => setMinReaders(value))}
-            />
-            <NumberFilter
-              label="Maximum readers"
-              value={maxReaders}
-              onChange={(value) => resetPage(() => setMaxReaders(value))}
-            />
-          </FieldGroup>
-          <FieldGroup label="Exact comma-separated facets">
-            <label className="browse-text-filter">
-              <span>Include genres</span>
-              <input
-                value={includeGenres}
-                onChange={(event) => resetPage(() => setIncludeGenres(event.target.value))}
-                placeholder="Fantasy, Adventure"
-              />
-            </label>
-            <label className="browse-text-filter">
-              <span>Exclude genres</span>
-              <input
-                value={excludeGenres}
-                onChange={(event) => resetPage(() => setExcludeGenres(event.target.value))}
-                placeholder="Harem"
-              />
-            </label>
-            <label className="browse-text-filter">
-              <span>Include tags</span>
-              <input
-                value={includeTags}
-                onChange={(event) => resetPage(() => setIncludeTags(event.target.value))}
-                placeholder="Time Loop"
-              />
-            </label>
-            <label className="browse-text-filter">
-              <span>Exclude tags</span>
-              <input
-                value={excludeTags}
-                onChange={(event) => resetPage(() => setExcludeTags(event.target.value))}
-                placeholder="Netorare"
-              />
-            </label>
             <label className="browse-library-filter">
               <input
                 type="checkbox"
@@ -898,14 +811,9 @@ export default function BrowsePage({
               />{' '}
               Hide titles in my local library
             </label>
-          </FieldGroup>
-        </details>
-      </Card>
-      <ActiveFilterChips
-        className="browse-active-filters"
-        filters={activeFilters.map((filter) => ({ label: filter.label, clear: () => resetPage(filter.clear) }))}
-        onClearAll={clearAll}
-      />
+          </div>
+        </section>
+      </AdvancedFilters>
 
       {!tagSupported && (
         <p className="browse-notice">
@@ -933,6 +841,7 @@ export default function BrowsePage({
             key={novel.id}
             novel={novel}
             layout={layout}
+            coverFormat={mixedFormats}
             novelUrl={novelUrl}
             similarUrl={similarUrl}
             persistDisplaySettings={persistPreferences}
@@ -996,6 +905,7 @@ export default function BrowsePage({
 function BrowseCard({
   novel,
   layout,
+  coverFormat,
   novelUrl,
   similarUrl,
   onSelectAuthor,
@@ -1005,6 +915,7 @@ function BrowseCard({
 }: {
   novel: BrowseNovel;
   layout: ResultLayout;
+  coverFormat: boolean;
   novelUrl: (novel: BrowseNovel) => string;
   similarUrl: (novel: BrowseNovel) => string | null;
   onSelectAuthor: (author: string) => void;
@@ -1052,7 +963,7 @@ function BrowseCard({
     />
   );
   if (layout === 'compact') {
-    return <NovelCard variant="tile" className={dimmed ? 'nc-hidden-pick' : ''} item={item} libraryStatus={profileEntry?.status} libraryRating={profileEntry?.rating} coverFormat actions={actions} />;
+    return <NovelCard variant="tile" className={dimmed ? 'nc-hidden-pick' : ''} item={item} libraryStatus={profileEntry?.status} libraryRating={profileEntry?.rating} coverFormat={coverFormat} actions={actions} />;
   }
   return (
     <NovelCard
@@ -1074,35 +985,6 @@ function BrowseCard({
       }
       actions={actions}
     />
-  );
-}
-
-function NumberFilter({
-  label,
-  value,
-  onChange,
-  max,
-  step = 1,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  max?: number;
-  step?: number;
-}) {
-  return (
-    <label className="browse-number-filter">
-      <span>{label}</span>
-      <input
-        type="number"
-        min="0"
-        max={max}
-        step={step}
-        value={value || ''}
-        placeholder="Any"
-        onChange={(event) => onChange(Number(event.target.value) || 0)}
-      />
-    </label>
   );
 }
 
