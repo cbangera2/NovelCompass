@@ -1,5 +1,6 @@
-import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { BookOpen, ChevronRight, ExternalLink, Sparkles, Users } from 'lucide-react';
+import { navigateTo } from '../viewTransitions';
 import { formatStatusLabel, getMediaBadgeInfo, hasUsableCover } from '../novelLinks';
 import type { ReadingStatus } from '../profile/types';
 import { RatingChip } from './RatingChip';
@@ -67,9 +68,10 @@ interface NovelCardProps {
 
 function Cover({ item, eager, children }: { item: NovelCardItem; eager?: boolean; children?: ReactNode }) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const usable = hasUsableCover(item.coverUrl) && !failed;
   return (
-    <span className="nc-cover" data-preview-id={item.id}>
+    <span className="nc-cover" data-preview-id={item.id} data-loaded={loaded || undefined}>
       {usable ? (
         <img
           src={item.coverUrl}
@@ -77,6 +79,9 @@ function Cover({ item, eager, children }: { item: NovelCardItem; eager?: boolean
           loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : 'auto'}
           decoding="async"
+          // A cached image can finish before React attaches onLoad, hence the ref check.
+          ref={(img) => { if (img?.complete && img.naturalWidth) setLoaded(true); }}
+          onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />
       ) : (
@@ -85,6 +90,25 @@ function Cover({ item, eager, children }: { item: NovelCardItem; eager?: boolean
       {children}
     </span>
   );
+}
+
+/** Points the cover's tilt and sheen at the cursor (CSS reads the variables). Mouse only; touch has no hover. */
+function trackPointer(event: PointerEvent<HTMLElement>) {
+  if (event.pointerType !== 'mouse') return;
+  const cover = event.currentTarget.querySelector<HTMLElement>('.nc-cover');
+  if (!cover) return;
+  const box = cover.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
+  const y = Math.min(1, Math.max(0, (event.clientY - box.top) / box.height));
+  cover.style.setProperty('--rx', `${((x - .5) * 8).toFixed(2)}deg`);
+  cover.style.setProperty('--ry', `${((.5 - y) * 8).toFixed(2)}deg`);
+  cover.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+  cover.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+}
+
+function resetPointer(event: PointerEvent<HTMLElement>) {
+  const cover = event.currentTarget.querySelector<HTMLElement>('.nc-cover');
+  ['--rx', '--ry', '--mx', '--my'].forEach((name) => cover?.style.removeProperty(name));
 }
 
 /** Source + format badges (NovelUpdates / AniList, Novel / Manga / Anime). */
@@ -154,7 +178,16 @@ export function NovelCard(props: NovelCardProps) {
         }
       : undefined;
     const tile = (
-      <a className={`nc nc-tile ${actions ? '' : className}`.trim()} href={item.href} data-preview-id={item.id} onClick={onTileClick}>
+      <a
+        className={`nc nc-tile ${actions ? '' : className}`.trim()}
+        href={item.href}
+        data-preview-id={item.id}
+        onClick={onTileClick}
+        onPointerMove={trackPointer}
+        onPointerLeave={resetPointer}
+        // The cover again, as a blurred glow behind the tile. CSS only applies it on hover, so lazy covers stay lazy.
+        style={hasUsableCover(item.coverUrl) ? ({ '--nc-halo': `url("${item.coverUrl?.replace(/"/g, '%22')}")` } as CSSProperties) : undefined}
+      >
         <Cover item={item} eager={eager}>
           {libraryStatus && <StatusBadge status={libraryStatus} variant="overlay" />}
           {format && <span className={`nc-cover-format format-${format.formatKey}`}>{format.formatLabel}</span>}
@@ -186,7 +219,7 @@ export function NovelCard(props: NovelCardProps) {
   }
 
   const { actions, onActivate, children } = props;
-  const activate = onActivate ?? (() => { window.location.href = item.href; });
+  const activate = onActivate ?? (() => navigateTo(item.href));
   const onClick = (event: MouseEvent<HTMLElement>) => {
     if (!isInteractive(event.target)) activate();
   };

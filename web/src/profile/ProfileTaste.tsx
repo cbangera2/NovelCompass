@@ -8,6 +8,7 @@ import { novelPageUrl } from '../novelLinks';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { computeTasteProfile, TasteProfile } from './taste';
 import type { LocalUserProfile } from './types';
+import { navigateTo } from '../viewTransitions';
 const ProfileAnalytics = lazy(() => import('./ProfileAnalytics'));
 
 function appUrl(params = ''): string {
@@ -179,7 +180,7 @@ export function ProfileTaste({
           profile={profile}
           source={source}
           datasetVersion={dataset?.dataset_version || profile.dataset_version}
-          onOpenNovel={(novelId) => { window.location.href = novelPageUrl(novelId); }}
+          onOpenNovel={(novelId) => { navigateTo(novelPageUrl(novelId)); }}
         />
       </Suspense>
     </>

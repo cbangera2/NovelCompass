@@ -35,6 +35,7 @@ import { useSourceFilterState } from './sourceFilterState';
 import { parseMediaTypesFromUrl, useMediaFilterState, MediaTypeChoice } from './mediaFilterState';
 import { Palette, Film } from 'lucide-react';
 import { FormatScopeChip } from './components/FormatScopeChip';
+import { navigateTo } from './viewTransitions';
 
 const PAGE_SIZE = 24;
 
@@ -611,7 +612,7 @@ export default function BrowsePage({
     setError('');
     try {
       const novel = await source.getRandomNovel(browseRequest());
-      window.location.href = novelUrl(novel);
+      navigateTo(novelUrl(novel));
     } catch (reason: any) {
       setError(reason.message || 'Could not choose a random title.');
     } finally {

@@ -25,7 +25,11 @@
 /* ---------- Shared pieces ---------- */
 .nc{color:var(--text);min-width:0}
 .nc-cover{background:var(--surface-soft);display:block;overflow:hidden;position:relative}
-.nc-cover img{display:block;height:100%;object-fit:cover;width:100%}
+.nc-cover img{display:block;height:100%;object-fit:cover;opacity:0;transition:opacity .35s ease,transform .5s cubic-bezier(.2,.8,.2,1);width:100%}
+.nc-cover[data-loaded] img{opacity:1}
+/* Soft shimmer in the frame until the image arrives, instead of a flat grey box. */
+.nc-cover:not([data-loaded]):has(img){background:linear-gradient(100deg,var(--surface-soft) 35%,var(--surface-raised) 50%,var(--surface-soft) 65%) 0 0/250% 100%;animation:nc-shimmer 1.4s linear infinite}
+@keyframes nc-shimmer{to{background-position:-150% 0}}
 .nc-cover-fallback{align-items:center;color:var(--dim);display:flex;font-size:1.6rem;font-weight:700;height:100%;justify-content:center;text-transform:uppercase}
 
 /* ---------- Tile: cover-first (For You rows, related titles) ---------- */
@@ -33,6 +37,36 @@
 .nc-tile .nc-cover{aspect-ratio:2/3;border:1px solid var(--border);border-radius:10px;transition:transform .15s,border-color .15s}
 .nc-tile:hover .nc-cover,.nc-tile:focus-visible .nc-cover{border-color:var(--accent);transform:translateY(-2px)}
 .nc-tile:hover .nc-title{color:var(--accent-bright)}
+.nc-tile{isolation:isolate;position:relative}
+/* Hover effects are for mice only: on a phone :hover sticks after a tap. */
+.nc-tile::before{aspect-ratio:2/3;border-radius:14px;content:"";filter:blur(22px) saturate(1.6);left:0;opacity:0;pointer-events:none;position:absolute;right:0;top:0;z-index:-1}
+.nc-tile .nc-cover::after{background:radial-gradient(circle at var(--mx,50%) var(--my,30%),rgba(255,255,255,.28),transparent 58%);content:"";inset:0;mix-blend-mode:soft-light;opacity:0;pointer-events:none;position:absolute;transition:opacity .25s}
+@media(hover:hover) and (pointer:fine){
+  /* Glow behind the cover: the cover itself, blurred. It only has an image while hovered or focused. */
+  .nc-tile:hover::before,.nc-tile:focus-visible::before{animation:nc-halo-in .35s ease-out forwards;background:var(--nc-halo) center/cover}
+  .nc-tile:hover .nc-cover::after{opacity:1}
+  .nc-row:hover .nc-cover img,.nc-detailed:hover .nc-cover img{transform:scale(1.06)}
+}
+@keyframes nc-halo-in{from{opacity:0;transform:scale(.94)}to{opacity:.5;transform:translateY(8px) scale(1.04)}}
+
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+  .nc-tile .nc-cover{transition:transform .18s ease-out,border-color .15s,box-shadow .3s;will-change:transform}
+  .nc-tile:hover .nc-cover,.nc-tile:focus-visible .nc-cover{box-shadow:0 18px 34px rgba(0,0,0,.4);transform:perspective(700px) translateY(-4px) rotateX(var(--ry,0deg)) rotateY(var(--rx,0deg)) scale(1.02)}
+  .nc-tile:hover .nc-cover img{transform:scale(1.07)}
+}
+
+/* Cards rise in, a few at a time, when a shelf or page of results appears. */
+@media(prefers-reduced-motion:no-preference){
+  .nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile){animation:nc-rise .45s cubic-bezier(.2,.8,.2,1) both}
+  :is(.nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile)):nth-child(2){animation-delay:.03s}
+  :is(.nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile)):nth-child(3){animation-delay:.06s}
+  :is(.nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile)):nth-child(4){animation-delay:.09s}
+  :is(.nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile)):nth-child(5){animation-delay:.12s}
+  :is(.nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile)):nth-child(6){animation-delay:.15s}
+  :is(.nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile)):nth-child(7){animation-delay:.18s}
+  :is(.nc-tile-wrap,.nc-tile:not(.nc-tile-wrap>.nc-tile)):nth-child(n+8){animation-delay:.21s}
+}
+@keyframes nc-rise{from{opacity:0;transform:translateY(10px)}}
 .nc-tile .nc-cover-fallback{font-size:2rem}
 .nc-cover-format{background:rgba(0,0,0,.72);border-radius:999px;color:#fff;font-size:.58rem;font-weight:750;letter-spacing:.03em;padding:.15rem .42rem;position:absolute;right:.4rem;text-transform:uppercase;top:.4rem;transition:opacity .12s}
 .nc-cover-note{background:rgba(0,0,0,.72);border-radius:999px;bottom:2rem;color:#fff;font-size:.62rem;left:.4rem;padding:.15rem .5rem;position:absolute}

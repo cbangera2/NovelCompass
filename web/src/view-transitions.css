@@ -1,0 +1,55 @@
+/* Cover-to-hero page transition (see viewTransitions.ts). */
+@media (prefers-reduced-motion: no-preference) {
+  /* The hero cover, and the stand-in shown while the novel page is still loading, are the flight's landing slot. */
+  .novel-cover-shell, .vt-ghost-cover { view-transition-name: novel-cover; }
+
+  ::view-transition-group(novel-cover) {
+    animation-duration: .5s;
+    animation-timing-function: cubic-bezier(.2, .8, .2, 1);
+    z-index: 2;
+  }
+  ::view-transition-old(novel-cover), ::view-transition-new(novel-cover) {
+    height: 100%;
+    object-fit: cover;
+    overflow: clip;
+    border-radius: 14px;
+  }
+
+  ::view-transition-old(root) { animation: vt-fade-out .18s ease-in both; }
+  ::view-transition-new(root) { animation: vt-fade-in .32s .06s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes vt-fade-out { to { opacity: 0; } }
+  @keyframes vt-fade-in { from { opacity: 0; transform: translateY(8px); } }
+}
+
+/* Cover placeholder on the novel page while its data loads: the same image the user just clicked, already cached. */
+.vt-ghost-cover {
+  aspect-ratio: 2/3;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .28);
+  display: block;
+  max-width: 240px;
+  overflow: hidden;
+  width: 100%;
+}
+.vt-ghost-cover img { display: block; height: 100%; object-fit: cover; width: 100%; }
+
+/* Same outer box as the novel page, so the stand-in cover sits where the real one will. */
+.vt-ghost-page {
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 1.45rem clamp(.85rem, 2.5vw, 2rem) 4rem;
+}
+.vt-ghost-page::before { content: ""; display: block; height: calc(.72rem * 1.5 + 1rem); }
+
+/* In the novel page's own loading state the stand-in sits in the skeleton grid, below where the breadcrumb row will be. */
+.novel-page-loading .vt-ghost-cover { margin-top: calc(.72rem * 1.5 + 1rem); }
+
+/* Phone layout, matching novel-page.css: the cover is centred and smaller, and the page padding is tighter. */
+@media (max-width: 700px) {
+  .vt-ghost-page { padding: 1rem max(.7rem, env(safe-area-inset-left)) 3rem; }
+  .vt-ghost-page::before { height: calc(.72rem * 1.5 + .75rem); }
+  .vt-ghost-cover { border-radius: 14px; box-shadow: 0 14px 34px rgba(0, 0, 0, .25); margin-inline: auto; width: min(54vw, 200px); }
+  .novel-page-loading .vt-ghost-cover { grid-column: 1 / -1; justify-self: center; margin-top: calc(.72rem * 1.5 + .75rem); }
+}
