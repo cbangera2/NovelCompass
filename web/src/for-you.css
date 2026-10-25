@@ -3,7 +3,8 @@
 .fy-controls{align-items:center;display:flex;gap:.6rem;margin-bottom:1rem}.fy-controls+.fy-lists{margin:-.2rem 0 1.4rem}
 .fy-lists{display:flex;flex-wrap:wrap;gap:.4rem}.fy-lists button{align-items:center;background:var(--surface-soft);border:1px solid var(--border);border-radius:999px;color:var(--muted);cursor:pointer;display:inline-flex;font-size:.78rem;gap:.45rem;padding:.35rem .7rem}.fy-lists button.active{border-color:var(--accent);color:var(--text)}
 .fy-row{margin:0 0 2.2rem}.fy-row>header{align-items:flex-end;display:flex;gap:.75rem;justify-content:space-between;margin-bottom:.7rem}.fy-row h2{font-size:1.25rem;letter-spacing:-.02em;margin:0}.fy-row header p{color:var(--muted);font-size:.78rem;margin:.25rem 0 0;max-width:70ch}.fy-row-nav{align-items:center;display:flex;flex:0 0 auto;gap:.25rem}
-.fy-track{display:flex;gap:.85rem;margin-top:-4px;overflow-x:auto;padding-bottom:.6rem;padding-top:4px;scroll-snap-type:x proximity;scrollbar-width:thin}
+/* Room around the cards for the hover lift, tilt and glow: a scrolling row clips on every side, so the padding is cancelled by negative margins. */
+.fy-track{display:flex;gap:.85rem;margin:-14px -10px -.4rem;overflow-x:auto;padding:14px 10px 1.1rem;scroll-padding-inline:10px;scroll-snap-type:x proximity;scrollbar-width:thin}
 .fy-card,.fy-card-skeleton{flex:0 0 168px;scroll-snap-align:start}.fy-card-skeleton{height:290px}
 .fy-error,.fy-empty{color:var(--muted);font-size:.85rem}.fy-error{color:var(--red)}
 .fy-controls .ds-button{flex:0 0 auto;white-space:nowrap}.fy-lists .fy-more{border-style:dashed}
