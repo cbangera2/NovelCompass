@@ -10,6 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { ResultLayoutToggle } from '../components/ResultLayoutToggle';
 import { loadResultLayout, saveResultLayout, type ResultLayout } from '../preferences';
 import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './types';
+import { navigateTo } from '../viewTransitions';
 
 export const STATUS_LABELS: Record<ReadingStatus, string> = {
   reading: 'Reading',
@@ -75,7 +76,7 @@ export function ProfileLibrary({
   }, [source, visibleEntries]);
 
   const open = (entry: ProfileEntry) => {
-    if (entry.novel_id != null) window.location.href = novelPageUrl(entry.novel_id);
+    if (entry.novel_id != null) navigateTo(novelPageUrl(entry.novel_id));
   };
 
   const statusChips: Array<['all' | ReadingStatus, string, number]> = [

@@ -20,6 +20,7 @@ import { audienceLabel, formatStatusLabel, getMediaBadgeInfo, hasUsableCover, no
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import { CHANNEL_LABELS, previewFromRecommendation, registerPreviews, signalStrength } from './CoverPreview';
 import { NovelCard } from './components/NovelCard';
+import { NovelCoverGhost } from './components/NovelCoverGhost';
 import './novel-page.css';
 import { useDataModePreference } from './dataModePreference';
 
@@ -209,7 +210,8 @@ export default function NovelPage(): JSX.Element {
   };
 
   if (error) return <main className="novel-page-state"><Card><BookOpen /><h1>Title unavailable</h1><p>{error}</p><DSButton as="a" href={import.meta.env.BASE_URL}>Return to Discover</DSButton></Card></main>;
-  if (!detail || !source) return <main className="novel-page novel-page-loading" aria-busy="true"><Skeleton className="novel-hero-skeleton" /><Skeleton className="novel-content-skeleton" /></main>;
+  const coverGhost = !detail ? <NovelCoverGhost id={novelId} /> : null;
+  if (!detail || !source) return <main className="novel-page novel-page-loading" aria-busy="true">{coverGhost || <Skeleton className="novel-hero-skeleton" />}<Skeleton className="novel-content-skeleton" /></main>;
 
   return <main className="novel-page">
     <nav className="novel-breadcrumbs" aria-label="Breadcrumb">
