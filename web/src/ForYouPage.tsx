@@ -18,6 +18,8 @@ import { listPageUrl } from './listPageUrl';
 import { ForYouOnboarding } from './ForYouOnboarding';
 import { registerPreviews, type PreviewData } from './CoverPreview';
 import { NovelCard } from './components/NovelCard';
+import { CardActions } from './components/CardActions';
+import { useLocalProfile } from './profile/useLocalProfile';
 import './for-you.css';
 import { FormatScopeChip } from './components/FormatScopeChip';
 
@@ -257,6 +259,9 @@ function previewFor(rec: RowRec): PreviewData {
 }
 
 function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean }) {
+  const { feedback } = useLocalProfile();
+  // "Hide recommendations like this" drops the card from every row right away.
+  if (feedback.get(rec.target_id) === 'not_for_me') return null;
   const onList = rec.on_lists ?? [];
   return (
     <NovelCard
@@ -277,6 +282,14 @@ function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, Re
       strengthPercent={rec.match_score_percent}
       caption={rec.evidence_bullets[0]}
       eager={eager}
+      actions={
+        <CardActions
+          variant="tile"
+          novel={{ id: rec.target_id, title: rec.title }}
+          label={rec.title}
+          similar={{ href: `${import.meta.env.BASE_URL}?seed=${rec.target_id}` }}
+        />
+      }
     />
   );
 }

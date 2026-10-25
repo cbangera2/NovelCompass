@@ -14,10 +14,10 @@
 .browse-result{height:100%}
 .browse-result .nc-chips{height:1.35rem;overflow:hidden}
 .browse-result .nc-actions .ui-tooltip{flex:0 0 auto}
-.browse-result .browse-icon-action{align-items:center;display:inline-flex;flex:0 0 36px;height:36px;justify-content:center;padding:0;width:36px}
+.browse-result .browse-icon-action{align-items:center;display:inline-flex;flex:0 0 36px;height:36px;justify-content:center;min-width:0;padding:0;width:36px}
 
 @media(max-width:680px){
-  .browse-result .browse-icon-action{flex-basis:44px;height:44px;width:44px}
+  .browse-result .browse-icon-action{flex-basis:44px;height:44px;min-width:44px;width:44px}
 }
 
 .browse-presets{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem}

@@ -113,3 +113,10 @@ a.nc-chip:hover,.nc-chips a:hover{border-color:var(--accent);color:var(--text)}
 
 .result-layout-toggle{display:flex;gap:.3rem}
 .result-layout-toggle .ds-button{height:36px;padding:0;width:36px}
+/* Tooltips on the cover buttons open to the left, inside the tile, so a scrolling row cannot clip them. */
+.nc-tile-actions .ui-tooltip-content{bottom:auto;left:auto;max-width:112px;right:calc(100% + 6px);top:50%;transform:translate(4px,-50%)}
+.nc-tile-actions .ui-tooltip:hover .ui-tooltip-content,.nc-tile-actions .ui-tooltip:focus-within .ui-tooltip-content{animation:nc-tip-in .15s ease-out forwards}
+@keyframes nc-tip-in{to{opacity:1;transform:translate(0,-50%)}}
+/* A title marked "not for me" in Browse stays listed but fades back until you look at it. */
+.nc-hidden-pick{opacity:.45;transition:opacity .12s}
+.nc-hidden-pick:hover{opacity:.85}
