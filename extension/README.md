@@ -11,23 +11,26 @@ Screenshots of the [Novel Compass web app](https://cbangera2.github.io/NovelComp
 
 Relationship-first discovery: pick a starting title you loved and the
 recommendation engine traces shared tropes, related works, and community recs
-across the full catalog.
+across the full catalog. Shown with refine filters and the first rows of
+evidence-backed matches for a seed title.
 
-![Discover view of the Novel Compass web app](../docs/screenshots/web/web-discover.png)
+![Discover view of the Novel Compass web app with filters and a grid of matches for a seed title](../docs/screenshots/web/web-discover.png)
 
 ### Series detail
 
-The cover, essential metadata, and percentile stats for every title fit in the
-first viewport; overview, insights, and similar titles continue down the page.
+The cover, essential metadata, and percentile stats fit in the first viewport;
+the overview, reader vote breakdown, and related titles continue down the page
+(insights follow below the captured area).
 
-![Omniscient Reader's Viewpoint detail view in the Novel Compass web app](../docs/screenshots/web/web-series-detail.png)
+![Omniscient Reader's Viewpoint detail page in the Novel Compass web app, from stats through related titles](../docs/screenshots/web/web-series-detail.png)
 
 ### Browse the catalog
 
-Every title in the snapshot — ranked by most read or top rated, with format
-and language filters.
+Every title in the snapshot, with quick format and ranking chips plus sort,
+language, and rating filters. Shown with the Anime format selected, sorted by
+most popular.
 
-![Browse view of the Novel Compass web app](../docs/screenshots/web/web-browse.png)
+![Browse view of the Novel Compass web app with filters and a grid of popular anime titles](../docs/screenshots/web/web-browse.png)
 
 Screenshots contain page content only. Personal account details are excluded.
 
