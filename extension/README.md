@@ -5,20 +5,37 @@ site's live links, releases, reviews, rankings, lists, and account actions.
 
 ## Screenshots
 
-### Compact series view
+These are screenshots of the [Novel Compass web app](https://cbangera2.github.io/NovelCompass/),
+which this extension complements: the extension brings the same navigation and
+styling to Novel Updates pages, while the web app provides discovery, browsing,
+and series detail views. They are not captures of the extension itself.
 
-The cover, essential metadata, description, and details fit in the first
-viewport. Overview, chapters, reviews, and similar titles continue down one
-page; the compact section bar provides jump links without hiding content.
+### Discover
 
-![Compact Novel Compass series view](../docs/screenshots/extension/series-detail-saint-dark-fantasy.png)
+Relationship-first discovery: pick a starting title you loved and the
+recommendation engine traces shared tropes, related works, and community recs
+across the full catalog. Shown with refine filters and the first rows of
+evidence-backed matches for a seed title (Omniscient Reader's Viewpoint).
 
-### Series rankings
+![Discover view of the Novel Compass web app with filters and a grid of matches for a seed title](../docs/screenshots/web/web-discover.png)
 
-![Novel Updates series rankings restyled by Novel Compass](../docs/screenshots/extension/series-rankings.png)
+### Series detail
 
-Screenshots contain page content only. Browser chrome and personal account
-details are excluded or redacted.
+The cover, essential metadata, and percentile stats fit in the first viewport;
+the overview, reader vote breakdown, and related titles continue down the page
+(insights follow below the captured area).
+
+![Omniscient Reader's Viewpoint detail page in the Novel Compass web app, from stats through related titles](../docs/screenshots/web/web-series-detail.png)
+
+### Browse the catalog
+
+Every title in the snapshot, with quick format and ranking chips plus sort,
+language, and rating filters. Shown scoped to light novels (Novels only),
+sorted by most popular.
+
+![Browse view of the Novel Compass web app with filters and a grid of popular light novels](../docs/screenshots/web/web-browse.png)
+
+Screenshots contain page content only. Personal account details are excluded.
 
 ## Build the lightweight extension
 
