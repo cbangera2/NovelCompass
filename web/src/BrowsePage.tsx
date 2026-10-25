@@ -6,7 +6,6 @@ import {
   Search,
   Shuffle,
   SlidersHorizontal,
-  Sparkles,
 } from 'lucide-react';
 import {
   createDataSource,
@@ -26,7 +25,9 @@ import { FieldGroup, Select, Tooltip } from './ui';
 import { Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
+import { CardActions } from './components/CardActions';
 import { loadLocalProfile } from './profile/store';
+import { useLocalProfile } from './profile/useLocalProfile';
 import { loadFilterSnapshot, loadResultLayout, parseResultLayout, saveFilterSnapshot, saveResultLayout, type ResultLayout } from './preferences';
 import { ResultLayoutToggle } from './components/ResultLayoutToggle';
 import { useSourceFilterState } from './sourceFilterState';
@@ -1035,21 +1036,18 @@ function BrowseCard({
     ratingVotes: novel.rating_votes,
     readers: novel.reading_list_count,
   };
+  const { entries, feedback } = useLocalProfile();
+  const profileEntry = persistDisplaySettings ? entries.get(novel.id) : undefined;
+  // "Hide recommendations like this" keeps the title in the catalog but fades it, so Browse stays a faithful listing.
+  const dimmed = persistDisplaySettings && feedback.get(novel.id) === 'not_for_me';
   const actions = (
-    <>
-      {recommendationHref && (
-        <Tooltip content="Find similar titles">
-          <DSButton
-            as="a"
-            variant="ghost"
-            className="browse-icon-action"
-            href={recommendationHref}
-            aria-label={`Find titles similar to ${title}`}
-          >
-            <Sparkles size={16} aria-hidden="true" />
-          </DSButton>
-        </Tooltip>
-      )}
+    <CardActions
+      variant={layout === 'compact' ? 'tile' : 'row'}
+      novel={{ id: novel.id, slug: novel.slug, title: novel.title }}
+      label={title}
+      similar={recommendationHref ? { href: recommendationHref } : undefined}
+      profileActions={persistDisplaySettings}
+    >
       <Tooltip content={`Open on ${sourceName}`}>
         <DSButton
           as="a"
@@ -1067,16 +1065,18 @@ function BrowseCard({
           <ExternalLink size={16} aria-hidden="true" />
         </DSButton>
       </Tooltip>
-    </>
+    </CardActions>
   );
   if (layout === 'compact') {
-    return <NovelCard variant="tile" item={item} coverFormat actions={actions} />;
+    return <NovelCard variant="tile" className={dimmed ? 'nc-hidden-pick' : ''} item={item} libraryStatus={profileEntry?.status} libraryRating={profileEntry?.rating} coverFormat actions={actions} />;
   }
   return (
     <NovelCard
       variant="row"
-      className="browse-result"
+      className={dimmed ? 'browse-result nc-hidden-pick' : 'browse-result'}
       item={item}
+      libraryStatus={profileEntry?.status}
+      libraryRating={profileEntry?.rating}
       chips={novel.genres?.slice(0, 3).map((item) => (
         <a key={item} href={embedded ? '#' : browseFacetUrl('genre', item)} onClick={facetClick(onSelectGenre, item)}>
           {item}

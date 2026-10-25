@@ -1,9 +1,7 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import {
   BookOpen,
-  Check,
   ExternalLink,
-  Heart,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -11,7 +9,6 @@ import {
   Users,
   X
 } from 'lucide-react';
-import { Menu } from '@base-ui/react/menu';
 import {
   DatasetManifest,
   RecommendResponse,
@@ -28,8 +25,8 @@ import {
   sourceDisplayName
 } from './data';
 import { useDataModePreference } from './dataModePreference';
-import type { LocalUserProfile, ProfileEntry, ReadingStatus } from './profile/types';
-import { loadLocalProfile, saveLocalProfile } from './profile/store';
+import type { ProfileEntry } from './profile/types';
+import { loadSharedProfile, useLocalProfile } from './profile/useLocalProfile';
 import {
   buildExcludeIds,
   computeTasteProfile,
@@ -43,6 +40,7 @@ import { Badge, Card, DSButton as Button } from './design-system';
 import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
 import { previewFromRecommendation, registerPreviews } from './CoverPreview';
 import { MediaBadges, NovelCard } from './components/NovelCard';
+import { CardActions } from './components/CardActions';
 import { RatingChip } from './components/RatingChip';
 import { openGlobalSearch, SEED_SELECTED_EVENT } from './components/searchEvents';
 import { ActiveFilterChips, CoreFilters, type ActiveFilter } from './components/CoreFilters';
@@ -192,7 +190,7 @@ export default function App(): JSX.Element {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailEvidence, setDetailEvidence] = useState<string[]>([]);
-  const [profile, setProfile] = useState<LocalUserProfile | null>(null);
+  const { profile, entries: profileEntries, feedback: feedbackByNovel } = useLocalProfile(dataset?.dataset_version);
   const [hideLibraryTitles, setHideLibraryTitles] = useState(true);
   const [forYouMode, setForYouMode] = useState(() =>
     new URLSearchParams(window.location.search).get('for_you') === '1'
@@ -205,10 +203,6 @@ export default function App(): JSX.Element {
     mode?: 'api-multi-seed' | 'client-merge';
     affinityApplied?: boolean;
   } | null>(null);
-
-  useEffect(() => {
-    loadLocalProfile().then(setProfile).catch(() => setProfile(null));
-  }, []);
 
   useEffect(() => {
     saveFilterSnapshot('discover', { hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted,
@@ -436,11 +430,8 @@ export default function App(): JSX.Element {
     if (wantForYou) {
       setForYouMode(true);
       // Wait for profile load then multi-seed; profile effect may still be settling.
-      loadLocalProfile()
-        .then((loaded) => {
-          if (loaded) setProfile(loaded);
-          return fetchRecommendations(null, Math.min(40, maxResults), false, { forYou: true });
-        })
+      loadSharedProfile()
+        .then(() => fetchRecommendations(null, Math.min(40, maxResults), false, { forYou: true }))
         .catch(() => fetchRecommendations(null, Math.min(40, maxResults), false, { forYou: true }))
         .finally(() => { autoRefreshReadyRef.current = true; });
       return;
@@ -583,58 +574,6 @@ export default function App(): JSX.Element {
       setError(profileError.message || 'Could not find similar titles for that profile entry.');
       setLoading(false);
     }
-  };
-
-  const profileEntries = useMemo(() => new Map(profile?.entries.map((entry) => [entry.novel_id, entry]) || []), [profile]);
-  const feedbackByNovel = useMemo(() => new Map((profile?.feedback || []).map((item) => [item.novel_id, item.signal])), [profile]);
-
-  const setNovelFeedback = async (rec: Recommendation, signal: 'love' | 'read' | 'not_for_me') => {
-    const current = profile || {
-      profile_id: crypto.randomUUID(),
-      parser_version: 1,
-      dataset_version: dataset?.dataset_version || 'unknown',
-      imported_at: new Date().toISOString(),
-      source_fingerprints: [],
-      entries: [],
-      curated_lists: [],
-      feedback: []
-    };
-    const existingSignal = current.feedback?.find((item) => item.novel_id === rec.target_id)?.signal;
-    const feedback = (current.feedback || []).filter((item) => item.novel_id !== rec.target_id);
-    if (existingSignal !== signal) feedback.push({
-      novel_id: rec.target_id,
-      slug: rec.slug,
-      title: rec.title,
-      signal,
-      updated_at: new Date().toISOString()
-    });
-    const next = { ...current, feedback };
-    await saveLocalProfile(next);
-    setProfile(next);
-  };
-
-  const setReadingStatus = async (rec: Recommendation, status: ReadingStatus | '') => {
-    const current = profile || {
-      profile_id: crypto.randomUUID(),
-      parser_version: 1,
-      dataset_version: dataset?.dataset_version || 'unknown',
-      imported_at: new Date().toISOString(),
-      source_fingerprints: [],
-      entries: [],
-      curated_lists: [],
-      feedback: []
-    };
-    const entries = current.entries.filter((entry) => entry.novel_id !== rec.target_id && entry.slug !== rec.slug);
-    if (status) entries.push({
-      novel_id: rec.target_id,
-      slug: rec.slug,
-      imported_title: rec.title,
-      status,
-      source_file: 'recommendation'
-    });
-    const next = { ...current, entries };
-    await saveLocalProfile(next);
-    setProfile(next);
   };
 
   const openNovelDetail = async (novel: Recommendation) => {
@@ -1114,73 +1053,13 @@ export default function App(): JSX.Element {
                 source_file: 'recommendation'
               });
               const actions = (
-                    <>
-                    {compact ? (
-                      <Tooltip content="Find similar titles">
-                        <Button variant="ghost" aria-label={`Find titles similar to ${rec.title}`} onClick={findSimilar}>
-                          <Sparkles size={14} aria-hidden="true" />
-                        </Button>
-                      </Tooltip>
-                    ) : (
-                      <Button variant="primary" className="card-primary-action" onClick={findSimilar}>
-                        <Sparkles size={14} aria-hidden="true" /> Similar
-                      </Button>
-                    )}
-                    <Menu.Root>
-                      <Tooltip content="Set reading status">
-                        <Menu.Trigger className="card-icon-action"
-                          aria-label={`Set reading status for ${rec.title}`}>
-                          <BookOpen size={16} aria-hidden="true" />
-                        </Menu.Trigger>
-                      </Tooltip>
-                      <Menu.Portal>
-                        <Menu.Positioner sideOffset={6} align="end" className="reading-menu-positioner">
-                          <Menu.Popup className="reading-menu">
-                            {([
-                              ['', 'Add'],
-                              ['reading', 'Reading'],
-                              ['completed', 'Completed'],
-                              ['plan_to_read', 'Plan'],
-                              ['paused', 'Paused'],
-                              ['dropped', 'Dropped'],
-                            ] as const).map(([status, label]) => (
-                              <Menu.Item key={status || 'add'} className="reading-menu-item"
-                                onClick={() => setReadingStatus(rec, status)}>
-                                <span>{label}</span>
-                                {(profileEntries.get(rec.target_id)?.status || '') === status &&
-                                  <Check size={14} aria-hidden="true" />}
-                              </Menu.Item>
-                            ))}
-                          </Menu.Popup>
-                        </Menu.Positioner>
-                      </Menu.Portal>
-                    </Menu.Root>
-                    {compact ? <>
-                      <Tooltip content="Love this recommendation">
-                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`}
-                          aria-label={`Love ${rec.title}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'}
-                          onClick={() => setNovelFeedback(rec, 'love')}><Heart size={16} aria-hidden="true" /></Button>
-                      </Tooltip>
-                      <Tooltip content="Hide recommendations like this">
-                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'not_for_me' ? 'selected' : ''}`}
-                          aria-label={`${rec.title} is not for me`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'not_for_me'}
-                          onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={16} aria-hidden="true" /></Button>
-                      </Tooltip>
-                    </> : (
-                    <div className="card-preference-actions">
-                      <Tooltip content="Love this recommendation">
-                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'love' ? 'selected' : ''}`}
-                          aria-label={`Love ${rec.title}`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'love'}
-                          onClick={() => setNovelFeedback(rec, 'love')}><Heart size={16} aria-hidden="true" /></Button>
-                      </Tooltip>
-                      <Tooltip content="Hide recommendations like this">
-                        <Button variant="ghost" className={`btn-feedback icon-only ${feedbackByNovel.get(rec.target_id) === 'not_for_me' ? 'selected' : ''}`}
-                          aria-label={`${rec.title} is not for me`} aria-pressed={feedbackByNovel.get(rec.target_id) === 'not_for_me'}
-                          onClick={() => setNovelFeedback(rec, 'not_for_me')}><X size={16} aria-hidden="true" /></Button>
-                      </Tooltip>
-                    </div>
-                    )}
-                                        </>
+                <CardActions
+                  variant={compact ? 'tile' : 'detailed'}
+                  novel={{ id: rec.target_id, slug: rec.slug, title: rec.title }}
+                  label={rec.title}
+                  similar={{ onClick: findSimilar }}
+                  datasetVersion={dataset?.dataset_version}
+                />
               );
               return (
                 <NovelCard
