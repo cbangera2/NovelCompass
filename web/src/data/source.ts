@@ -59,6 +59,12 @@ export function externalMediaUrl(id: number, source?: string, external_id?: stri
   return `https://www.novelupdates.com/?p=${id}`;
 }
 
+/** Where a title lives on its source site (NovelUpdates, AniList, Novel Phoenix), if we can tell. */
+export function sourceLink(n: { id: number; source?: string; external_id?: string; media_type?: string; external_url?: string; novelupdates_url?: string }): { href: string; name: string } | undefined {
+  const href = n.external_url || externalMediaUrl(n.id, n.source, n.external_id, n.media_type) || n.novelupdates_url;
+  return href ? { href, name: sourceDisplayName(n.source, n.id) } : undefined;
+}
+
 export function sourceDisplayName(source?: string, id?: number): string {
   if (source === 'novelphoenix') return 'Novel Phoenix';
   if (source === 'anilist' || (id != null && id >= 2000000)) return 'AniList';

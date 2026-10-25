@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Search, Sparkles } from 'lucide-react';
-import type { RecommendationDataSource } from '../data';
+import { sourceLink, type RecommendationDataSource } from '../data';
 import type { NovelSearchResult } from '../types';
 import { Card, DSButton } from '../design-system';
+import { SourceLinkButton } from '../components/CardActions';
 import { Tooltip } from '../ui';
 import { registerPreviews } from '../CoverPreview';
 import { novelPageUrl } from '../novelLinks';
@@ -137,6 +138,7 @@ export function ProfileLibrary({
                 </article>
               );
             }
+            const source = sourceLink({ id: entry.novel_id, source: meta?.source, media_type: meta?.media_type });
             return (
               <NovelCard
                 key={entry.slug}
@@ -155,6 +157,7 @@ export function ProfileLibrary({
                 coverFormat
                 caption={entry.progress || undefined}
                 actions={(
+                  <>
                   <Tooltip content="Find similar titles">
                     <DSButton
                       as="a"
@@ -166,6 +169,8 @@ export function ProfileLibrary({
                       <Sparkles size={16} aria-hidden="true" />
                     </DSButton>
                   </Tooltip>
+                  {source && <SourceLinkButton link={source} label={entry.imported_title} className="browse-icon-action" />}
+                </>
                 )}
               />
             );

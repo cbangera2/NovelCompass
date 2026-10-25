@@ -7,7 +7,7 @@ import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
 import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
-import { createDataSource } from './data';
+import { createDataSource, sourceLink } from './data';
 import { sourceInScope, useSourceFilterState } from './sourceFilterState';
 import { passesMinRecRating, useDisplaySettings } from './settings';
 import { mediaTypeInScope, useMediaFilterState, type MediaTypeChoice } from './mediaFilterState';
@@ -291,6 +291,7 @@ function RecCard({ rec, library, eager }: { rec: RowRec; library: Map<number, Re
           novel={{ id: rec.target_id, title: rec.title }}
           label={rec.title}
           similar={{ href: `${import.meta.env.BASE_URL}?seed=${rec.target_id}` }}
+          external={sourceLink({ id: rec.target_id, source: rec.source, media_type: rec.media_type })}
         />
       }
     />

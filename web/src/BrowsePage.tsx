@@ -2,16 +2,14 @@ import { MouseEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ArrowDownUp,
   BookOpen,
-  ExternalLink,
   Search,
   Shuffle,
   SlidersHorizontal,
 } from 'lucide-react';
 import {
   createDataSource,
-  externalMediaUrl,
   RecommendationDataSource,
-  sourceDisplayName,
+  sourceLink,
 } from './data';
 import { useDataModePreference } from './dataModePreference';
 import { stableRouteUrl } from './routeState';
@@ -21,7 +19,7 @@ import { ActiveFilterChips, CoreFilters } from './components/CoreFilters';
 import { formatMinRating, readCoreFilterParams, writeCoreFilterParams } from './components/coreFilterParams';
 import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
-import { FieldGroup, Select, Tooltip } from './ui';
+import { FieldGroup, Select } from './ui';
 import { Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
@@ -1025,7 +1023,6 @@ function BrowseCard({
           handler(value);
         }
       : undefined;
-  const sourceName = sourceDisplayName(novel.source, novel.id);
   const item = {
     id: novel.id,
     title,
@@ -1051,25 +1048,8 @@ function BrowseCard({
       label={title}
       similar={recommendationHref ? { href: recommendationHref } : undefined}
       profileActions={persistDisplaySettings}
-    >
-      <Tooltip content={`Open on ${sourceName}`}>
-        <DSButton
-          as="a"
-          variant="ghost"
-          className="browse-icon-action"
-          href={
-            novel.external_url ||
-            externalMediaUrl(novel.id, novel.source, novel.external_id, novel.media_type) ||
-            novel.novelupdates_url
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Open ${title} on ${sourceName}`}
-        >
-          <ExternalLink size={16} aria-hidden="true" />
-        </DSButton>
-      </Tooltip>
-    </CardActions>
+      external={sourceLink(novel)}
+    />
   );
   if (layout === 'compact') {
     return <NovelCard variant="tile" className={dimmed ? 'nc-hidden-pick' : ''} item={item} libraryStatus={profileEntry?.status} libraryRating={profileEntry?.rating} coverFormat actions={actions} />;
