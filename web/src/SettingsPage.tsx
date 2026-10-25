@@ -1,4 +1,4 @@
-import { Bug, Code2, Compass, Database, ExternalLink, FilterX, Info, Library, Monitor, Moon, Sun, Type } from 'lucide-react';
+import { Bug, Code2, Compass, Database, ExternalLink, FilterX, Info, Library, Monitor, Moon, Star, Sun, Type } from 'lucide-react';
 import { useDisplaySettings } from './settings';
 import { Badge, Card, CardHeader } from './design-system';
 import { loadFilterControlPreferences, loadNavigationPreferences, resetSavedFilters, saveFilterControlPreferences, saveNavigationPreferences } from './preferences';
@@ -91,6 +91,15 @@ export default function SettingsPage(): JSX.Element {
           </button>
         </div>
         <p className="settings-disclosure">Associated names are unordered. The dataset does not prove which title is English, original-language, official, or fan-translated, so this setting deliberately makes none of those claims. Catalog search and compact recommendation records may not include alternates and will fall back consistently.</p>
+      </Card>
+      <Card className="settings-card">
+        <CardHeader title="Recommendation quality" description="Hide recommendations below a minimum NovelUpdates rating." action={<Star size={19} />} />
+        <Select label="Minimum rating" value={settings.minRecRating}
+          onChange={(event) => updateSettings({ minRecRating: Number(event.target.value) })}>
+          <option value={0}>Off (show everything)</option>
+          {[3, 3.5, 3.7, 3.8, 4, 4.2].map((v) => <option key={v} value={v}>{v.toFixed(1)}+</option>)}
+        </Select>
+        <p className="settings-disclosure">Applies to Discover and every For You row. Titles with no ratings yet are still shown. A stricter Rating filter on Discover can tighten this further.</p>
       </Card>
       <Card className="settings-card">
         <CardHeader title="Data source" description="Choose how this browser loads catalog and recommendation data." />

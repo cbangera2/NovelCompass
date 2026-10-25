@@ -9,6 +9,7 @@ import { planLibraryRows, type LibrarySeed } from './forYouLibrary';
 import type { NovelDetail } from './types';
 import { createDataSource } from './data';
 import { sourceInScope, useSourceFilterState } from './sourceFilterState';
+import { passesMinRecRating, useDisplaySettings } from './settings';
 import { mediaTypeInScope, useMediaFilterState, type MediaTypeChoice } from './mediaFilterState';
 import { MIN_GENRE_ROW_TITLES, pickGenreRows, rowTitle, type BrowseFormat } from './forYouGenres';
 import { customRowKey, useForYouRowPrefs } from './forYouRowPrefs';
@@ -457,6 +458,7 @@ export default function ForYouPage(): JSX.Element {
   const [selected, setSelected] = useState<number[]>([]);
   const { selectedTypes } = useMediaFilterState();
   const { selectedSources } = useSourceFilterState();
+  const minRating = useDisplaySettings().settings.minRecRating;
   const { prefs, setHidden, removeCustom } = useForYouRowPrefs();
   const prefsKey = JSON.stringify(prefs);
   const novelsOn = selectedTypes.includes('novel');
@@ -539,7 +541,8 @@ export default function ForYouPage(): JSX.Element {
     const inScope = (row: RowData): RowData => ({
       ...row,
       recommendations: row.recommendations.filter((r) =>
-        mediaTypeInScope(r.target_id, r.media_type, selectedTypes) && sourceInScope(r.target_id, r.source, selectedSources)),
+        mediaTypeInScope(r.target_id, r.media_type, selectedTypes) && sourceInScope(r.target_id, r.source, selectedSources)
+        && passesMinRecRating(r, minRating)),
     });
     const libraryJobs: Array<{ key: string; title: string; subtitle: string; seeds: LibrarySeed[] }> = [
       { key: 'lib-rated', title: 'Because you rated highly', subtitle: 'Seeded by your top-rated titles', seeds: plan.rated },
@@ -657,7 +660,7 @@ export default function ForYouPage(): JSX.Element {
     return out;
     // plan/profile are covered by planKey; seenIds by seenKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey, typesKey, sourcesKey, prefsKey]);
+  }, [selectedKey, hideKnown, seenKey, profileTitles, planKey, typesKey, sourcesKey, minRating, prefsKey]);
 
   const [epoch, setEpoch] = useState(0); // bumped when jobs change so rows remount and re-arm their visibility trigger
   // Rows load when they near the viewport, so a visit only pays for what is actually scrolled to.

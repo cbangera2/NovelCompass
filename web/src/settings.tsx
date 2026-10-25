@@ -5,10 +5,12 @@ export type TitlePreference = 'catalog' | 'alternate';
 export interface DisplaySettings {
   theme: ThemePreference;
   titlePreference: TitlePreference;
+  /** Hide recommendations whose NovelUpdates rating is below this. 0 = off. */
+  minRecRating: number;
 }
 
 const STORAGE_KEY = 'novel-recommender-display-settings-v1';
-const DEFAULTS: DisplaySettings = { theme: 'system', titlePreference: 'catalog' };
+const DEFAULTS: DisplaySettings = { theme: 'system', titlePreference: 'catalog', minRecRating: 3.8 };
 
 function loadSettings(): DisplaySettings {
   try {
@@ -65,6 +67,12 @@ export function useDisplaySettings({ persist = true }: { persist?: boolean } = {
         return updated;
       }),
   };
+}
+
+/** Unrated titles (no votes) always pass: unrated is not the same as low-rated. */
+export function passesMinRecRating(rec: { rating?: number | null; rating_votes?: number | null }, min: number): boolean {
+  if (!min || !rec.rating_votes || !rec.rating) return true;
+  return rec.rating >= min;
 }
 
 export function displayNovelTitle(
