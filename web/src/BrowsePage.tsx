@@ -23,7 +23,7 @@ import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
 import { Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { getMediaBadgeInfo, novelPageUrl, progressUnitLabel } from './novelLinks';
+import { hasMixedFormats, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
 import { CardActions } from './components/CardActions';
 import { loadLocalProfile } from './profile/store';
@@ -115,9 +115,7 @@ export default function BrowsePage({
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
   // The format pill only earns its space when the result set actually mixes formats.
-  const mixedFormats = new Set(
-    items.map((novel) => getMediaBadgeInfo({ id: novel.id, media_type: novel.media_type, source: novel.source }).formatKey),
-  ).size > 1;
+  const mixedFormats = hasMixedFormats(items);
   const [query, setQuery] = useState(initialString('q', 'query'));
   const [sort, setSort] = useState<BrowseSort>(
     initialParams.has('sort') &&

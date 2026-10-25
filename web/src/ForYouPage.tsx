@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { DSButton, Skeleton } from './design-system';
-import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
+import { hasMixedFormats, novelPageUrl } from './novelLinks';
 import { loadLocalProfile, subscribeLocalProfile } from './profile/store';
 import { computeTasteProfile, type TasteProfile } from './profile/taste';
 import type { LocalUserProfile, ReadingStatus } from './profile/types';
@@ -259,10 +259,13 @@ function previewFor(rec: RowRec): PreviewData {
   };
 }
 
-/** The format pill only earns its space when a row actually mixes formats. */
-function hasMixedFormats(recs: RowRec[]): boolean {
-  const formats = new Set(recs.map((rec) => getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type }).formatKey));
-  return formats.size > 1;
+/** Mixed-format check over the cards a row actually renders (RecCard drops "not for me" picks). */
+function rowMixesFormats(recs: RowRec[], feedback: ReadonlyMap<number, string>): boolean {
+  return hasMixedFormats(
+    recs
+      .filter((rec) => feedback.get(rec.target_id) !== 'not_for_me')
+      .map((rec) => ({ id: rec.target_id, media_type: rec.media_type, source: rec.source })),
+  );
 }
 
 function RecCard({ rec, library, eager, coverFormat = false }: { rec: RowRec; library: Map<number, ReadingStatus>; eager?: boolean; coverFormat?: boolean }) {
@@ -347,6 +350,7 @@ function Row({
   onHide?: () => void;
   onVisible: () => void;
 }) {
+  const { feedback } = useLocalProfile();
   const track = useRef<HTMLDivElement>(null);
   const section = useRef<HTMLElement>(null);
   const visibleRef = useRef(onVisible);
@@ -363,7 +367,7 @@ function Row({
   }, []);
   const scroll = (direction: number) =>
     track.current?.scrollBy({ left: direction * track.current.clientWidth * 0.85, behavior: 'smooth' });
-  const mixedFormats = state.status === 'ready' && hasMixedFormats(state.recommendations);
+  const mixedFormats = state.status === 'ready' && rowMixesFormats(state.recommendations, feedback);
 
   return (
     <section className="fy-row" ref={section}>
@@ -408,6 +412,7 @@ function RowGrid({
   library: Map<number, ReadingStatus>;
   onBack: () => void;
 }) {
+  const { feedback } = useLocalProfile();
   const [state, setState] = useState<RowState>(preview);
   const [fullyLoaded, setFullyLoaded] = useState(false);
   const [shown, setShown] = useState(GRID_BATCH);
@@ -423,7 +428,7 @@ function RowGrid({
   }, [job]);
 
   const total = state.status === 'ready' ? state.recommendations.length : 0;
-  const mixedFormats = state.status === 'ready' && hasMixedFormats(state.recommendations);
+  const mixedFormats = state.status === 'ready' && rowMixesFormats(state.recommendations, feedback);
   useEffect(() => {
     const node = sentinel.current;
     if (!node || shown >= total) return;

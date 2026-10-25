@@ -37,7 +37,7 @@ import { displayNovelTitle, passesMinRecRating, useDisplaySettings } from './set
 import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
-import { getMediaBadgeInfo, novelPageUrl } from './novelLinks';
+import { getMediaBadgeInfo, hasMixedFormats, novelPageUrl } from './novelLinks';
 import { previewFromRecommendation, registerPreviews } from './CoverPreview';
 import { MediaBadges, NovelCard } from './components/NovelCard';
 import { CardActions } from './components/CardActions';
@@ -728,7 +728,7 @@ export default function App(): JSX.Element {
     .slice(0, maxResults), [data, feedbackByNovel, hideLibraryTitles, maxResults, profileEntries, settings.minRecRating]);
   // The format pill only earns its space when the result set actually mixes formats.
   const discoverMixedFormats = useMemo(
-    () => new Set(filteredRecommendations.map((rec) => getMediaBadgeInfo({ id: rec.target_id, media_type: rec.media_type, source: rec.source }).formatKey)).size > 1,
+    () => hasMixedFormats(filteredRecommendations.map((rec) => ({ id: rec.target_id, media_type: rec.media_type, source: rec.source }))),
     [filteredRecommendations],
   );
 
