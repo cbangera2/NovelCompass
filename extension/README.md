@@ -5,20 +5,31 @@ site's live links, releases, reviews, rankings, lists, and account actions.
 
 ## Screenshots
 
-### Compact series view
+Screenshots of the [Novel Compass web app](https://cbangera2.github.io/NovelCompass/).
 
-The cover, essential metadata, description, and details fit in the first
-viewport. Overview, chapters, reviews, and similar titles continue down one
-page; the compact section bar provides jump links without hiding content.
+### Discover
 
-![Compact Novel Compass series view](../docs/screenshots/extension/series-detail-saint-dark-fantasy.png)
+Relationship-first discovery: pick a starting title you loved and the
+recommendation engine traces shared tropes, related works, and community recs
+across the full catalog.
 
-### Series rankings
+![Discover view of the Novel Compass web app](../docs/screenshots/web/web-discover.png)
 
-![Novel Updates series rankings restyled by Novel Compass](../docs/screenshots/extension/series-rankings.png)
+### Series detail
 
-Screenshots contain page content only. Browser chrome and personal account
-details are excluded or redacted.
+The cover, essential metadata, and percentile stats for every title fit in the
+first viewport; overview, insights, and similar titles continue down the page.
+
+![Omniscient Reader's Viewpoint detail view in the Novel Compass web app](../docs/screenshots/web/web-series-detail.png)
+
+### Browse the catalog
+
+Every title in the snapshot — ranked by most read or top rated, with format
+and language filters.
+
+![Browse view of the Novel Compass web app](../docs/screenshots/web/web-browse.png)
+
+Screenshots contain page content only. Personal account details are excluded.
 
 ## Build the lightweight extension
 
