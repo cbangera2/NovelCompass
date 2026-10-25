@@ -4,7 +4,7 @@ import type { RecommendationDataSource } from '../data';
 import type { NovelSearchResult } from '../types';
 import { Card, DSButton } from '../design-system';
 import { Tooltip } from '../ui';
-import { novelPageUrl } from '../novelLinks';
+import { hasMixedFormats, novelPageUrl } from '../novelLinks';
 import { NovelCard } from '../components/NovelCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { ResultLayoutToggle } from '../components/ResultLayoutToggle';
@@ -53,6 +53,13 @@ export function ProfileLibrary({
       .sort((a, b) => (b.rating || 0) - (a.rating || 0) || a.imported_title.localeCompare(b.imported_title));
   }, [profile, query, rating, status]);
   const visibleEntries = useMemo(() => entries.slice(0, visibleCount), [entries, visibleCount]);
+  const mixedFormats = useMemo(() => hasMixedFormats(
+    visibleEntries.flatMap((entry) => (entry.novel_id == null ? [] : [{
+      id: entry.novel_id,
+      media_type: catalog.get(entry.slug)?.media_type,
+      source: catalog.get(entry.slug)?.source,
+    }])),
+  ), [visibleEntries, catalog]);
 
   useEffect(() => {
     setVisibleCount(60);
@@ -146,7 +153,7 @@ export function ProfileLibrary({
                   rating: entry.rating,
                 }}
                 libraryStatus={entry.status}
-                coverFormat
+                coverFormat={mixedFormats}
                 caption={entry.progress || undefined}
                 actions={(
                   <Tooltip content="Find similar titles">

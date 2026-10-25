@@ -23,7 +23,7 @@ import './browse.css';
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { FieldGroup, Select, Tooltip } from './ui';
 import { Card, CardHeader, DSButton, Skeleton } from './design-system';
-import { novelPageUrl, progressUnitLabel } from './novelLinks';
+import { hasMixedFormats, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
 import { CardActions } from './components/CardActions';
 import { loadLocalProfile } from './profile/store';
@@ -114,6 +114,8 @@ export default function BrowsePage({
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
+  // The format pill only earns its space when the result set actually mixes formats.
+  const mixedFormats = hasMixedFormats(items);
   const [query, setQuery] = useState(initialString('q', 'query'));
   const [sort, setSort] = useState<BrowseSort>(
     initialParams.has('sort') &&
@@ -932,6 +934,7 @@ export default function BrowsePage({
             key={novel.id}
             novel={novel}
             layout={layout}
+            coverFormat={mixedFormats}
             novelUrl={novelUrl}
             similarUrl={similarUrl}
             persistDisplaySettings={persistPreferences}
@@ -995,6 +998,7 @@ export default function BrowsePage({
 function BrowseCard({
   novel,
   layout,
+  coverFormat,
   novelUrl,
   similarUrl,
   onSelectAuthor,
@@ -1004,6 +1008,7 @@ function BrowseCard({
 }: {
   novel: BrowseNovel;
   layout: ResultLayout;
+  coverFormat: boolean;
   novelUrl: (novel: BrowseNovel) => string;
   similarUrl: (novel: BrowseNovel) => string | null;
   onSelectAuthor: (author: string) => void;
@@ -1069,7 +1074,7 @@ function BrowseCard({
     </CardActions>
   );
   if (layout === 'compact') {
-    return <NovelCard variant="tile" className={dimmed ? 'nc-hidden-pick' : ''} item={item} libraryStatus={profileEntry?.status} libraryRating={profileEntry?.rating} coverFormat actions={actions} />;
+    return <NovelCard variant="tile" className={dimmed ? 'nc-hidden-pick' : ''} item={item} libraryStatus={profileEntry?.status} libraryRating={profileEntry?.rating} coverFormat={coverFormat} actions={actions} />;
   }
   return (
     <NovelCard

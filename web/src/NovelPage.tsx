@@ -16,7 +16,7 @@ import { LocalNovelFeedback, LocalUserProfile, ReadingStatus } from './profile/t
 import { displayNovelTitle, useDisplaySettings } from './settings';
 import { CuratedListSummary, NovelDetail, NovelInsights, Recommendation, RelatedSeriesItem } from './types';
 import { catalogVerdicts, CuratedListsCard, RatingDistributionCard, SeriesCard, summarizeRatings } from './NovelReaderSignals';
-import { audienceLabel, formatStatusLabel, getMediaBadgeInfo, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
+import { audienceLabel, formatStatusLabel, getMediaBadgeInfo, hasMixedFormats, hasUsableCover, novelPageUrl, progressUnitLabel } from './novelLinks';
 import { CollapsibleFacetList } from './CollapsibleFacetList';
 import { CHANNEL_LABELS, previewFromRecommendation, registerPreviews, signalStrength } from './CoverPreview';
 import { NovelCard } from './components/NovelCard';
@@ -114,7 +114,7 @@ export default function NovelPage(): JSX.Element {
   const knownCount = related.slice(0, 10).filter((item) => libraryIds.has(item.target_id)).length;
   // A novel's related titles are usually all novels; the format pill only helps when they mix formats.
   const relatedMixedFormats =
-    new Set(related.slice(0, 10).map((item) => getMediaBadgeInfo({ id: item.target_id, media_type: item.media_type, source: item.source }).formatKey)).size > 1;
+    hasMixedFormats(related.slice(0, 10).map((item) => ({ id: item.target_id, media_type: item.media_type, source: item.source })));
   const title = detail ? displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference) : '';
   useEffect(() => {
     if (title) document.title = `${title} - Novel Compass`;
