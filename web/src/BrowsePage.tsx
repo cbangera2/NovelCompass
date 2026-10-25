@@ -25,6 +25,8 @@ import { FieldGroup, Select, Tooltip } from './ui';
 import { Card, CardHeader, DSButton, Skeleton } from './design-system';
 import { novelPageUrl, progressUnitLabel } from './novelLinks';
 import { NovelCard } from './components/NovelCard';
+import { registerPreviews } from './CoverPreview';
+import { previewFromBrowse } from './previewData';
 import { CardActions } from './components/CardActions';
 import { loadLocalProfile } from './profile/store';
 import { useLocalProfile } from './profile/useLocalProfile';
@@ -114,6 +116,7 @@ export default function BrowsePage({
   const [source, setSource] = useState<RecommendationDataSource | null>(null);
   const [options, setOptions] = useState<FilterOptions>({ genres: [] });
   const [items, setItems] = useState<BrowseNovel[]>([]);
+  useEffect(() => registerPreviews(items.map(previewFromBrowse)), [items]);
   const [query, setQuery] = useState(initialString('q', 'query'));
   const [sort, setSort] = useState<BrowseSort>(
     initialParams.has('sort') &&

@@ -16,6 +16,7 @@ export function RatingChip({
   showVotes = true,
   variant = 'plain',
   size = 13,
+  hint = true,
   className = '',
 }: {
   rating?: number | null;
@@ -23,13 +24,15 @@ export function RatingChip({
   showVotes?: boolean;
   variant?: 'plain' | 'pill' | 'overlay';
   size?: number;
+  /** Native tooltip with the vote count. Turn off inside cards, where the hover card is the one tooltip. */
+  hint?: boolean;
   className?: string;
 }) {
   const hasVotes = votes != null && votes > 0;
   return (
     <span
       className={`rating-chip rating-chip-${variant} ${className}`.trim()}
-      title={hasVotes ? `${votes.toLocaleString()} rating votes` : 'Rating'}
+      title={hint ? (hasVotes ? `${votes.toLocaleString()} rating votes` : 'Rating') : undefined}
     >
       <Star size={size} fill="currentColor" aria-hidden="true" />
       <b>{formatRating(rating)}</b>

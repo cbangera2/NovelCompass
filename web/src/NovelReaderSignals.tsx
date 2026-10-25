@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, ExternalLink, Users } from 'lucide-react';
 import { CuratedListSummary, NovelDetail, NovelInsights, RelatedSeriesItem } from './types';
+import { registerPreviews } from './CoverPreview';
 import { novelPageUrl } from './novelLinks';
+import { previewFromSearch } from './previewData';
 import { staticListIds } from './forYouStatic';
 import { listPageUrl } from './listPageUrl';
 
@@ -78,6 +80,7 @@ const RELATION_LABELS: Record<string, string> = {
 const RELATION_ORDER = ['parent', 'prequel', 'sequel', 'spin_off', 'side_story', 'adaptation', 'alternative', 'character', 'related', 'other'];
 
 export function SeriesCard({ items, fromId }: { items: RelatedSeriesItem[]; fromId: number }) {
+  useEffect(() => registerPreviews(items.map(previewFromSearch)), [items]);
   if (!items.length) return null;
   const extra = [...new Set(items.map((item) => item.relation))].filter((relation) => !RELATION_ORDER.includes(relation));
   const groups = [...RELATION_ORDER, ...extra].map((relation) => ({ relation, items: items.filter((item) => item.relation === relation) }))
@@ -87,7 +90,7 @@ export function SeriesCard({ items, fromId }: { items: RelatedSeriesItem[]; from
     {groups.map((group) => <div key={group.relation} className="series-group">
       <h4>{RELATION_LABELS[group.relation] || group.relation}</h4>
       <ul>{group.items.slice(0, 6).map((item) => <li key={item.id}>
-        <a href={novelPageUrl(item.id, fromId)} data-preview-id={item.id}>
+        <a href={novelPageUrl(item.id, fromId)} data-preview-id={item.id} data-preview-card>
           <span className="series-cover">{item.cover_url ? <img src={item.cover_url} alt="" loading="lazy" /> : <BookOpen size={14} />}</span>
           <span><strong>{item.title}</strong><small>{[item.media_type, item.year].filter(Boolean).join(' · ')}</small></span>
         </a>

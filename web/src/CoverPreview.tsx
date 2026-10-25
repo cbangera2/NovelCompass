@@ -2,95 +2,48 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { configuredDataMode, createDataSource, DataMode } from './data';
 import { useDataModePreference } from './dataModePreference';
-import { audienceLabel, formatStatusLabel, progressUnitLabel } from './novelLinks';
-import { NovelDetail, Recommendation } from './types';
+import { compactText, mergeDefined, previewFacts, previewFromDetail, previewTags, signalStrength, TAG_LIMIT, type PreviewData } from './previewData';
 import './cover-preview.css';
 
 /**
- * Global cover hover card. Any element carrying `data-preview-id` shows it on hover or focus.
- * An ancestor with `data-preview-card` is used as the placement anchor so the card sits beside
- * the whole item instead of covering the cover being hovered.
+ * The one hover card for every title in the app. Contract:
+ * - `data-preview-id` goes on the item's single focusable link (or button), never on its cover.
+ * - `data-preview-card` goes on the whole tile or row. Hovering anywhere on it opens the card, which
+ *   anchors beside it, so moving from cover to title is one continuous hover.
+ * - Surfaces call `registerPreviews` with whatever they already loaded; the synopsis is fetched when missing.
+ * The card has one shape: header, synopsis, optional "why it surfaced", tags, then facts the surface does not show.
  */
-export interface PreviewData {
-  id: number;
-  title: string;
-  author?: string;
-  language?: string;
-  rating?: number;
-  rating_votes?: number;
-  reading_list_count?: number;
-  chapters_trans?: number;
-  status_trans?: string;
-  media_type?: string;
-  year?: number;
-  synopsis?: string;
-  tags?: string[];
-  matchPercent?: number;
-  signals?: Array<{ label: string; rank: number }>;
-  sharedTags?: string[];
-  bullets?: string[];
-  curatedListCount?: number;
-  /** Rating/status already show on the cover, so the card leads with the synopsis instead. */
-  statsOnCover?: boolean;
-}
 
-export const CHANNEL_LABELS: Record<string, string> = {
-  vector: 'Meaning', tag: 'Tags', direct_rec: 'Reader recs', rec_list: 'Curated lists', ease: 'Co-read pattern', structural: 'Catalog structure'
-};
-export const signalStrength = (rank: number) => Math.max(0.12, 1 - Math.log10(Math.max(1, rank)) / 2);
+const SHOW_DELAY = 240;
+const SWITCH_DELAY = 60;
+const HIDE_DELAY = 60;
+const CARD_ID = 'cover-preview-card';
 
 // Keyed by data mode so switching between API and static data never reuses the other mode's preview.
 const previewKey = (mode: DataMode, id: number) => `${mode}:${id}`;
 const registry = new Map<string, PreviewData>();
 const detailCache = new Map<string, Promise<PreviewData | null>>();
 
-/** Make already-loaded data available to the card so it opens instantly without a fetch. */
-export function registerPreviews(items: PreviewData[]) {
+/** Make already-loaded data available to the card so it opens instantly without a fetch. Undefined fields never overwrite. */
+export function registerPreviews(items: Array<PreviewData | null | undefined>) {
   const mode = configuredDataMode();
   for (const item of items) {
+    if (!item) continue;
     const key = previewKey(mode, item.id);
-    registry.set(key, { ...registry.get(key), ...item });
+    registry.set(key, mergeDefined(registry.get(key), item));
   }
-}
-
-export function previewFromRecommendation(item: Recommendation): PreviewData {
-  const signals = Object.entries(CHANNEL_LABELS)
-    .map(([channel, label]) => ({ label, rank: item.channel_ranks?.[channel] }))
-    .filter((signal): signal is { label: string; rank: number } => Number.isFinite(signal.rank))
-    .sort((a, b) => a.rank - b.rank);
-  return {
-    id: item.target_id, title: item.title, author: item.author, language: item.language, rating: item.rating,
-    rating_votes: item.rating_votes, reading_list_count: item.reading_list_count, chapters_trans: item.chapters_trans,
-    status_trans: item.status_trans, media_type: item.media_type, matchPercent: item.match_score_percent, signals,
-    sharedTags: item.shared_tags, bullets: item.evidence_bullets.filter((bullet) => !/^(Shared key tropes|Co-occurs on)/i.test(bullet)).slice(0, 3),
-    curatedListCount: item.curated_lists?.length
-  };
-}
-
-function fromDetail(detail: NovelDetail): PreviewData {
-  return {
-    id: detail.id, title: detail.title, author: detail.author, language: detail.language, rating: detail.rating,
-    rating_votes: detail.rating_votes, reading_list_count: detail.reading_list_count, chapters_trans: detail.chapters_trans,
-    status_trans: detail.status_trans, media_type: detail.media_type, year: detail.year, synopsis: detail.synopsis,
-    tags: detail.tags?.slice(0, 10)
-  };
 }
 
 function loadDetail(id: number, mode: DataMode): Promise<PreviewData | null> {
   const key = previewKey(mode, id);
   let pending = detailCache.get(key);
   if (!pending) {
-    pending = createDataSource(mode).then((source) => source.getNovel(id)).then(fromDetail).catch(() => null);
+    pending = createDataSource(mode).then((source) => source.getNovel(id)).then(previewFromDetail).catch(() => null);
     detailCache.set(key, pending);
     void pending.then((value) => { if (!value && detailCache.get(key) === pending) detailCache.delete(key); });
   }
   return pending;
 }
-
-const compact = (text: string, max = 190) => {
-  const clean = text.replace(/\s+/g, ' ').trim();
-  return clean.length > max ? `${clean.slice(0, max).replace(/\s\S*$/, '')}…` : clean;
-};
 
 const GAP = 12;
 const MARGIN = 10;
@@ -108,7 +61,29 @@ function place(anchor: DOMRect, card: { width: number; height: number }) {
   return { left: clampLeft(anchor.right + GAP), top: clampTop(anchor.top) };
 }
 
-const triggerOf = (target: EventTarget | null) => target instanceof Element ? target.closest<HTMLElement>('[data-preview-id]') : null;
+/** Pointer: anywhere on a `data-preview-card` resolves to that item's one trigger. Focus: only the trigger itself. */
+function triggerOf(target: EventTarget | null, wide: boolean): HTMLElement | null {
+  if (!(target instanceof Element)) return null;
+  if (wide) {
+    const card = target.closest<HTMLElement>('[data-preview-card]');
+    const inner = card && (card.matches('[data-preview-id]') ? card : card.querySelector<HTMLElement>('[data-preview-id]'));
+    if (inner) return inner;
+  }
+  return target.closest<HTMLElement>('[data-preview-id]');
+}
+
+/** Registered data plus the lazily fetched detail, remembered so the second hover is instant. */
+function ensureDetail(id: number, mode: DataMode): Promise<PreviewData | null> {
+  const key = previewKey(mode, id);
+  const known = registry.get(key);
+  if (known?.synopsis) return Promise.resolve(known);
+  return loadDetail(id, mode).then((detail) => {
+    if (!detail) return null;
+    const merged = mergeDefined<PreviewData>(detail, registry.get(key) ?? {});
+    registry.set(key, merged);
+    return merged;
+  });
+}
 
 export function CoverPreviewHost() {
   const { mode } = useDataModePreference();
@@ -118,43 +93,58 @@ export function CoverPreviewHost() {
   const cardRef = useRef<HTMLDivElement>(null);
   const showTimer = useRef<number>();
   const hideTimer = useRef<number>();
+  const pending = useRef<HTMLElement | null>(null);
+  const dismissed = useRef<HTMLElement | null>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   useEffect(() => {
     if (!window.matchMedia('(hover: hover)').matches) return undefined;
     const open = (trigger: HTMLElement) => {
       window.clearTimeout(hideTimer.current);
-      if (activeRef.current?.trigger === trigger) return;
+      if (activeRef.current?.trigger === trigger || dismissed.current === trigger) return;
       window.clearTimeout(showTimer.current);
       const id = Number(trigger.dataset.previewId);
       if (!Number.isFinite(id)) return;
-      showTimer.current = window.setTimeout(() => { setPos(null); setActive({ id, trigger }); }, activeRef.current ? 60 : 240);
+      pending.current = trigger;
+      void ensureDetail(id, modeRef.current);
+      showTimer.current = window.setTimeout(() => { setPos(null); setActive({ id, trigger }); }, activeRef.current ? SWITCH_DELAY : SHOW_DELAY);
     };
     const close = () => {
       window.clearTimeout(showTimer.current);
       window.clearTimeout(hideTimer.current);
-      hideTimer.current = window.setTimeout(() => setActive(null), 60);
+      pending.current = null;
+      hideTimer.current = window.setTimeout(() => setActive(null), HIDE_DELAY);
     };
-    const onOver = (event: Event) => { const trigger = triggerOf(event.target); if (trigger) open(trigger); };
-    const onOut = (event: Event) => {
-      const from = triggerOf(event.target);
-      if (from && triggerOf((event as MouseEvent).relatedTarget) !== from) close();
+    const over = (wide: boolean) => (event: Event) => { const trigger = triggerOf(event.target, wide); if (trigger) open(trigger); };
+    const out = (wide: boolean) => (event: Event) => {
+      const from = triggerOf(event.target, wide);
+      if (!from || triggerOf((event as MouseEvent).relatedTarget, wide) === from) return;
+      if (dismissed.current === from) dismissed.current = null;
+      close();
     };
-    const dismiss = () => { window.clearTimeout(showTimer.current); setActive(null); };
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss(); };
-    document.addEventListener('pointerover', onOver);
-    document.addEventListener('pointerout', onOut);
-    document.addEventListener('focusin', onOver);
-    document.addEventListener('focusout', onOut);
+    const dismiss = () => { window.clearTimeout(showTimer.current); pending.current = null; setActive(null); };
+    // Esc keeps the card closed until the pointer or focus leaves this item.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      dismissed.current = activeRef.current?.trigger ?? pending.current;
+      dismiss();
+    };
+    const [pointerOver, pointerOut, focusOver, focusOut] = [over(true), out(true), over(false), out(false)];
+    document.addEventListener('pointerover', pointerOver);
+    document.addEventListener('pointerout', pointerOut);
+    document.addEventListener('focusin', focusOver);
+    document.addEventListener('focusout', focusOut);
     document.addEventListener('keydown', onKey);
     window.addEventListener('scroll', dismiss, true);
     window.addEventListener('blur', dismiss);
     return () => {
-      document.removeEventListener('pointerover', onOver);
-      document.removeEventListener('pointerout', onOut);
-      document.removeEventListener('focusin', onOver);
-      document.removeEventListener('focusout', onOut);
+      document.removeEventListener('pointerover', pointerOver);
+      document.removeEventListener('pointerout', pointerOut);
+      document.removeEventListener('focusin', focusOver);
+      document.removeEventListener('focusout', focusOut);
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('scroll', dismiss, true);
       window.removeEventListener('blur', dismiss);
@@ -168,14 +158,23 @@ export function CoverPreviewHost() {
     let cancelled = false;
     const known = registry.get(previewKey(mode, active.id)) || null;
     setData(known);
-    if (known?.statsOnCover ? !known.synopsis : !known?.tags?.length && !known?.sharedTags?.length) {
-      void loadDetail(active.id, mode).then((detail) => {
-        if (cancelled || !detail) return;
-        setData({ ...detail, ...Object.fromEntries(Object.entries(known || {}).filter(([, value]) => value !== undefined)) } as PreviewData);
-      });
+    if (!known?.synopsis) {
+      void ensureDetail(active.id, mode).then((detail) => { if (!cancelled && detail) setData(detail); });
     }
     return () => { cancelled = true; };
   }, [active, mode]);
+
+  const shown = Boolean(active && data);
+  const trigger = active?.trigger;
+  useEffect(() => {
+    if (!shown || !trigger) return undefined;
+    const previous = trigger.getAttribute('aria-describedby');
+    trigger.setAttribute('aria-describedby', previous ? `${previous} ${CARD_ID}` : CARD_ID);
+    return () => {
+      if (previous === null) trigger.removeAttribute('aria-describedby');
+      else trigger.setAttribute('aria-describedby', previous);
+    };
+  }, [shown, trigger]);
 
   useLayoutEffect(() => {
     if (!active || !data || !cardRef.current) return;
@@ -186,32 +185,31 @@ export function CoverPreviewHost() {
   }, [active, data]);
 
   if (!active || !data) return null;
-  const tags = data.sharedTags?.length ? data.sharedTags : data.tags || [];
+  const { label: tagLabel, tags } = previewTags(data);
+  const facts = previewFacts(data);
+  const hasWhy = Boolean(data.signals?.length || data.bullets?.length);
   return createPortal(
-    <div className="cover-preview" ref={cardRef} role="tooltip" style={pos ? { left: pos.left, top: pos.top, opacity: 1 } : { left: 0, top: 0, opacity: 0 }}>
+    <div id={CARD_ID} className="cover-preview" ref={cardRef} role="tooltip" style={pos ? { left: pos.left, top: pos.top, opacity: 1 } : { left: 0, top: 0, opacity: 0 }}>
       <strong>{data.title}</strong>
-      <p>{[data.author, data.language, data.media_type, data.year].filter(Boolean).join(' · ')}</p>
-      {data.statsOnCover && data.synopsis && <p className="pop-synopsis">{compact(data.synopsis, 320)}</p>}
-      {!data.statsOnCover && <div className="pop-facts">
-        <span><b>{data.rating ? data.rating.toFixed(1) : '—'}</b>rating{data.rating_votes != null ? ` · ${data.rating_votes.toLocaleString()} votes` : ''}</span>
-        {data.reading_list_count != null && <span><b>{data.reading_list_count.toLocaleString()}</b>{audienceLabel(data.id, data.media_type)}</span>}
-        {data.chapters_trans != null && <span><b>{data.chapters_trans > 0 ? data.chapters_trans.toLocaleString() : '—'}</b>{progressUnitLabel(data.id, data.media_type)}{data.status_trans ? ` · ${formatStatusLabel(data.status_trans)}` : ''}</span>}
-      </div>}
-      {data.signals && data.signals.length > 0 && <div className="pop-signals">
+      <p>{[data.author, data.language, data.media_type?.replace(/_/g, ' '), data.year].filter(Boolean).join(' · ')}</p>
+      {data.synopsis && <p className="pop-synopsis">{compactText(data.synopsis)}</p>}
+      {hasWhy && <div className="pop-signals">
         <h5>Why it surfaced{data.matchPercent != null ? ` · ${data.matchPercent.toFixed(0)}% match` : ''}</h5>
-        {data.signals.map((signal) => <div key={signal.label}>
+        {data.signals?.map((signal) => <div key={signal.label}>
           <span>{signal.label}</span>
           <i><u style={{ width: `${signalStrength(signal.rank) * 100}%` }} /></i>
           <b>#{signal.rank}</b>
         </div>)}
+        {data.bullets && data.bullets.length > 0 && <ul>{data.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
       </div>}
       {tags.length > 0 && <div className="pop-tags">
-        <h5>{data.sharedTags?.length ? `Shared tags · ${data.sharedTags.length}` : 'Top tags'}</h5>
-        <span>{tags.slice(0, 8).map((tag) => <em key={tag}>{tag}</em>)}{tags.length > 8 && <em>+{tags.length - 8}</em>}</span>
+        <h5>{tagLabel}</h5>
+        <span>{tags.slice(0, TAG_LIMIT).map((tag) => <em key={tag}>{tag}</em>)}{tags.length > TAG_LIMIT && <em>+{tags.length - TAG_LIMIT}</em>}</span>
       </div>}
-      {!data.statsOnCover && !data.signals?.length && data.synopsis && <p className="pop-synopsis">{compact(data.synopsis)}</p>}
-      {data.bullets && data.bullets.length > 0 && <ul>{data.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
-      {(data.curatedListCount || 0) > 0 && <p className="pop-lists">On {data.curatedListCount} curated list{data.curatedListCount === 1 ? '' : 's'}</p>}
+      {facts.length > 0 && <div className="pop-facts">
+        {facts.map((fact) => <span key={fact.label}><b>{fact.value}</b>{fact.label}</span>)}
+      </div>}
+      {data.onYourLists && data.onYourLists.length > 0 && <p className="pop-lists">On your list: {data.onYourLists.join(', ')}</p>}
     </div>,
     document.body
   );

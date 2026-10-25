@@ -4,7 +4,9 @@ import type { RecommendationDataSource } from '../data';
 import type { NovelSearchResult } from '../types';
 import { Card, DSButton } from '../design-system';
 import { Tooltip } from '../ui';
+import { registerPreviews } from '../CoverPreview';
 import { novelPageUrl } from '../novelLinks';
+import { previewFromProfile } from '../previewData';
 import { NovelCard } from '../components/NovelCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { ResultLayoutToggle } from '../components/ResultLayoutToggle';
@@ -75,6 +77,10 @@ export function ProfileLibrary({
     return () => { cancelled = true; };
   }, [source, visibleEntries]);
 
+  useEffect(() => {
+    registerPreviews(visibleEntries.map((entry) => previewFromProfile(entry, catalog.get(entry.slug))));
+  }, [visibleEntries, catalog]);
+
   const open = (entry: ProfileEntry) => {
     if (entry.novel_id != null) navigateTo(novelPageUrl(entry.novel_id));
   };
@@ -126,7 +132,7 @@ export function ProfileLibrary({
                     <span className="nc-cover-fallback" aria-hidden="true">{entry.imported_title.slice(0, 1) || <BookOpen />}</span>
                     <StatusBadge status={entry.status} variant="overlay" />
                   </span>
-                  <strong className="nc-title" title={entry.imported_title}>{entry.imported_title}</strong>
+                  <strong className="nc-title">{entry.imported_title}</strong>
                   <small className="nc-caption">Not in this snapshot</small>
                 </article>
               );
@@ -187,9 +193,9 @@ export function ProfileLibrary({
               </>
             );
             return (
-              <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`} data-preview-id={entry.novel_id ?? undefined}>
+              <article key={entry.slug} className={`profile-entry ${entry.novel_id == null ? 'unmatched' : ''}`} data-preview-card={entry.novel_id != null ? '' : undefined}>
                 {entry.novel_id != null
-                  ? <button className="profile-entry-open" onClick={() => open(entry)} aria-label={`Open details for ${entry.imported_title}`}>{body}</button>
+                  ? <button className="profile-entry-open" data-preview-id={entry.novel_id} onClick={() => open(entry)} aria-label={`Open details for ${entry.imported_title}`}>{body}</button>
                   : <div className="profile-entry-open">{body}</div>}
                 {entry.novel_id != null
                   ? <a href={appUrl(`?seed=${entry.novel_id}`)}><Sparkles size={14} /> Find similar</a>

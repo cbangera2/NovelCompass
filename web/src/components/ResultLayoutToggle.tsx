@@ -7,7 +7,7 @@ import type { ResultLayout } from '../preferences';
 export function ResultLayoutToggle({ value, onChange }: { value: ResultLayout; onChange: (layout: ResultLayout) => void }) {
   return (
     <div className="result-layout-toggle" role="group" aria-label="Result layout">
-      <Tooltip content="Compact posters: rating, status and match on the cover. Hover for the synopsis.">
+      <Tooltip content="Compact posters: rating, status and match on the cover. Hover a poster for its synopsis and tags.">
         <DSButton
           variant={value === 'compact' ? 'primary' : 'ghost'}
           aria-label="Compact posters"
