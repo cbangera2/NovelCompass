@@ -3,7 +3,6 @@ import {
   BookOpen,
   ExternalLink,
   Search,
-  SlidersHorizontal,
   Sparkles,
   Star,
   Users,
@@ -45,6 +44,9 @@ import { RatingChip } from './components/RatingChip';
 import { openGlobalSearch, SEED_SELECTED_EVENT } from './components/searchEvents';
 import { ActiveFilterChips, CoreFilters, type ActiveFilter } from './components/CoreFilters';
 import { formatMinRating } from './components/coreFilterParams';
+import { AdvancedFilters } from './components/AdvancedFilters';
+import { advancedActiveFilters, genreListsFrom, genreStatesFrom, type AdvancedFilterValues } from './components/advancedFilterModel';
+import { formatList, parseList } from './components/tokenInput';
 
 const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
   default: module.NovelInsightsPanel
@@ -120,7 +122,7 @@ export default function App(): JSX.Element {
   const savedFilters = loadFilterSnapshot('discover', {
     hiddenGemMode: false, excludeHarem: false, excludeBL: false, excludeYuri: false,
     requireCompleted: false, language: '', minRating: 0, minRatingVotes: 0, maxReaders: 0,
-    minYear: 0, maxYear: 0, genreStates: {} as Record<string, 'include' | 'exclude'>,
+    minYear: 0, maxYear: 0, minChapters: 0, genreStates: {} as Record<string, 'include' | 'exclude'>,
     includeTagsText: '', excludeTagsText: '', tagWeight: .8, directRecWeight: 1.2,
     listWeight: 1, structuralWeight: .6, hiddenGemStrength: .3, maxResults: 60,
     types: ''
@@ -159,6 +161,7 @@ export default function App(): JSX.Element {
   const [maxReaders, setMaxReaders] = useState(savedNumber(initialRoute.maxReaders, 0));
   const [minYear, setMinYear] = useState(savedNumber(initialRoute.minYear, 0));
   const [maxYear, setMaxYear] = useState(savedNumber(initialRoute.maxYear, 0));
+  const [minChapters, setMinChapters] = useState(savedNumber(initialRoute.minChapters, 0));
   const [genreStates, setGenreStates] = useState<Record<string, 'include' | 'exclude'>>(() =>
     Object.fromEntries(Object.entries(initialRoute.genreStates).filter(([, value]) => value === 'include' || value === 'exclude'))
   );
@@ -172,6 +175,7 @@ export default function App(): JSX.Element {
   const [maxResults, setMaxResults] = useState(savedNumber(initialRoute.maxResults, 60));
   const [routeRevision, setRouteRevision] = useState(0);
   const [genres, setGenres] = useState<string[]>([]);
+  const [tagChoices, setTagChoices] = useState<string[]>([]);
   const [languageChoices, setLanguageChoices] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
@@ -206,10 +210,10 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     saveFilterSnapshot('discover', { hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted,
-      language, minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
+      language, minRating, minRatingVotes, maxReaders, minYear, maxYear, minChapters, genreStates, includeTagsText,
       excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults });
   }, [hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language, minRating,
-    minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
+    minRatingVotes, maxReaders, minYear, maxYear, minChapters, genreStates, includeTagsText, excludeTagsText,
     tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults]);
 
   useEffect(() => {
@@ -218,7 +222,7 @@ export default function App(): JSX.Element {
         seed: forYouMode ? undefined : selectedNovel?.id,
         forYou: forYouMode,
         hiddenGemMode, excludeHarem, excludeBL,
-        excludeYuri, requireCompleted, language, minRating, minRatingVotes, maxReaders, minYear, maxYear,
+        excludeYuri, requireCompleted, language, minRating, minRatingVotes, maxReaders, minYear, maxYear, minChapters,
         genreStates, includeTagsText, excludeTagsText, tagWeight, directRecWeight, listWeight,
         structuralWeight, hiddenGemStrength, maxResults,
         types: isAllSelected ? '' : selectedTypes.join(','),
@@ -227,7 +231,7 @@ export default function App(): JSX.Element {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [selectedNovel?.id, forYouMode, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
-    minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText, excludeTagsText,
+    minRating, minRatingVotes, maxReaders, minYear, maxYear, minChapters, genreStates, includeTagsText, excludeTagsText,
     tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength, maxResults, selectedTypes, isAllSelected]);
 
   useEffect(() => {
@@ -246,7 +250,7 @@ export default function App(): JSX.Element {
         setDataSource(source);
         setDataset(manifest);
         source.getOptions()
-          .then((options) => { if (!cancelled) { setGenres(options.genres || []); setLanguageChoices(options.languages || []); } })
+          .then((options) => { if (!cancelled) { setGenres(options.genres || []); setTagChoices(options.tags || []); setLanguageChoices(options.languages || []); } })
           .catch(() => { /* Advanced facets can remain unavailable without blocking discovery. */ });
       })
       .catch((initializationError: any) => {
@@ -254,6 +258,24 @@ export default function App(): JSX.Element {
       });
     return () => { cancelled = true; };
   }, [dataMode]);
+
+  const advancedValues: AdvancedFilterValues = {
+    ...genreListsFrom(genreStates),
+    includeTags: parseList(includeTagsText),
+    excludeTags: parseList(excludeTagsText),
+    minVotes: minRatingVotes, minYear, maxYear, minChapters, maxReaders,
+  };
+  const applyAdvanced = (patch: Partial<AdvancedFilterValues>) => {
+    const next = { ...advancedValues, ...patch };
+    if (patch.includeGenres || patch.excludeGenres) setGenreStates(genreStatesFrom(next.includeGenres, next.excludeGenres));
+    if (patch.includeTags) setIncludeTagsText(formatList(patch.includeTags));
+    if (patch.excludeTags) setExcludeTagsText(formatList(patch.excludeTags));
+    if (patch.minVotes !== undefined) setMinRatingVotes(patch.minVotes);
+    if (patch.minYear !== undefined) setMinYear(patch.minYear);
+    if (patch.maxYear !== undefined) setMaxYear(patch.maxYear);
+    if (patch.minChapters !== undefined) setMinChapters(patch.minChapters);
+    if (patch.maxReaders !== undefined) setMaxReaders(patch.maxReaders);
+  };
 
   const libraryExcludeIds = useMemo(() => {
     if (!profile) return [] as number[];
@@ -293,10 +315,11 @@ export default function App(): JSX.Element {
       max_readers: maxReaders,
       min_year: minYear,
       max_year: maxYear,
-      include_genres: Object.entries(genreStates).filter(([, state]) => state === 'include').map(([genre]) => genre),
-      exclude_genres: Object.entries(genreStates).filter(([, state]) => state === 'exclude').map(([genre]) => genre),
-      include_tags: includeTagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
-      exclude_tags: excludeTagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
+      min_chapters: minChapters,
+      include_genres: advancedValues.includeGenres,
+      exclude_genres: advancedValues.excludeGenres,
+      include_tags: advancedValues.includeTags,
+      exclude_tags: advancedValues.excludeTags,
       channel_weights: {
         tag: tagWeight,
         direct_rec: directRecWeight,
@@ -478,7 +501,7 @@ export default function App(): JSX.Element {
       setHiddenGemMode(route.hiddenGemMode); setExcludeHarem(route.excludeHarem); setExcludeBL(route.excludeBL);
       setExcludeYuri(route.excludeYuri); setRequireCompleted(route.requireCompleted); setLanguage(route.language);
       setMinRating(route.minRating); setMinRatingVotes(route.minRatingVotes); setMaxReaders(route.maxReaders);
-      setMinYear(route.minYear); setMaxYear(route.maxYear); setGenreStates(route.genreStates);
+      setMinYear(route.minYear); setMaxYear(route.maxYear); setMinChapters(route.minChapters); setGenreStates(route.genreStates);
       setIncludeTagsText(route.includeTagsText); setExcludeTagsText(route.excludeTagsText);
       setTagWeight(route.tagWeight); setDirectRecWeight(route.directRecWeight); setListWeight(route.listWeight);
       setStructuralWeight(route.structuralWeight); setHiddenGemStrength(route.hiddenGemStrength); setMaxResults(route.maxResults);
@@ -519,7 +542,7 @@ export default function App(): JSX.Element {
     // reacts to recommendation controls and coalesces rapid text/slider edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataSource, forYouMode, hideLibraryTitles, libraryExcludeIds, hiddenGemMode, excludeHarem, excludeBL, excludeYuri, requireCompleted, language,
-    minRating, minRatingVotes, maxReaders, minYear, maxYear, genreStates, includeTagsText,
+    minRating, minRatingVotes, maxReaders, minYear, maxYear, minChapters, genreStates, includeTagsText,
     excludeTagsText, tagWeight, directRecWeight, listWeight, structuralWeight, hiddenGemStrength,
     maxResults, routeRevision, mediaParam, sourceParam, includeOtherFormats]);
 
@@ -639,21 +662,12 @@ export default function App(): JSX.Element {
     };
   }, [activeDetailId]);
 
-  const cycleGenre = (genre: string) => {
-    setGenreStates((current) => {
-      const next = { ...current };
-      if (!next[genre]) next[genre] = 'include';
-      else if (next[genre] === 'include') next[genre] = 'exclude';
-      else delete next[genre];
-      return next;
-    });
-  };
-
   const resetAdvanced = () => {
     setMinRatingVotes(0);
     setMaxReaders(0);
     setMinYear(0);
     setMaxYear(0);
+    setMinChapters(0);
     setGenreStates({});
     setIncludeTagsText('');
     setExcludeTagsText('');
@@ -706,16 +720,7 @@ export default function App(): JSX.Element {
     if (!isAllSelected && includeOtherFormats) add('Cross-format recs', () => setIncludeOtherFormats(false));
     if (language) add(`Language: ${language}`, () => setLanguage(''));
     if (minRating) add(`Rating: ${formatMinRating(minRating)}`, () => setMinRating(0));
-    if (minRatingVotes) add(`${minRatingVotes}+ votes`, () => setMinRatingVotes(0));
-    if (maxReaders) add(`≤${maxReaders} readers`, () => setMaxReaders(0));
-    if (minYear || maxYear) add('Year range', () => { setMinYear(0); setMaxYear(0); });
-    if (includeTagsText.trim()) add('Required tags', () => setIncludeTagsText(''));
-    if (excludeTagsText.trim()) add('Excluded tags', () => setExcludeTagsText(''));
-    Object.entries(genreStates).forEach(([genre, state]) =>
-      add(`${state === 'include' ? '+' : '−'}${genre}`, () => setGenreStates((current) => {
-        const { [genre]: _removed, ...rest } = current;
-        return rest;
-      })));
+    active.push(...advancedActiveFilters(advancedValues, applyAdvanced));
     if (tagWeight !== .8 || directRecWeight !== 1.2 || listWeight !== 1 || structuralWeight !== .6 || hiddenGemStrength !== .3) add('Custom ranking', resetAdvancedWeights);
     return active;
   })();
@@ -820,7 +825,6 @@ export default function App(): JSX.Element {
       <Card className="filter-panel" aria-label="Recommendation filters">
         <div className="filter-panel-heading">
           <div><strong>Refine matches</strong><span>{activeFilters.length ? `${activeFilters.length} active` : 'Using balanced defaults'}</span></div>
-          {activeFilters.length > 0 && <Button variant="ghost" onClick={resetFilters}>Reset all</Button>}
         </div>
         <div className="filter-basics">
           <FieldGroup label="Show">
@@ -896,95 +900,33 @@ export default function App(): JSX.Element {
             </Select>
           </CoreFilters>
         </div>
-        <ActiveFilterChips filters={activeFilters} onClearAll={resetFilters} />
       </Card>
+      <ActiveFilterChips className="filter-active-row" filters={activeFilters} onClearAll={resetFilters} />
 
-      <details className="advanced-panel">
-        <summary>
-          <span>
-            <strong><SlidersHorizontal size={16} aria-hidden="true" /> Advanced filters & ranking</strong>
-            <small>Genres, tags, catalog thresholds, and algorithm weights</small>
-          </span>
-          <span className="summary-action">Customize</span>
-        </summary>
-
-        <div className="advanced-content">
-          <section className="advanced-section">
-            <div className="section-heading">
-              <div>
-                <h3>Genres</h3>
-                <p>Click once to require, twice to exclude, three times to clear.</p>
-              </div>
+      <AdvancedFilters
+        values={advancedValues}
+        onChange={applyAdvanced}
+        genres={genres}
+        tags={tagChoices}
+        summaryExtra="algorithm weights"
+      >
+        <section className="advanced-section">
+          <div className="section-heading">
+            <div>
+              <h3>Relationship recipe</h3>
+              <p>Change which evidence sources matter most. Defaults are balanced for human signals.</p>
             </div>
-            <div className="genre-chips">
-              {genres.map((genre) => (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  key={genre}
-                  className={`genre-chip ${genreStates[genre] || ''}`}
-                  onClick={() => cycleGenre(genre)}
-                >
-                  {genreStates[genre] === 'include' ? '+ ' : genreStates[genre] === 'exclude' ? '− ' : ''}
-                  {genre}
-                </Button>
-              ))}
-            </div>
-          </section>
-
-          <section className="advanced-section">
-            <div className="section-heading">
-              <div>
-                <h3>Tags and catalog limits</h3>
-                <p>Comma-separate exact Novel Updates tags.</p>
-              </div>
-            </div>
-            <div className="advanced-grid">
-              <label>
-                Required tags
-                <input value={includeTagsText} onChange={(e) => setIncludeTagsText(e.target.value)} placeholder="cunning protagonist, time loop" />
-              </label>
-              <label>
-                Excluded tags
-                <input value={excludeTagsText} onChange={(e) => setExcludeTagsText(e.target.value)} placeholder="netorare, dense protagonist" />
-              </label>
-              <label>
-                Minimum rating votes
-                <input type="number" min="0" value={minRatingVotes || ''} onChange={(e) => setMinRatingVotes(Number(e.target.value))} placeholder="Any" />
-              </label>
-              <label>
-                Maximum readers
-                <input type="number" min="0" value={maxReaders || ''} onChange={(e) => setMaxReaders(Number(e.target.value))} placeholder="Any" />
-              </label>
-              <label>
-                Earliest year
-                <input type="number" min="1900" max="2100" value={minYear || ''} onChange={(e) => setMinYear(Number(e.target.value))} placeholder="Any" />
-              </label>
-              <label>
-                Latest year
-                <input type="number" min="1900" max="2100" value={maxYear || ''} onChange={(e) => setMaxYear(Number(e.target.value))} placeholder="Any" />
-              </label>
-            </div>
-          </section>
-
-          <section className="advanced-section">
-            <div className="section-heading">
-              <div>
-                <h3>Relationship recipe</h3>
-                <p>Change which evidence sources matter most. Defaults are balanced for human signals.</p>
-              </div>
-              <Button type="button" variant="ghost" className="reset-button" onClick={resetAdvanced}>Reset defaults</Button>
-            </div>
-            <div className="weight-grid">
-              <WeightControl label="Shared tropes" hint="Tag overlap weighted by specificity" value={tagWeight} onChange={setTagWeight} />
-              <WeightControl label="Direct recommendations" hint="Title-to-title human votes" value={directRecWeight} onChange={setDirectRecWeight} />
-              <WeightControl label="Curated lists" hint="Co-occurrence on recommendation lists" value={listWeight} onChange={setListWeight} />
-              <WeightControl label="Author & related series" hint="Same creator, sequels, shared universe" value={structuralWeight} onChange={setStructuralWeight} />
-              <WeightControl label="Hidden-gem strength" hint="How strongly to favor lower list counts" value={hiddenGemStrength} onChange={setHiddenGemStrength} max={1} />
-            </div>
-          </section>
-        </div>
-      </details>
+            <Button type="button" variant="ghost" className="reset-button" onClick={resetAdvanced}>Reset defaults</Button>
+          </div>
+          <div className="weight-grid">
+            <WeightControl label="Shared tropes" hint="Tag overlap weighted by specificity" value={tagWeight} onChange={setTagWeight} />
+            <WeightControl label="Direct recommendations" hint="Title-to-title human votes" value={directRecWeight} onChange={setDirectRecWeight} />
+            <WeightControl label="Curated lists" hint="Co-occurrence on recommendation lists" value={listWeight} onChange={setListWeight} />
+            <WeightControl label="Author & related series" hint="Same creator, sequels, shared universe" value={structuralWeight} onChange={setStructuralWeight} />
+            <WeightControl label="Hidden-gem strength" hint="How strongly to favor lower list counts" value={hiddenGemStrength} onChange={setHiddenGemStrength} max={1} />
+          </div>
+        </section>
+      </AdvancedFilters>
 
       {error && <div className="error-message">{error}</div>}
 

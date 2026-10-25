@@ -4,3 +4,6 @@
 .active-filter-chips .ui-button { background: var(--accent-soft); border: 1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius: 999px; color: var(--accent-bright); font-size: .68rem; gap: .3rem; min-height: 0; padding: .2rem .5rem; }
 .active-filter-chips .ui-button.clear-all { background: transparent; border-color: transparent; }
 @media (max-width: 560px) { .core-filters > * { flex: 1 1 8rem; } }
+/* Active-filter chips sit under the basic filter card on both pages. */
+.active-filter-chips.filter-active-row { border-top: 0; margin: .7rem 0 0; padding-top: 0; }
+.filter-panel + .active-filter-chips.filter-active-row { margin: -.35rem auto 1rem; max-width: 1120px; }
