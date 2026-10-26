@@ -14,6 +14,8 @@ import {
 import { NovelDetail } from '../types';
 import { RecommendationDataSource } from '../data';
 import { LocalUserProfile, ProfileMediaKind } from './types';
+import ProfilePatterns from './ProfilePatterns';
+import { detailLoadOrder } from './patterns';
 import { novelPageUrl } from '../novelLinks';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '../chart';
 import {
@@ -32,8 +34,8 @@ import {
   StatsScope,
 } from './profileStats';
 
-/** Load more matched details than before, but stay responsive for large NU libraries. */
-const DETAIL_LIMIT = 250;
+/** Matched details to fetch; larger libraries load rated titles first (see detailLoadOrder). */
+const DETAIL_LIMIT = 800;
 const DETAIL_CONCURRENCY = 10;
 
 const FORMAT_NOUNS: Record<ProfileMediaKind, string> = { anime: 'Anime', manga: 'Manga', novel: 'Novels' };
@@ -94,7 +96,6 @@ export default function ProfileAnalytics({
 }) {
   const [scope, setScope] = useState<StatsScope>('all');
   const [details, setDetails] = useState<NovelDetail[]>([]);
-  const [requested, setRequested] = useState(0);
   const [failed, setFailed] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -115,13 +116,11 @@ export default function ProfileAnalytics({
     return () => media.removeEventListener('change', update);
   }, []);
 
+  const matchedIds = useMemo(() => detailLoadOrder(profile.entries), [profile.entries]);
+
   useEffect(() => {
     if (!source) return;
-    const ids = profile.entries
-      .flatMap((entry) => (entry.novel_id == null ? [] : [entry.novel_id]))
-      .filter((id, index, all) => all.indexOf(id) === index)
-      .slice(0, DETAIL_LIMIT);
-    setRequested(ids.length);
+    const ids = matchedIds.slice(0, DETAIL_LIMIT);
     if (!ids.length) {
       setDetails([]);
       setFailed(0);
@@ -151,7 +150,7 @@ export default function ProfileAnalytics({
     return () => {
       cancelled = true;
     };
-  }, [profile, source]);
+  }, [matchedIds, source]);
 
   const detailById = useMemo(() => new Map(details.map((detail) => [detail.id, detail])), [details]);
 
@@ -184,6 +183,12 @@ export default function ProfileAnalytics({
     const allowed = new Set(scopedEntries.flatMap((entry) => (entry.novel_id == null ? [] : [entry.novel_id])));
     return details.filter((detail) => allowed.has(detail.id));
   }, [details, scopedEntries]);
+
+  // Titles in scope that exist in the catalog, whether or not their details made it under the fetch cap.
+  const matchedInScope = useMemo(
+    () => new Set(scopedEntries.flatMap((entry) => (entry.novel_id == null ? [] : [entry.novel_id]))).size,
+    [scopedEntries]
+  );
 
   const summaries = useMemo(() => formatSummaries(scopedEntries, detailById), [scopedEntries, detailById]);
   const kpis = useMemo(() => overviewKpis(scopedEntries), [scopedEntries]);
@@ -218,14 +223,6 @@ export default function ProfileAnalytics({
 
   return (
     <section className="profile-analytics" aria-label="Library stats">
-      <p className="analytics-coverage">
-        Overview numbers use all {profile.entries.length.toLocaleString()} library entries
-        {scope !== 'all' ? ` filtered to ${scope}` : ''}. Catalog charts (genres, years, popularity)
-        use {scopedDetails.length.toLocaleString()} of {requested.toLocaleString()} matched titles
-        {failed ? ` (${failed} unavailable)` : ''}. Scores are on a 1–5 scale. The activity chart
-        needs start/finish dates, which AniList exports include.
-      </p>
-
       {showFormatFilter && (
         <div className="analytics-scope-tabs" role="tablist" aria-label="Stats media scope">
           {([
@@ -250,6 +247,17 @@ export default function ProfileAnalytics({
           })}
         </div>
       )}
+
+      <ProfilePatterns entries={scopedEntries} detailById={detailById} matchedTotal={matchedInScope} loading={loading} />
+
+      <h3 className="analytics-counts-title">Library counts</h3>
+      <p className="analytics-coverage">
+        Overview numbers use all {profile.entries.length.toLocaleString()} library entries
+        {scope !== 'all' ? ` filtered to ${scope}` : ''}. Catalog charts (genres, years, popularity)
+        use {scopedDetails.length.toLocaleString()} of {matchedInScope.toLocaleString()} matched titles
+        {failed ? ` (${failed} unavailable)` : ''}. Scores are on a 1–5 scale. The activity chart
+        needs start/finish dates, which AniList exports include.
+      </p>
 
       <div className="analytics-summaries">
         {summaries.map((summary) => (
@@ -539,7 +547,7 @@ export default function ProfileAnalytics({
         </article>
       )}
 
-      {!loading && !requested && (
+      {!loading && !matchedIds.length && (
         <p className="analytics-state">
           No matched catalog titles yet — status and score charts still use your full local list.
           Import more pages or sync AniList media into the catalog to unlock genres and release years.
