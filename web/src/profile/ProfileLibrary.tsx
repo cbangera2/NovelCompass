@@ -40,12 +40,14 @@ export function ProfileLibrary({
   const [status, setStatus] = useState<'all' | ReadingStatus>('all');
   const [rating, setRating] = useState(0);
   const [visibleCount, setVisibleCount] = useState(60);
-  const [catalog, setCatalog] = useState<Map<string, NovelSearchResult>>(new Map());
+  const [catalog, setCatalog] = useState<Map<number, NovelSearchResult>>(new Map());
   const [layout, setLayoutState] = useState<ResultLayout>(loadResultLayout);
   const setLayout = (next: ResultLayout) => {
     setLayoutState(next);
     saveResultLayout(next);
   };
+
+  const metaOf = (entry: ProfileEntry) => (entry.novel_id == null ? undefined : catalog.get(entry.novel_id));
 
   const entries = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -59,8 +61,8 @@ export function ProfileLibrary({
   const mixedFormats = useMemo(() => hasMixedFormats(
     visibleEntries.flatMap((entry) => (entry.novel_id == null ? [] : [{
       id: entry.novel_id,
-      media_type: catalog.get(entry.slug)?.media_type,
-      source: catalog.get(entry.slug)?.source,
+      media_type: catalog.get(entry.novel_id)?.media_type,
+      source: catalog.get(entry.novel_id)?.source,
     }])),
   ), [visibleEntries, catalog]);
 
@@ -74,11 +76,10 @@ export function ProfileLibrary({
       return;
     }
     let cancelled = false;
-    source.resolveSlugs(visibleEntries.filter((entry) => entry.novel_id != null).map((entry) => ({
-      slug: entry.slug,
-      title: entry.imported_title,
-    }))).then((resolved) => {
-      if (!cancelled) setCatalog(resolved);
+    // By id: matched entries already carry one, so there is no slug or title search over the catalog.
+    source.resolveNovelIds(visibleEntries.flatMap((entry) => (entry.novel_id == null ? [] : [entry.novel_id]))).then((resolved) => {
+      // Merged, so tiles keep their covers while the next filter's titles resolve.
+      if (!cancelled) setCatalog((prev) => new Map([...prev, ...resolved]));
     }).catch(() => {
       if (!cancelled) setCatalog(new Map());
     });
@@ -86,7 +87,7 @@ export function ProfileLibrary({
   }, [source, visibleEntries]);
 
   useEffect(() => {
-    registerPreviews(visibleEntries.map((entry) => previewFromProfile(entry, catalog.get(entry.slug))));
+    registerPreviews(visibleEntries.map((entry) => previewFromProfile(entry, entry.novel_id == null ? undefined : catalog.get(entry.novel_id))));
   }, [visibleEntries, catalog]);
 
   const open = (entry: ProfileEntry) => {
@@ -131,7 +132,7 @@ export function ProfileLibrary({
       {layout === 'compact' ? (
         <div className="nc-grid profile-library-tiles">
           {visibleEntries.map((entry) => {
-            const meta = catalog.get(entry.slug);
+            const meta = metaOf(entry);
             if (entry.novel_id == null) {
               return (
                 <article key={entry.slug} className="nc nc-tile profile-tile-unmatched">
@@ -185,7 +186,7 @@ export function ProfileLibrary({
       ) : (
         <div className="profile-entry-grid">
           {visibleEntries.map((entry) => {
-            const meta = catalog.get(entry.slug);
+            const meta = metaOf(entry);
             const body = (
               <>
                 <div className="profile-entry-cover">

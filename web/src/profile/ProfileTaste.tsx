@@ -56,7 +56,6 @@ export function ProfileTaste({
   const [tasteLoading, setTasteLoading] = useState(false);
   const [tasteLoadFailed, setTasteLoadFailed] = useState(0);
   // The stats module fetches up to 250 catalog details, so only mount it once the section is opened.
-  const [statsOpened, setStatsOpened] = useState(false);
 
   useEffect(() => {
     // Seeds/excludes work without catalog details; facets need detail fetches.
@@ -179,19 +178,14 @@ export function ProfileTaste({
         </Card>
       )}
 
-      <details
-        className="profile-stats-disclosure"
-        onToggle={(event) => { if (event.currentTarget.open) setStatsOpened(true); }}
-      >
+      <details className="profile-stats-disclosure" open>
         <summary>
           <BarChart3 size={18} aria-hidden="true" />
           <span><strong>Library stats</strong><small>Status, scores, formats, activity, release years and genres</small></span>
         </summary>
-        {statsOpened && (
-          <Suspense fallback={<p className="analytics-state">Loading stats…</p>}>
-            <ProfileAnalytics profile={profile} source={source} />
-          </Suspense>
-        )}
+        <Suspense fallback={<p className="analytics-state">Loading stats…</p>}>
+          <ProfileAnalytics profile={profile} source={source} />
+        </Suspense>
       </details>
     </>
   );
