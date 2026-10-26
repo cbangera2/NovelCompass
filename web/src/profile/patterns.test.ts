@@ -232,6 +232,17 @@ describe('dropOffCurves', () => {
     expect(result.totalDrops).toBe(7);
   });
 
+  it('omits a format whose event steps never have enough titles at risk', () => {
+    // Eight drops at 5..40, but three readers who stopped at 1-2 chapters leave at most 8 at risk (threshold 10).
+    const entries = [
+      ...Array.from({ length: 8 }, (_, i) => dropped(i + 1, 5 * (i + 1))),
+      ...[1, 2, 2].map((u, i) => finished(i + 50, u)),
+    ];
+    const result = dropOffCurves(entries, new Map());
+    expect(result.curves).toEqual([]);
+    expect(result.omitted).toEqual([{ kind: 'novel', drops: 8 }]);
+  });
+
   it('splits by format only when two formats each have 10 drops', () => {
     const both = [
       ...Array.from({ length: 10 }, (_, i) => dropped(i + 1, 10 + i)),

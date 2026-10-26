@@ -402,22 +402,24 @@ export function dropOffCurves(entries: ProfileEntry[], detailById: Map<number, N
   const totalDrops = kinds.reduce((sum, k) => sum + k.drops, 0);
   const split = kinds.filter((k) => k.drops >= MIN_DROPS_PER_SPLIT);
   const drawn = split.length >= 2 ? split : kinds.slice(0, 1).filter((k) => k.drops >= MIN_DROPS);
-  const curves = drawn.map(({ kind, list, drops }): DropCurve => {
+  const curves = drawn.flatMap(({ kind, list, drops }): DropCurve[] => {
     const steps = kaplanMeier(list);
     const eventTimes = list.filter((o) => o.event).map((o) => o.t).sort((a, b) => a - b);
     const x = eventTimes[Math.ceil(eventTimes.length / 2) - 1];
     const at = [...steps].reverse().find((s) => s.t <= x);
     const reliable = steps.filter((s) => s.atRisk >= Math.min(MIN_AT_RISK, list.length));
-    return {
+    // Early readers who never dropped can leave every event step with too few titles at risk.
+    if (!reliable.length) return [];
+    return [{
       kind,
       titles: list.length,
       drops,
       cutoff: reliable.length < steps.length ? reliable[reliable.length - 1].t : null,
       points: reliable.map((s) => ({ x: s.t, dropped: 1 - s.survival, lo: 1 - s.hi, hi: 1 - s.lo })),
       median: at ? { x, share: { value: 1 - at.survival, lo: 1 - at.hi, hi: 1 - at.lo } } : null,
-    };
+    }];
   });
-  const omitted = kinds.filter((k) => !drawn.some((d) => d.kind === k.kind)).map(({ kind, drops }) => ({ kind, drops }));
+  const omitted = kinds.filter((k) => !curves.some((c) => c.kind === k.kind)).map(({ kind, drops }) => ({ kind, drops }));
   return { totalDrops, curves, omitted };
 }
 
