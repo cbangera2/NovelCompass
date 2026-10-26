@@ -1,18 +1,44 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { BarChart3, Sparkles } from 'lucide-react';
 import type { RecommendationDataSource } from '../data';
 import type { DatasetManifest, NovelDetail } from '../types';
-import { Card } from '../design-system';
+import { Card, DSButton } from '../design-system';
 import { browseFacetUrl } from '../metadataLinks';
 import { novelPageUrl } from '../novelLinks';
 import { displayNovelTitle, useDisplaySettings } from '../settings';
 import { computeTasteProfile, TasteProfile } from './taste';
 import type { LocalUserProfile } from './types';
-import { navigateTo } from '../viewTransitions';
 const ProfileAnalytics = lazy(() => import('./ProfileAnalytics'));
 
 function appUrl(params = ''): string {
   return `${import.meta.env.BASE_URL}${params}`;
+}
+
+type Facet = TasteProfile['liked_genres'][number];
+
+/** One labelled row of facet links; `kind` picks the Browse filter they open. */
+function FacetRow({ label, kind, facets, empty, avoid, limit = 8 }: {
+  label: string;
+  kind: 'genre' | 'tag';
+  facets: Facet[];
+  empty: string;
+  avoid?: boolean;
+  /** Keeps the summary on one screen by showing only the strongest facets. */
+  limit?: number;
+}): JSX.Element {
+  return (
+    <div className="taste-facet-row">
+      <h4>{label}</h4>
+      <div className={`taste-chips ${avoid ? 'taste-chips-avoid' : ''}`}>
+        {facets.slice(0, limit).map((facet) => (
+          <a key={facet.name} href={browseFacetUrl(kind, facet.name)} title={`Weight ${facet.weight.toFixed(1)} from ${facet.count} title${facet.count === 1 ? '' : 's'}`}>
+            {facet.name}<small>×{facet.count}</small>
+          </a>
+        ))}
+        {!facets.length && <small>{empty}</small>}
+      </div>
+    </div>
+  );
 }
 
 export function ProfileTaste({
@@ -29,6 +55,8 @@ export function ProfileTaste({
   const [tasteDetails, setTasteDetails] = useState<NovelDetail[]>([]);
   const [tasteLoading, setTasteLoading] = useState(false);
   const [tasteLoadFailed, setTasteLoadFailed] = useState(0);
+  // The stats module fetches up to 250 catalog details, so only mount it once the section is opened.
+  const [statsOpened, setStatsOpened] = useState(false);
 
   useEffect(() => {
     // Seeds/excludes work without catalog details; facets need detail fetches.
@@ -61,8 +89,84 @@ export function ProfileTaste({
     return () => { cancelled = true; };
   }, [profile, source, dataset?.dataset_version]);
 
+  const seedCount = taste?.positive_seeds.length ?? 0;
+  const negativeCount = taste?.negative_ids.length ?? 0;
+
   return (
     <>
+      <Card className="taste-snapshot" aria-labelledby="taste-title">
+        <div className="taste-head">
+          <div>
+            <span className="eyebrow">What we learned</span>
+            <h2 id="taste-title">Your taste so far</h2>
+            <p className="taste-lede">
+              {seedCount
+                ? `Learned from ${seedCount} title${seedCount === 1 ? '' : 's'} you rated highly or finished${negativeCount ? `, and ${negativeCount} you dropped or disliked` : ''}.`
+                : 'Rate a few matched titles 4★ or higher, or mark some as Completed, and this fills in.'}
+            </p>
+          </div>
+          {seedCount > 0 && (
+            <DSButton as="a" variant="primary" className="taste-cta" href={appUrl('?view=discover&for_you=1')}>
+              <Sparkles size={15} aria-hidden="true" /> See your For You picks
+            </DSButton>
+          )}
+        </div>
+        {tasteLoading && <p className="profile-list-note" aria-live="polite">Reading catalog genres and tags for your titles…</p>}
+        {taste && (
+          <>
+            <div className="taste-learned">
+              <div>
+                <h3>You tend to like</h3>
+                <FacetRow label="Genres" kind="genre" facets={taste.liked_genres} empty="Needs matched titles to read genres." />
+                <FacetRow label="Tags" kind="tag" facets={taste.liked_tags} empty="Needs matched titles to read tags." />
+              </div>
+              <div>
+                <h3>You tend to avoid</h3>
+                <FacetRow label="Genres" kind="genre" facets={taste.avoid_genres} empty="No dropped or low-rated titles yet." avoid />
+                <FacetRow label="Tags" kind="tag" facets={taste.avoid_tags} empty="No negative tag signal yet." avoid />
+              </div>
+            </div>
+            {taste.evidence.caveats.length > 0 && (
+              <ul className="taste-caveats">
+                {taste.evidence.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}
+              </ul>
+            )}
+            <details className="taste-sample">
+              <summary>How this is calculated</summary>
+              <p className="profile-list-note">
+                {taste.positive_seeds.length} positive seeds · {taste.negative_ids.length} negatives ·{' '}
+                {taste.exclude_ids.length} matched IDs excluded from ranking ·{' '}
+                {taste.evidence.matched}/{taste.evidence.total_entries} library titles matched to catalog.
+                {tasteLoadFailed ? ` ${tasteLoadFailed} detail shard${tasteLoadFailed === 1 ? '' : 's'} failed to load.` : ''}
+                {' '}Genre and tag weights use rating, status and feedback, not equal title counts. Catalog snapshot {dataset?.dataset_version || profile.dataset_version}.
+              </p>
+              <h4>Positive seeds ({taste.positive_seeds.length}), used for For You</h4>
+              <ul>
+                {taste.positive_seeds.map((seed) => (
+                  <li key={seed.novel_id}>
+                    <a href={novelPageUrl(seed.novel_id)}>{seed.title}</a>
+                    {' '}· weight {seed.weight.toFixed(2)} · {seed.reason}
+                  </li>
+                ))}
+                {!taste.positive_seeds.length && <li>None yet. Rate matched titles 4★+ or mark Completed.</li>}
+              </ul>
+              {tasteDetails.length > 0 && (
+                <>
+                  <h4>Catalog titles loaded for genres and tags ({tasteDetails.length})</h4>
+                  <ul>
+                    {tasteDetails.map((detail) => (
+                      <li key={detail.id}>
+                        {displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </details>
+          </>
+        )}
+      </Card>
+
       {(profile.feedback?.length || 0) > 0 && (
         <Card className="profile-feedback-summary">
           <div><span className="eyebrow">Explicit local signals</span><h2>Recommendation feedback</h2></div>
@@ -75,114 +179,20 @@ export function ProfileTaste({
         </Card>
       )}
 
-      <Card className="taste-snapshot" aria-labelledby="taste-title">
-        <div className="profile-library-heading">
-          <div><span className="eyebrow">Weighted from your library</span><h2 id="taste-title">Taste profile</h2></div>
-          <span>{dataset?.dataset_version || profile.dataset_version}</span>
-        </div>
-        {tasteLoading && <p className="profile-list-note">Loading catalog metadata for seeds and negatives…</p>}
-        {taste && (
-          <>
-            <p className="profile-list-note">
-              {taste.positive_seeds.length} positive seeds · {taste.negative_ids.length} negatives ·{' '}
-              {taste.exclude_ids.length} matched IDs excluded from ranking ·{' '}
-              {taste.evidence.matched}/{taste.evidence.total_entries} library titles matched to catalog.
-              {tasteLoadFailed ? ` ${tasteLoadFailed} detail shard${tasteLoadFailed === 1 ? '' : 's'} failed to load.` : ''}
-              {' '}Facet weights use rating/status/feedback — not equal title counts.
-            </p>
-            {taste.evidence.caveats.length > 0 && (
-              <ul className="taste-caveats">
-                {taste.evidence.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}
-              </ul>
-            )}
-            <div className="taste-actions">
-              <a className="taste-for-you" href={appUrl('?view=discover&for_you=1')}>
-                <Sparkles size={15} /> For You recommendations
-              </a>
-              <small>Multi-seed RRF over your positive seeds; works in live API and static Pages mode.</small>
-            </div>
-            <div className="taste-columns taste-columns-4">
-              <div>
-                <h3>Liked genres</h3>
-                <div className="taste-chips">
-                  {taste.liked_genres.map((facet) => (
-                    <a key={facet.name} href={browseFacetUrl('genre', facet.name)}>
-                      {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
-                    </a>
-                  ))}
-                  {!taste.liked_genres.length && <small>Need matched seed details for genres.</small>}
-                </div>
-              </div>
-              <div>
-                <h3>Liked tags</h3>
-                <div className="taste-chips">
-                  {taste.liked_tags.map((facet) => (
-                    <a key={facet.name} href={browseFacetUrl('tag', facet.name)}>
-                      {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
-                    </a>
-                  ))}
-                  {!taste.liked_tags.length && <small>Need matched seed details for tags.</small>}
-                </div>
-              </div>
-              <div>
-                <h3>Avoid genres</h3>
-                <div className="taste-chips taste-chips-avoid">
-                  {taste.avoid_genres.map((facet) => (
-                    <a key={facet.name} href={browseFacetUrl('genre', facet.name)}>
-                      {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
-                    </a>
-                  ))}
-                  {!taste.avoid_genres.length && <small>No dropped / low-rated / not-for-me signal yet.</small>}
-                </div>
-              </div>
-              <div>
-                <h3>Avoid tags</h3>
-                <div className="taste-chips taste-chips-avoid">
-                  {taste.avoid_tags.map((facet) => (
-                    <a key={facet.name} href={browseFacetUrl('tag', facet.name)}>
-                      {facet.name}<strong>{facet.weight.toFixed(1)}</strong><small>×{facet.count}</small>
-                    </a>
-                  ))}
-                  {!taste.avoid_tags.length && <small>No negative tag signal yet.</small>}
-                </div>
-              </div>
-            </div>
-            <details className="taste-sample" open={taste.positive_seeds.length > 0 && taste.positive_seeds.length <= 8}>
-              <summary>Positive seeds ({taste.positive_seeds.length}) — used for For You</summary>
-              <ul>
-                {taste.positive_seeds.map((seed) => (
-                  <li key={seed.novel_id}>
-                    <a href={novelPageUrl(seed.novel_id)}>{seed.title}</a>
-                    {' '}· weight {seed.weight.toFixed(2)} · {seed.reason}
-                  </li>
-                ))}
-                {!taste.positive_seeds.length && <li>None yet — rate matched titles 4★+ or mark Completed.</li>}
-              </ul>
-            </details>
-            {tasteDetails.length > 0 && (
-              <details className="taste-sample">
-                <summary>Catalog titles loaded for facets ({tasteDetails.length})</summary>
-                <ul>
-                  {tasteDetails.map((detail) => (
-                    <li key={detail.id}>
-                      {displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </>
+      <details
+        className="profile-stats-disclosure"
+        onToggle={(event) => { if (event.currentTarget.open) setStatsOpened(true); }}
+      >
+        <summary>
+          <BarChart3 size={18} aria-hidden="true" />
+          <span><strong>Library stats</strong><small>Status, scores, formats, activity, release years and genres</small></span>
+        </summary>
+        {statsOpened && (
+          <Suspense fallback={<p className="analytics-state">Loading stats…</p>}>
+            <ProfileAnalytics profile={profile} source={source} />
+          </Suspense>
         )}
-      </Card>
-
-      <Suspense fallback={<section className="profile-analytics"><p className="analytics-state">Loading analytics module…</p></section>}>
-        <ProfileAnalytics
-          profile={profile}
-          source={source}
-          datasetVersion={dataset?.dataset_version || profile.dataset_version}
-          onOpenNovel={(novelId) => { navigateTo(novelPageUrl(novelId)); }}
-        />
-      </Suspense>
+      </details>
     </>
   );
 }

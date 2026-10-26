@@ -103,17 +103,16 @@ export function ProfileLibrary({
       <div className="profile-library-heading">
         <div><span className="eyebrow">Personal shelf</span><h2>Library</h2></div>
         <div className="profile-library-heading-actions">
-          <span className="profile-library-count">{entries.length.toLocaleString()} shown</span>
+          <span className="profile-library-count" aria-live="polite">{entries.length.toLocaleString()} shown</span>
           <ResultLayoutToggle value={layout} onChange={setLayout} />
         </div>
       </div>
-      <div className="profile-status-chips" role="group" aria-label="Filter by status">
-        {statusChips.map(([value, label, count]) => (
+      <div className="profile-status-segments" role="group" aria-label="Filter by status">
+        {statusChips.filter(([value, , count]) => value === 'all' || value === status || count > 0).map(([value, label, count]) => (
           <button
             key={value}
             type="button"
             aria-pressed={status === value}
-            disabled={value !== 'all' && count === 0}
             onClick={() => setStatus(value)}
           >
             {label} <small>{count.toLocaleString()}</small>

@@ -1,5 +1,6 @@
 import { Download, ExternalLink, FileUp, ShieldCheck, Trash2 } from 'lucide-react';
 import { Card } from '../design-system';
+import { useDataModePreference } from '../dataModePreference';
 import { clearLocalProfile } from './store';
 import { downloadProfileBackup } from './transfer';
 import { ListPagesImport, useImportedLists } from './ListPagesImport';
@@ -14,6 +15,7 @@ export function ProfileData({
   onProfileChange: (profile: LocalUserProfile | null) => void;
 }): JSX.Element {
   const importedLists = useImportedLists();
+  const { mode: dataMode } = useDataModePreference();
 
   const clear = async () => {
     if (!window.confirm('Delete the complete local profile from this browser?')) return;
@@ -24,7 +26,7 @@ export function ProfileData({
   return (
     <>
       <Card className="profile-control-strip">
-        <div><ShieldCheck size={18} /><span><strong>Private local profile</strong><small>Normalized data stays in IndexedDB on this browser.</small></span></div>
+        <div><ShieldCheck size={18} /><span><strong>Private local profile</strong><small>Stored only in this browser (IndexedDB) and never uploaded. It is a private recommender profile, not a Novel Updates login or connected account.</small></span></div>
         <div className="profile-data-actions">
           <ProfileImportDialog profile={profile} triggerClassName="profile-data-button profile-data-primary" trigger={<><FileUp size={15} aria-hidden="true" /> Import or merge files</>} />
           <button type="button" className="profile-data-button" onClick={() => downloadProfileBackup(profile)}><Download size={15} /> Export JSON</button>
@@ -37,9 +39,19 @@ export function ProfileData({
           <div><span className="eyebrow">Saved metadata</span><h2>Created lists</h2></div>
           <span>{profile.curated_lists.length} summaries</span>
         </div>
-        <p className="profile-list-note">Your saved profile page only lists each list's title. Add the saved pages of the lists themselves to use their titles as taste signals on the For You page.</p>
-        <ListPagesImport onImported={importedLists.refresh} disabled={!importedLists.available} />
-        {!importedLists.available && <p className="profile-list-note">Importing needs the live API (the uvicorn server) to be running.</p>}
+        {importedLists.available ? (
+          <>
+            <p className="profile-list-note">Your saved profile page only lists each list's title. Add the saved pages of the lists themselves to use their titles as taste signals on the For You page.</p>
+            <ListPagesImport onImported={importedLists.refresh} />
+          </>
+        ) : (
+          <p className="profile-list-note">
+            {dataMode === 'static'
+              ? "List page import isn't available in this static version."
+              : "List page import needs the local Novel Compass API, which isn't reachable right now."}
+          </p>
+        )}
+        {!profile.curated_lists.length && <p className="profile-list-note">No created lists came with this profile.</p>}
         <div className="profile-list-grid">
           {profile.curated_lists.map((list) => (
             <article key={list.id}>
