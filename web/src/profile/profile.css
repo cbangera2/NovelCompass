@@ -75,12 +75,21 @@
 .profile-stats-disclosure .profile-analytics { border-top: 1px solid var(--border); margin: 0; padding: 1rem; }
 .profile-stats-disclosure > .analytics-state { padding: 0 1rem 1rem; }
 
-/* Your patterns: statistics cards at the top of the Library stats area. */
-.profile-patterns { margin-bottom: 1.4rem; }
-.profile-patterns > h3, .analytics-counts-title { font-size: 1.1rem; margin-bottom: .5rem; }
-.profile-patterns > .analytics-coverage { margin-top: 0; }
-.analytics-counts-title { border-top: 1px solid var(--border); margin-top: 1.4rem; padding-top: 1rem; }
-.pattern-stack { display: grid; gap: .7rem; }
+/* Stats sections: sticky jump nav, one block per topic. */
+.stats-nav { backdrop-filter: blur(16px); background: color-mix(in srgb, var(--bg) 88%, transparent); border: 1px solid var(--border); border-radius: 0 0 12px 12px; border-top: 0; display: flex; gap: .25rem; margin-bottom: .6rem; overflow-x: auto; padding: .3rem; position: sticky; top: 64px; z-index: 12; }
+.stats-nav button { background: transparent; border: 0; border-radius: 8px; color: var(--muted); cursor: pointer; flex: 0 0 auto; font-size: .72rem; font-weight: 650; padding: .5rem .75rem; }
+.stats-nav button:hover, .stats-nav button.active { background: var(--accent-soft); color: var(--accent-bright); }
+.stats-nav button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: -2px; }
+.stats-section { padding: 1.1rem 0 .2rem; scroll-margin-top: calc(64px + 4rem); }
+.stats-section + .stats-section { border-top: 1px solid var(--border); margin-top: 1rem; }
+.stats-section > h3 { font-size: 1.1rem; margin-bottom: .7rem; }
+.analytics-pending { border-top: 1px solid var(--border); color: var(--muted); font-size: .72rem; margin-top: 1.2rem; padding-top: .9rem; }
+.analytics-pending h4 { color: var(--dim); font-size: .64rem; letter-spacing: .08em; margin: 0 0 .4rem; text-transform: uppercase; }
+.analytics-pending ul { display: grid; gap: .25rem; list-style: none; margin: 0; padding: 0; }
+.analytics-pending strong { color: var(--text); font-weight: 650; }
+.analytics-pending li::before { content: '—'; margin-right: .35rem; }
+.analytics-pending li strong { margin-right: .15rem; }
+.analytics-coverage { margin-top: 1rem; }
 .pattern-card h4 { font-size: .95rem; }
 .pattern-card h5 { color: var(--dim); font-size: .64rem; letter-spacing: .08em; margin: 0 0 .45rem; text-transform: uppercase; }
 .pattern-card h5.pattern-subhead { border-top: 1px solid var(--border); color: var(--text); font-size: .8rem; letter-spacing: 0; margin-top: 1rem; padding-top: .8rem; text-transform: none; }
@@ -130,6 +139,10 @@
 
 @media (max-width: 850px) {
   .profile-page-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .stats-nav { top: 58px; }
+  .stats-section { scroll-margin-top: calc(58px + 4rem); }
 }
 @media (max-width: 700px) {
   .taste-learned, .pattern-split, .pattern-columns { grid-template-columns: 1fr; }

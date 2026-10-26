@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo } from 'react';
+import { ReactNode, useDeferredValue, useMemo } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -18,14 +18,19 @@ import { displayNovelTitle, useDisplaySettings } from '../settings';
 import {
   calibration,
   calibrationPoints,
+  Calibration,
   CalibrationPoint,
   DropCurve,
   dropOffCurves,
+  DropOff,
   FacetEffect,
   FacetFamily,
   facetPatterns,
   fitRatingModel,
+  RatingModel,
+  StartWithPick,
   MIN_CALIBRATION,
+  MIN_COMMUNITY_VOTES,
   MIN_DROPS,
   MIN_MODEL_TITLES,
   MIN_OUTCOMES,
@@ -67,11 +72,11 @@ function clippedSegment(line: { slope: number; intercept: number }, x0: number, 
     : ([clip(x0), clip(x1)] as const);
 }
 
-function PatternCard({ title, lede, children }: { title: string; lede: string; children: React.ReactNode }): JSX.Element {
+function PatternCard({ title, lede, children }: { title: string; lede?: string; children: ReactNode }): JSX.Element {
   return (
     <article className="analytics-card analytics-card-wide pattern-card">
       <h4>{title}</h4>
-      <p>{lede}</p>
+      {lede && <p>{lede}</p>}
       {children}
     </article>
   );
@@ -104,20 +109,7 @@ function Disagreements({ label, points }: { label: string; points: CalibrationPo
   );
 }
 
-function CalibrationCard({ rows }: { rows: ReturnType<typeof patternRows> }): JSX.Element {
-  const points = useMemo(() => calibrationPoints(rows), [rows]);
-  const result = useMemo(() => calibration(points), [points]);
-  const lede = 'Your star ratings against the catalog rating, on the same 1–5 scale. Only titles with 10 or more community votes count.';
-  if (!result) {
-    return (
-      <PatternCard title="You vs the community" lede={lede}>
-        <p className="analytics-state">
-          Rate {MIN_CALIBRATION - points.length} more catalog title{MIN_CALIBRATION - points.length === 1 ? '' : 's'} with 10+ community votes to compare
-          ({points.length} of {MIN_CALIBRATION} so far).
-        </p>
-      </PatternCard>
-    );
-  }
+function CalibrationCard({ result }: { result: Calibration }): JSX.Element {
   const { bias, spearman, highShare, line } = result;
   const half = (bias.hi - bias.lo) / 2;
   const headline = bias.lo > 0
@@ -128,7 +120,7 @@ function CalibrationCard({ rows }: { rows: ReturnType<typeof patternRows> }): JS
   const segment = line ? clippedSegment(line, 1, 5, 0.5, 5.5) : null;
   const summary = `${headline}. ${result.n} rated titles.${spearman ? ` Rank agreement ${fixed(spearman.value, 2)}.` : ''}`;
   return (
-    <PatternCard title="You vs the community" lede={lede}>
+    <PatternCard title="You vs the community">
       <p className="pattern-headline">{headline}.</p>
       <div className="pattern-split">
         <div role="img" aria-label={`Scatter plot. ${summary}`}>
@@ -167,46 +159,36 @@ function CalibrationCard({ rows }: { rows: ReturnType<typeof patternRows> }): JS
             </ScatterChart>
           </ChartContainer>
           <p className="pattern-legend">
-            <span><i className="pattern-key-line" /> Fit through your ratings</span>
-            <span><i className="pattern-key-dash" /> You agree exactly</span>
+            <span><i className="pattern-key-line" /> Your trend</span>
+            <span><i className="pattern-key-dash" /> Agree exactly</span>
           </p>
         </div>
         <dl className="pattern-stats">
           <div>
-            <dt>Rank agreement</dt>
+            <dt>Agreement</dt>
             <dd>
               {spearman ? (
                 <>
                   <strong>{fixed(spearman.value, 2)}</strong>
-                  <small>95% {range(fixed(spearman.lo, 2), fixed(spearman.hi, 2))}: {agreementWord(spearman.value)}</small>
+                  <small>{agreementWord(spearman.value)} ({range(fixed(spearman.lo, 2), fixed(spearman.hi, 2))})</small>
                 </>
-              ) : <small>Undefined: one side gives every title the same score.</small>}
+              ) : <small>One side rates every title the same.</small>}
             </dd>
           </div>
           <div>
-            <dt>Average gap</dt>
-            <dd>
-              <strong>{signed(bias.value)}★</strong>
-              <small>95% {range(signed(bias.lo), signed(bias.hi))}★ (yours minus community)</small>
-            </dd>
-          </div>
-          <div>
-            <dt>How spread out</dt>
+            <dt>Spread</dt>
             <dd>
               <strong>{fixed(result.sdMine, 2)} vs {fixed(result.sdCommunity, 2)}</strong>
-              <small>Std. dev. of your ratings vs theirs. {pct(highShare.value)} of yours are 4★+ (95% {range(pct(highShare.lo), pct(highShare.hi))}) against {pct(result.communityHighShare)} of theirs.</small>
+              <small>Std. dev., you vs them. You give 4★+ to {pct(highShare.value)} ({range(pct(highShare.lo), pct(highShare.hi))}); they do to {pct(result.communityHighShare)}.</small>
             </dd>
           </div>
         </dl>
       </div>
       <div className="pattern-columns">
-        <Disagreements label="You rated higher than everyone" points={result.higher} />
-        <Disagreements label="You rated lower than everyone" points={result.lower} />
+        <Disagreements label="You rate higher" points={result.higher} />
+        <Disagreements label="You rate lower" points={result.lower} />
       </div>
-      <p className="pattern-basis">
-        Reliability: {result.n} rated titles. The true average gap is likely between {signed(bias.lo)}★ and {signed(bias.hi)}★.
-        Rank agreement needs roughly 30 titles before its interval narrows.
-      </p>
+      <p className="pattern-footnote">{result.n} rated titles with {MIN_COMMUNITY_VOTES}+ community votes. Ranges are 95% intervals.</p>
     </PatternCard>
   );
 }
@@ -249,8 +231,8 @@ function FacetList({ label, rows, scale, format, tone }: {
   );
 }
 
-function FacetFamilyView({ heading, intro, family, format, labels }: {
-  heading: string;
+function FacetFamilyCard({ title, intro, family, format, labels }: {
+  title: string;
   intro: string;
   family: FacetFamily;
   format: (value: number) => string;
@@ -259,60 +241,18 @@ function FacetFamilyView({ heading, intro, family, format, labels }: {
   const shown = [...family.positive, ...family.negative].slice(0, FACET_LIST_LIMIT * 2);
   const scale = Math.max(1e-6, ...shown.flatMap((f) => [Math.abs(f.lo), Math.abs(f.hi)]));
   return (
-    <section>
-      <h5 className="pattern-subhead">{heading}</h5>
-      <p className="pattern-basis">{intro}</p>
+    <PatternCard title={title} lede={intro}>
       {family.shown <= family.expectedByChance * 1.5 && (
-        <p className="pattern-caution">
-          That is about as many as chance alone would produce, so read these as hints to check, not findings.
-        </p>
+        <p className="pattern-caution">About as many as chance alone would produce, so treat these as hints.</p>
       )}
       <div className="pattern-columns">
         <FacetList label={labels[0]} rows={family.positive} scale={scale} format={format} tone="good" />
         <FacetList label={labels[1]} rows={family.negative} scale={scale} format={format} tone="warn" />
       </div>
       <p className="pattern-footnote">
-        {family.shown} of {family.tested} genres and tags with 4+ titles showed a clear effect (95% interval clear of zero); about{' '}
-        {fixed(family.expectedByChance)} would show up by chance alone, and {family.tested - family.shown} were unclear.
-        Effects are pulled toward your average, most for the facets with the fewest titles.
+        {family.shown} of {family.tested} genres and tags (4+ titles each) stand out; about {fixed(family.expectedByChance)} would by chance.
+        Small groups are pulled toward your average.
       </p>
-    </section>
-  );
-}
-
-function FacetsCard({ rows }: { rows: ReturnType<typeof patternRows> }): JSX.Element {
-  const result = useMemo(() => facetPatterns(rows), [rows]);
-  return (
-    <PatternCard
-      title="What predicts how you rate or drop"
-      lede="Genres and tags that shift how often you finish a title, or how high you rate it, compared with your own averages."
-    >
-      {result.completion ? (
-        <FacetFamilyView
-          heading="Finishing vs dropping"
-          intro={`You finished ${pct(result.completion.baseline)} of the ${result.outcomes} titles you finished or dropped. Bars show the shift in that rate, in percentage points.`}
-          family={result.completion}
-          format={(v) => `${signed(v * 100, 0)} pts`}
-          labels={['You tend to finish', 'You tend to drop']}
-        />
-      ) : (
-        <p className="analytics-state">
-          Needs at least {MIN_OUTCOMES} finished or dropped titles, with 3 or more of each ({result.outcomes} so far).
-        </p>
-      )}
-      {result.rating ? (
-        <FacetFamilyView
-          heading="How you rate"
-          intro={`Your average across ${result.rated} rated titles is ${fixed(result.rating.mean, 2)}★. Bars show how far a facet's titles sit above or below it.`}
-          family={result.rating}
-          format={(v) => `${signed(v)}★`}
-          labels={['You rate higher', 'You rate lower']}
-        />
-      ) : (
-        <p className="analytics-state">
-          Needs at least {MIN_RATED_FOR_FACETS} rated titles that are not all the same score ({result.rated} so far).
-        </p>
-      )}
     </PatternCard>
   );
 }
@@ -385,42 +325,30 @@ function DropCurveView({ curve, unit }: { curve: DropCurve; unit: string }): JSX
         </ChartContainer>
       </div>
       <p className="pattern-basis">
-        {curve.drops} drops among {curve.titles} titles with a recorded {unit} count. The shaded band is the 95% Greenwood interval.
-        {curve.cutoff != null && ` The curve stops at ${unit} ${Math.round(curve.cutoff)}, past which fewer than 10 titles remain.`}
+        {curve.drops} drops among {curve.titles} titles; the band is a 95% interval.
+        {curve.cutoff != null && ` Stops at ${unit} ${Math.round(curve.cutoff)}, where fewer than 10 titles remain.`}
       </p>
     </div>
   );
 }
 
-function DropOffCard({ entries, detailById }: { entries: ProfileEntry[]; detailById: Map<number, NovelDetail> }): JSX.Element {
-  const result = useMemo(() => dropOffCurves(entries, detailById), [entries, detailById]);
+function DropOffCard({ result }: { result: DropOff }): JSX.Element {
   return (
     <PatternCard
       title="Where you drop titles"
-      lede="How far into a title you get before dropping it. Titles you finished or are still reading count as 'not dropped yet' at the progress you logged."
+      lede="How far in you get before dropping. Finished and ongoing titles count as not dropped yet."
     >
-      {result.curves.length ? (
-        <div className={result.curves.length > 1 ? 'pattern-columns' : undefined}>
-          {result.curves.map((curve) => (
-            <div key={curve.kind}>
-              {result.curves.length > 1 && <h5>{KIND_NOUNS[curve.kind]}</h5>}
-              <DropCurveView curve={curve} unit={curve.kind === 'anime' ? 'episode' : 'chapter'} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="analytics-state">
-          Needs at least {MIN_DROPS} dropped titles with a recorded chapter or episode count; you have {result.totalDrops}.
-        </p>
-      )}
-      {result.omitted.length > 0 && result.curves.length > 0 && (
+      <div className={result.curves.length > 1 ? 'pattern-columns' : undefined}>
+        {result.curves.map((curve) => (
+          <div key={curve.kind}>
+            {result.curves.length > 1 && <h5>{KIND_NOUNS[curve.kind]}</h5>}
+            <DropCurveView curve={curve} unit={curve.kind === 'anime' ? 'episode' : 'chapter'} />
+          </div>
+        ))}
+      </div>
+      {result.omitted.length > 0 && (
         <p className="pattern-footnote">
-          Left out because there are too few drops to draw: {result.omitted.map((o) => `${KIND_NOUNS[o.kind]} (${o.drops})`).join(', ')}.
-        </p>
-      )}
-      {result.curves.length > 0 && (
-        <p className="pattern-footnote">
-          Finishing a title is treated as 'could still have dropped it later', so the share dropped by the right-hand end is the least certain part.
+          Too few drops to draw: {result.omitted.map((o) => `${KIND_NOUNS[o.kind]} (${o.drops})`).join(', ')}.
         </p>
       )}
     </PatternCard>
@@ -429,95 +357,121 @@ function DropOffCard({ entries, detailById }: { entries: ProfileEntry[]; detailB
 
 /* ---------------------------------------------------------------- 4. predicted ratings */
 
-function ModelCard({ rows }: { rows: ReturnType<typeof patternRows> }): JSX.Element {
+function ModelCard({ model, picks }: { model: Extract<RatingModel, { status: 'better' }>; picks: StartWithPick[] }): JSX.Element {
   const { settings } = useDisplaySettings();
-  const model = useMemo(() => fitRatingModel(rows), [rows]);
-  const picks = useMemo(() => (model.status === 'better' ? startWith(model, rows) : []), [model, rows]);
-  const lede = 'Learns from your ratings which genres, tags, release years and community scores go with a higher rating, then tests itself on titles it has not seen.';
   return (
-    <PatternCard title="Start with these" lede={lede}>
-      {model.status === 'needs-data' && (
-        <p className="analytics-state">
-          Needs {MIN_MODEL_TITLES} rated catalog titles to learn from and test on ({model.n} so far).
-        </p>
-      )}
-      {model.status === 'not-better' && (
-        <>
-          <p className="pattern-headline">Not better than guessing your average yet. Rate more titles.</p>
-          <p className="pattern-basis">
-            Tested by leaving each of {model.n} rated titles out in turn: the model misses by {fixed(model.modelMae, 2)}★ on typical, against
-            {' '}{fixed(model.baselineMae, 2)}★ for always guessing your mean. Its gain is {signed(model.gain.value, 2)}★ per title
-            (95% {range(signed(model.gain.lo, 2), signed(model.gain.hi, 2))}), which is not a clear improvement (it has to be above zero
-            with 95% confidence and at least 5%), so no predictions are shown.
-          </p>
-        </>
-      )}
-      {model.status === 'better' && (
-        <>
-          <p className="pattern-headline">
-            Predictions miss by {fixed(model.modelMae, 2)}★ on typical, against {fixed(model.baselineMae, 2)}★ for guessing your average.
-          </p>
-          <p className="pattern-basis">
-            Tested by leaving each of {model.n} rated titles out in turn: {pct(model.improvement)} smaller error, {signed(model.gain.value, 2)}★ per
-            title (95% {range(signed(model.gain.lo, 2), signed(model.gain.hi, 2))}). The setting was chosen on the same test, so the true gain is
-            probably a little lower.
-          </p>
-          {picks.length > 0 ? (
-            <ol className="pattern-picks">
-              {picks.map(({ detail, prediction }) => (
-                <li key={detail.id}>
-                  <a href={novelPageUrl(detail.id)} aria-describedby={`pick-why-${detail.id}`}>
-                    <strong>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</strong>
-                    <span>
-                      <b>≈ {fixed(prediction.rating)}★</b> <small>±{fixed(model.modelMae)} typical error</small>
-                    </span>
-                  </a>
-                  <span className="pattern-why" id={`pick-why-${detail.id}`} role="tooltip">
-                    {prediction.up.length > 0 && <>Pushes up: {prediction.up.map((c) => `${c.label} (${signed(c.stars, 2)})`).join(', ')}. </>}
-                    {prediction.down.length > 0 && <>Pulls down: {prediction.down.map((c) => `${c.label} (${signed(c.stars, 2)})`).join(', ')}.</>}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          ) : <p className="analytics-state">No unrated plan-to-read titles with catalog details to score.</p>}
-        </>
-      )}
+    <PatternCard
+      title="Start with these"
+      lede="Predicts your rating from genres, tags, year and community score, tested on titles it has not seen."
+    >
+      <p className="pattern-headline">
+        Typical miss {fixed(model.modelMae, 2)}★, against {fixed(model.baselineMae, 2)}★ for guessing your average.
+      </p>
+      <p className="pattern-basis">
+        Leave-one-out test on {model.n} rated titles: {pct(model.improvement)} smaller error, {signed(model.gain.value, 2)}★ per title
+        ({range(signed(model.gain.lo, 2), signed(model.gain.hi, 2))}). The setting was tuned on the same test, so the real gain is likely a bit lower.
+      </p>
+      {picks.length > 0 ? (
+        <ol className="pattern-picks">
+          {picks.map(({ detail, prediction }) => (
+            <li key={detail.id}>
+              <a href={novelPageUrl(detail.id)} aria-describedby={`pick-why-${detail.id}`}>
+                <strong>{displayNovelTitle(detail.title, detail.associated_names, settings.titlePreference)}</strong>
+                <span>
+                  <b>≈ {fixed(prediction.rating)}★</b> <small>±{fixed(model.modelMae)} typical error</small>
+                </span>
+              </a>
+              <span className="pattern-why" id={`pick-why-${detail.id}`} role="tooltip">
+                {prediction.up.length > 0 && <>Pushes up: {prediction.up.map((c) => `${c.label} (${signed(c.stars, 2)})`).join(', ')}. </>}
+                {prediction.down.length > 0 && <>Pulls down: {prediction.down.map((c) => `${c.label} (${signed(c.stars, 2)})`).join(', ')}.</>}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : <p className="analytics-state">No unrated plan-to-read titles with catalog details to score.</p>}
     </PatternCard>
   );
 }
 
-/* ---------------------------------------------------------------- section */
+/* ---------------------------------------------------------------- assembly */
 
-export default function ProfilePatterns({ entries, detailById, matchedTotal, loading }: {
-  entries: ProfileEntry[];
-  detailById: Map<number, NovelDetail>;
-  /** Every catalog-matched title in scope, including those whose details were not loaded. */
-  matchedTotal: number;
-  loading: boolean;
-}): JSX.Element {
+export type PatternId = 'calibration' | 'finishing' | 'rating' | 'drop' | 'model';
+
+export interface PatternCards {
+  /** False while catalog details are still loading, so missing cards are not yet "no data". */
+  ready: boolean;
+  /** A card per pattern with enough signal; absent patterns are listed in `unavailable`. */
+  cards: Partial<Record<PatternId, ReactNode>>;
+  unavailable: Array<{ id: PatternId; title: string; reason: string }>;
+}
+
+/**
+ * Computes every pattern once and returns only the cards that have something to say, plus a one-line
+ * reason for each that does not, so the page can leave empty sections out.
+ */
+export function usePatternCards(
+  entries: ProfileEntry[],
+  detailById: Map<number, NovelDetail>,
+  loading: boolean,
+): PatternCards {
   // Deferred so React can slice the chart and model work instead of blocking the tab switch.
-  const settledDetails = useDeferredValue(detailById);
-  const rows = useMemo(() => patternRows(entries, settledDetails), [entries, settledDetails]);
-  return (
-    <section className="profile-patterns" aria-labelledby="profile-patterns-title">
-      <h3 id="profile-patterns-title">Your patterns</h3>
-      <p className="analytics-coverage">
-        How your library relates to the catalog. Every result shows how many titles it rests on and a 95% interval; where the data is too thin it says so instead of guessing.
-        {' '}Based on {rows.length.toLocaleString()} of {matchedTotal.toLocaleString()} catalog-matched titles
-        {rows.length < matchedTotal ? ' (rated and finished titles are loaded first)' : ''}.
-      </p>
-      {(loading || settledDetails !== detailById) && !rows.length ? (
-        <p className="analytics-state" aria-live="polite">Loading catalog details for your titles…</p>
-      ) : rows.length ? (
-        <div className="pattern-stack">
-          <CalibrationCard rows={rows} />
-          <FacetsCard rows={rows} />
-          <DropOffCard entries={entries} detailById={settledDetails} />
-          <ModelCard rows={rows} />
-        </div>
-      ) : (
-        <p className="analytics-state">Patterns need titles matched to the catalog, with ratings or finished and dropped statuses.</p>
-      )}
-    </section>
-  );
+  const settled = useDeferredValue(detailById);
+  const rows = useMemo(() => patternRows(entries, settled), [entries, settled]);
+  const comparable = useMemo(() => calibrationPoints(rows), [rows]);
+  const calibrationResult = useMemo(() => calibration(comparable), [comparable]);
+  const facets = useMemo(() => facetPatterns(rows), [rows]);
+  const drop = useMemo(() => dropOffCurves(entries, settled), [entries, settled]);
+  const model = useMemo(() => fitRatingModel(rows), [rows]);
+  const picks = useMemo(() => (model.status === 'better' ? startWith(model, rows) : []), [model, rows]);
+
+  const ready = !loading && settled === detailById;
+  const cards: PatternCards['cards'] = {};
+  const unavailable: PatternCards['unavailable'] = [];
+  if (!ready) return { ready, cards, unavailable };
+
+  const skip = (id: PatternId, title: string, reason: string) => unavailable.push({ id, title, reason });
+
+  if (calibrationResult) cards.calibration = <CalibrationCard result={calibrationResult} />;
+  else skip('calibration', 'You vs the community', `rate ${MIN_CALIBRATION}+ titles that have ${MIN_COMMUNITY_VOTES}+ community votes (${comparable.length} so far)`);
+
+  const { completion, rating } = facets;
+  if (completion && completion.shown > 0) {
+    cards.finishing = (
+      <FacetFamilyCard
+        title="Finishing vs dropping"
+        intro={`You finished ${pct(completion.baseline)} of ${facets.outcomes} titles you finished or dropped. Bars show the shift in points.`}
+        family={completion}
+        format={(v) => `${signed(v * 100, 0)} pts`}
+        labels={['You tend to finish', 'You tend to drop']}
+      />
+    );
+  } else {
+    skip('finishing', 'Finishing vs dropping', completion
+      ? 'no genre or tag stands out yet'
+      : `needs ${MIN_OUTCOMES} finished or dropped titles, 3+ of each (${facets.outcomes} so far)`);
+  }
+  if (rating && rating.shown > 0) {
+    cards.rating = (
+      <FacetFamilyCard
+        title="How you rate"
+        intro={`Your average over ${facets.rated} rated titles is ${fixed(rating.mean, 2)}★. Bars show how far a facet sits above or below it.`}
+        family={rating}
+        format={(v) => `${signed(v)}★`}
+        labels={['You rate higher', 'You rate lower']}
+      />
+    );
+  } else {
+    skip('rating', 'How you rate', rating
+      ? 'no genre or tag stands out yet'
+      : `needs ${MIN_RATED_FOR_FACETS} rated titles with varied scores (${facets.rated} so far)`);
+  }
+
+  if (drop.curves.length) cards.drop = <DropOffCard result={drop} />;
+  else skip('drop', 'Where you drop titles', `needs ${MIN_DROPS} drops with a chapter or episode count (${drop.totalDrops} so far)`);
+
+  if (model.status === 'better') cards.model = <ModelCard model={model} picks={picks} />;
+  else if (model.status === 'needs-data') skip('model', 'Start with these', `needs ${MIN_MODEL_TITLES} rated catalog titles (${model.n} so far)`);
+  else skip('model', 'Start with these', `not better than guessing your average yet (${fixed(model.modelMae, 2)}★ vs ${fixed(model.baselineMae, 2)}★ typical miss)`);
+
+  return { ready, cards, unavailable };
 }

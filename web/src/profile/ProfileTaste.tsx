@@ -181,7 +181,7 @@ export function ProfileTaste({
       <details className="profile-stats-disclosure" open>
         <summary>
           <BarChart3 size={18} aria-hidden="true" />
-          <span><strong>Library stats</strong><small>Your patterns, then status, scores, formats, activity, release years and genres</small></span>
+          <span><strong>Library stats</strong><small>Overview, ratings, taste, picks, habits and catalog</small></span>
         </summary>
         <Suspense fallback={<p className="analytics-state">Loading stats…</p>}>
           <ProfileAnalytics profile={profile} source={source} />

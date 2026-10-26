@@ -4,8 +4,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Pie,
-  PieChart,
   Scatter,
   ScatterChart,
   XAxis,
@@ -14,13 +12,13 @@ import {
 import { NovelDetail } from '../types';
 import { RecommendationDataSource } from '../data';
 import { LocalUserProfile, ProfileMediaKind } from './types';
-import ProfilePatterns from './ProfilePatterns';
+import { usePatternCards } from './ProfilePatterns';
+import StatsNav from './StatsNav';
 import { detailLoadOrder } from './patterns';
 import { novelPageUrl } from '../novelLinks';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '../chart';
 import {
   activityByMonth,
-  countByStatus,
   filterEntriesByScope,
   genreBreakdown,
   languageBreakdown,
@@ -30,7 +28,6 @@ import {
   profileHasDates,
   releaseYearDistribution,
   scoreDistribution,
-  STATUS_LABELS,
   StatsScope,
 } from './profileStats';
 
@@ -192,7 +189,6 @@ export default function ProfileAnalytics({
 
   const summaries = useMemo(() => formatSummaries(scopedEntries, detailById), [scopedEntries, detailById]);
   const kpis = useMemo(() => overviewKpis(scopedEntries), [scopedEntries]);
-  const statusData = useMemo(() => countByStatus(scopedEntries).filter((row) => row.count > 0), [scopedEntries]);
   const scoreData = useMemo(() => scoreDistribution(scopedEntries), [scopedEntries]);
   const activityData = useMemo(() => activityByMonth(scopedEntries), [scopedEntries]);
   const mediaData = useMemo(() => mediaKindBreakdown(scopedEntries, detailById), [scopedEntries, detailById]);
@@ -216,10 +212,29 @@ export default function ProfileAnalytics({
     [scopedDetails]
   );
 
-  const progressLabel =
-    scope === 'anime' ? 'Episodes logged' : scope === 'manga' ? 'Chapters logged' : 'Chapters / episodes logged';
-
   const showFormatFilter = availableScopes.size > 1;
+
+  const { ready, cards, unavailable: unavailablePatterns } = usePatternCards(scopedEntries, detailById, loading);
+  const showScores = kpis.rated > 0;
+  const showActivity = hasDates && activityData.length > 0;
+  const showTaste = Boolean(cards.finishing || cards.rating) || genreData.length > 0;
+  const showHabits = Boolean(cards.drop) || showActivity;
+  const showCatalog = yearData.length > 1 || scatterData.length > 0 || languageData.length > 0;
+
+  const unavailable = [
+    ...unavailablePatterns,
+    ...(!showActivity ? [{ id: 'activity', title: 'Activity over time', reason: 'needs start and finish dates, which AniList exports include' }] : []),
+    ...(!matchedIds.length ? [{ id: 'catalog', title: 'Genres, years and languages', reason: 'need titles matched to the catalog' }] : []),
+  ];
+
+  const sections = [
+    { id: 'stats-overview', label: 'Overview', show: true },
+    { id: 'stats-ratings', label: 'Ratings', show: Boolean(cards.calibration) },
+    { id: 'stats-taste', label: 'Taste', show: showTaste },
+    { id: 'stats-picks', label: 'Picks', show: Boolean(cards.model) },
+    { id: 'stats-habits', label: 'Habits', show: showHabits },
+    { id: 'stats-catalog', label: 'Catalog', show: showCatalog },
+  ].filter((section) => section.show);
 
   return (
     <section className="profile-analytics" aria-label="Library stats">
@@ -248,311 +263,300 @@ export default function ProfileAnalytics({
         </div>
       )}
 
-      <ProfilePatterns entries={scopedEntries} detailById={detailById} matchedTotal={matchedInScope} loading={loading} />
+      <StatsNav sections={sections} reducedMotion={reducedMotion} />
 
-      <h3 className="analytics-counts-title">Library counts</h3>
-      <p className="analytics-coverage">
-        Overview numbers use all {profile.entries.length.toLocaleString()} library entries
-        {scope !== 'all' ? ` filtered to ${scope}` : ''}. Catalog charts (genres, years, popularity)
-        use {scopedDetails.length.toLocaleString()} of {matchedInScope.toLocaleString()} matched titles
-        {failed ? ` (${failed} unavailable)` : ''}. Scores are on a 1–5 scale. The activity chart
-        needs start/finish dates, which AniList exports include.
-      </p>
-
-      <div className="analytics-summaries">
-        {summaries.map((summary) => (
-          <article key={summary.kind} className="analytics-summary" aria-label={`${FORMAT_NOUNS[summary.kind]} summary`}>
-            <div className="analytics-summary-stats">
-              <div><strong>{summary.total.toLocaleString()}</strong><span>Total {FORMAT_NOUNS[summary.kind]}</span></div>
-              <div title={summary.kind === 'anime' ? 'Estimated at 24 minutes per episode' : undefined}>
-                <strong>{summary.kind === 'anime' ? '~' : ''}{summary.progressValue.toLocaleString()}</strong>
-                <span>{summary.progressLabel}</span>
+      <section id="stats-overview" className="stats-section" aria-labelledby="stats-overview-title">
+        <h3 id="stats-overview-title">Overview</h3>
+        <div className="analytics-summaries">
+          {summaries.map((summary) => (
+            <article key={summary.kind} className="analytics-summary" aria-label={`${FORMAT_NOUNS[summary.kind]} summary`}>
+              <div className="analytics-summary-stats">
+                <div><strong>{summary.total.toLocaleString()}</strong><span>Total {FORMAT_NOUNS[summary.kind]}</span></div>
+                <div title={summary.kind === 'anime' ? 'Estimated at 24 minutes per episode' : undefined}>
+                  <strong>{summary.kind === 'anime' ? '~' : ''}{summary.progressValue.toLocaleString()}</strong>
+                  <span>{summary.progressLabel}</span>
+                </div>
+                <div><strong>{summary.meanScore != null ? summary.meanScore.toFixed(2) : '—'}</strong><span>Mean score (of 5)</span></div>
               </div>
-              <div><strong>{summary.meanScore != null ? summary.meanScore.toFixed(2) : '—'}</strong><span>Mean score (of 5)</span></div>
-            </div>
-            <div className="analytics-summary-bar" role="img" aria-label={summary.statuses.map((row) => `${row.label} ${row.count}`).join(', ')}>
-              {summary.statuses.map((row) => (
-                <i key={row.status} style={{ background: STATUS_COLORS[row.status], flexGrow: row.count }} title={`${row.label}: ${row.count}`} />
-              ))}
-            </div>
-            <ul className="analytics-summary-legend">
-              {summary.statuses.map((row) => (
-                <li key={row.status}><i style={{ background: STATUS_COLORS[row.status] }} />{row.label} <strong>{row.count.toLocaleString()}</strong></li>
-              ))}
-            </ul>
-          </article>
-        ))}
-      </div>
-
-      <div className="analytics-kpi-grid">
-        <div><strong>{kpis.total.toLocaleString()}</strong><span>Total titles</span></div>
-        <div><strong>{kpis.meanScore ? kpis.meanScore.toFixed(2) : '—'}</strong><span>Mean score (of 5)</span></div>
-        <div><strong>{kpis.stdScore ? kpis.stdScore.toFixed(2) : '—'}</strong><span>Score std. dev.</span></div>
-        <div><strong>{kpis.rated.toLocaleString()}</strong><span>Rated</span></div>
-        <div><strong>{kpis.completionRate}%</strong><span>Completed</span></div>
-        <div><strong>{kpis.progressTotal.toLocaleString()}</strong><span>{progressLabel}</span></div>
-        <div><strong>{kpis.matched.toLocaleString()}</strong><span>Matched in catalog</span></div>
-      </div>
-
-      {loading && <p className="analytics-state" aria-live="polite">Loading matched catalog analytics…</p>}
-      {error && <p className="analytics-state analytics-error">{error}</p>}
-
-      <div className="analytics-grid">
-        <article className="analytics-card">
-          <h3>Status distribution</h3>
-          <p>Your local reading statuses — same buckets for NovelUpdates and AniList imports.</p>
-          {statusData.length ? (
-            <>
-              <ChartContainer
-                config={Object.fromEntries(statusData.map((row) => [row.status, { label: row.label, color: STATUS_COLORS[row.status] }]))}
-                className="analytics-chart analytics-chart-pie"
-              >
-                <PieChart>
-                  <ChartTooltip
-                    content={<ChartTooltipContent config={Object.fromEntries(statusData.map((row) => [row.status, { label: row.label, color: STATUS_COLORS[row.status] }]))} />}
-                  />
-                  <Pie
-                    data={statusData}
-                    dataKey="count"
-                    nameKey="status"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    isAnimationActive={!reducedMotion}
-                  >
-                    {statusData.map((row) => (
-                      <Cell key={row.status} fill={STATUS_COLORS[row.status] || 'var(--chart-1)'} stroke="var(--surface)" />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ChartContainer>
-              <ul className="analytics-legend">
-                {statusData.map((row) => (
-                  <li key={row.status}>
-                    <i style={{ background: STATUS_COLORS[row.status] }} />
-                    <span>{STATUS_LABELS[row.status]}</span>
-                    <strong>{row.count}</strong>
-                  </li>
+              <div className="analytics-summary-bar" role="img" aria-label={summary.statuses.map((row) => `${row.label} ${row.count}`).join(', ')}>
+                {summary.statuses.map((row) => (
+                  <i key={row.status} style={{ background: STATUS_COLORS[row.status], flexGrow: row.count }} title={`${row.label}: ${row.count}`} />
+                ))}
+              </div>
+              <ul className="analytics-summary-legend">
+                {summary.statuses.map((row) => (
+                  <li key={row.status}><i style={{ background: STATUS_COLORS[row.status] }} />{row.label} <strong>{row.count.toLocaleString()}</strong></li>
                 ))}
               </ul>
-            </>
-          ) : (
-            <p className="analytics-state">No status data yet.</p>
-          )}
-        </article>
+            </article>
+          ))}
+        </div>
 
-        <article className="analytics-card">
-          <h3>Score distribution</h3>
-          <p>How many titles you gave each star rating (1–5 scale; NovelUpdates stars and AniList scores both map here).</p>
-          <ChartContainer config={scoreChartConfig} className="analytics-chart">
-            <BarChart accessibilityLayer data={scoreData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
-              <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-              <XAxis dataKey="score" tickLine={false} axisLine={false} tickMargin={8} tick={{ fill: 'var(--muted)', fontSize: 11 }} tickFormatter={(value) => `${value}★`} />
-              <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-              <ChartTooltip cursor={false} content={<ChartTooltipContent config={scoreChartConfig} />} />
-              <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} maxBarSize={56} isAnimationActive={!reducedMotion} />
-            </BarChart>
-          </ChartContainer>
-        </article>
+        <div className="analytics-kpi-grid">
+          <div><strong>{kpis.rated.toLocaleString()}</strong><span>Rated</span></div>
+          <div><strong>{kpis.completionRate}%</strong><span>Completed</span></div>
+          <div><strong>{kpis.matched.toLocaleString()}</strong><span>In catalog</span></div>
+        </div>
 
-        {mediaData.length > 1 && (
-          <article className="analytics-card">
-            <h3>Format mix</h3>
-            <p>Inferred from import source and catalog metadata when available.</p>
-            <ChartContainer
-              config={{
-                novel: { label: 'Novels', color: 'var(--chart-1)' },
-                manga: { label: 'Manga', color: 'var(--chart-2)' },
-                anime: { label: 'Anime', color: 'var(--chart-3)' },
-              }}
-              className="analytics-chart analytics-chart-bars"
-            >
-              <BarChart data={mediaData} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-                <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
-                <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-                <YAxis type="category" dataKey="label" width={64} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-                <ChartTooltip content={<ChartTooltipContent config={{ count: { label: 'Titles', color: 'var(--chart-1)' } }} />} />
-                <Bar dataKey="count" radius={[0, 6, 6, 0]} isAnimationActive={!reducedMotion}>
-                  {mediaData.map((row) => (
-                    <Cell
-                      key={row.kind}
-                      fill={row.kind === 'novel' ? 'var(--chart-1)' : row.kind === 'manga' ? 'var(--chart-2)' : 'var(--chart-3)'}
+        {(showScores || mediaData.length > 1) && (
+          <div className="analytics-grid">
+            {showScores && (
+              <article className="analytics-card">
+                <h4>Score distribution</h4>
+                <ChartContainer config={scoreChartConfig} className="analytics-chart">
+                  <BarChart accessibilityLayer data={scoreData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
+                    <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+                    <XAxis dataKey="score" tickLine={false} axisLine={false} tickMargin={8} tick={{ fill: 'var(--muted)', fontSize: 11 }} tickFormatter={(value) => `${value}★`} />
+                    <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent config={scoreChartConfig} />} />
+                    <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} maxBarSize={56} isAnimationActive={!reducedMotion} />
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            )}
+            {mediaData.length > 1 && (
+              <article className="analytics-card">
+                <h4>Format mix</h4>
+                <ChartContainer
+                  config={{
+                    novel: { label: 'Novels', color: 'var(--chart-1)' },
+                    manga: { label: 'Manga', color: 'var(--chart-2)' },
+                    anime: { label: 'Anime', color: 'var(--chart-3)' },
+                  }}
+                  className="analytics-chart analytics-chart-bars"
+                >
+                  <BarChart data={mediaData} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                    <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
+                    <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="label" width={64} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <ChartTooltip content={<ChartTooltipContent config={{ count: { label: 'Titles', color: 'var(--chart-1)' } }} />} />
+                    <Bar dataKey="count" radius={[0, 6, 6, 0]} isAnimationActive={!reducedMotion}>
+                      {mediaData.map((row) => (
+                        <Cell
+                          key={row.kind}
+                          fill={row.kind === 'novel' ? 'var(--chart-1)' : row.kind === 'manga' ? 'var(--chart-2)' : 'var(--chart-3)'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            )}
+          </div>
+        )}
+      </section>
+
+      {cards.calibration && (
+        <section id="stats-ratings" className="stats-section" aria-labelledby="stats-ratings-title">
+          <h3 id="stats-ratings-title">Ratings</h3>
+          <div className="analytics-grid">{cards.calibration}</div>
+        </section>
+      )}
+
+      {showTaste && (
+        <section id="stats-taste" className="stats-section" aria-labelledby="stats-taste-title">
+          <h3 id="stats-taste-title">Taste</h3>
+          <div className="analytics-grid">
+            {cards.finishing}
+            {cards.rating}
+            {genreData.length > 0 && (
+              <article className="analytics-card analytics-card-wide">
+                <h4>Top genres</h4>
+                <p>Titles per genre. Hover for your mean score.</p>
+                <ChartContainer config={genreChartConfig} className="analytics-chart analytics-chart-wide analytics-chart-bars">
+                  <BarChart data={genreData} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                    <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
+                    <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="genre" width={110} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          config={genreChartConfig}
+                          valueFormatter={(value, _key, payload) =>
+                            `${Number(value).toLocaleString()} titles${payload?.meanScore ? ` · mean ${payload.meanScore}★` : ''}`
+                          }
+                        />
+                      }
                     />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          </article>
-        )}
-
-        {languageData.length > 0 && (
-          <article className="analytics-card">
-            <h3>Languages</h3>
-            <p>Among matched catalog titles (NovelUpdates language field or AniList country mapping).</p>
-            <ChartContainer config={languageChartConfig} className="analytics-chart analytics-chart-bars">
-              <BarChart data={languageData.slice(0, 8)} layout="vertical" margin={{ left: 4, right: 16, top: 8, bottom: 8 }}>
-                <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
-                <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-                <YAxis type="category" dataKey="language" width={84} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-                <ChartTooltip content={<ChartTooltipContent config={languageChartConfig} />} />
-                <Bar dataKey="count" fill="var(--color-count)" radius={[0, 6, 6, 0]} isAnimationActive={!reducedMotion} />
-              </BarChart>
-            </ChartContainer>
-          </article>
-        )}
-      </div>
-
-      {hasDates && activityData.length > 0 && (
-        <article className="analytics-card analytics-card-wide">
-          <h3>Activity over time</h3>
-          <p>From AniList start/finish dates when present. NovelUpdates HTML imports usually omit dates, so this chart stays empty for pure NU libraries.</p>
-          <ChartContainer config={activityChartConfig} className="analytics-chart analytics-chart-wide">
-            <BarChart accessibilityLayer data={activityData} barGap={1} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
-              <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-              <XAxis
-                dataKey="month"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-                minTickGap={24}
-                tick={{ fill: 'var(--muted)', fontSize: 10 }}
-                tickFormatter={(value) => String(value).slice(2)}
-              />
-              <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-              <ChartTooltip cursor={false} content={<ChartTooltipContent config={activityChartConfig} />} />
-              <Bar dataKey="started" fill="var(--color-started)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
-              <Bar dataKey="finished" fill="var(--color-finished)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
-            </BarChart>
-          </ChartContainer>
-        </article>
+                    <Bar dataKey="count" fill="var(--color-count)" radius={[0, 6, 6, 0]} isAnimationActive={!reducedMotion} />
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            )}
+          </div>
+        </section>
       )}
 
-      {yearData.length > 1 && (
-        <article className="analytics-card analytics-card-wide">
-          <h3>Release years</h3>
-          <p>Publication / premiere year from matched catalog metadata.</p>
-          <ChartContainer config={yearChartConfig} className="analytics-chart analytics-chart-wide">
-            <BarChart accessibilityLayer data={yearData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
-              <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-              <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} minTickGap={20} tick={{ fill: 'var(--muted)', fontSize: 10 }} />
-              <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-              <ChartTooltip cursor={false} content={<ChartTooltipContent config={yearChartConfig} />} />
-              <Bar dataKey="count" fill="var(--color-count)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
-            </BarChart>
-          </ChartContainer>
-        </article>
+      {cards.model && (
+        <section id="stats-picks" className="stats-section" aria-labelledby="stats-picks-title">
+          <h3 id="stats-picks-title">Picks</h3>
+          <div className="analytics-grid">{cards.model}</div>
+        </section>
       )}
 
-      {genreData.length > 0 && (
-        <article className="analytics-card analytics-card-wide">
-          <h3>Top genres</h3>
-          <p>Count among matched titles, with mean personal score when you rated them.</p>
-          <ChartContainer config={genreChartConfig} className="analytics-chart analytics-chart-wide analytics-chart-bars">
-            <BarChart data={genreData} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-              <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
-              <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-              <YAxis type="category" dataKey="genre" width={110} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    config={genreChartConfig}
-                    valueFormatter={(value, _key, payload) =>
-                      `${Number(value).toLocaleString()} titles${payload?.meanScore ? ` · mean ${payload.meanScore}★` : ''}`
-                    }
-                  />
-                }
-              />
-              <Bar dataKey="count" fill="var(--color-count)" radius={[0, 6, 6, 0]} isAnimationActive={!reducedMotion} />
-            </BarChart>
-          </ChartContainer>
-        </article>
+      {showHabits && (
+        <section id="stats-habits" className="stats-section" aria-labelledby="stats-habits-title">
+          <h3 id="stats-habits-title">Habits</h3>
+          <div className="analytics-grid">
+            {cards.drop}
+            {hasDates && activityData.length > 0 && (
+              <article className="analytics-card analytics-card-wide">
+                <h4>Activity over time</h4>
+                <p>From AniList start and finish dates.</p>
+                <ChartContainer config={activityChartConfig} className="analytics-chart analytics-chart-wide">
+                  <BarChart accessibilityLayer data={activityData} barGap={1} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
+                    <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      minTickGap={24}
+                      tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                      tickFormatter={(value) => String(value).slice(2)}
+                    />
+                    <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent config={activityChartConfig} />} />
+                    <Bar dataKey="started" fill="var(--color-started)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+                    <Bar dataKey="finished" fill="var(--color-finished)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            )}
+          </div>
+        </section>
       )}
 
-      {scatterData.length > 0 && (
-        <article className="analytics-card analytics-card-wide scatter-card">
-          <h3>Catalog rating vs list count</h3>
-          <p>
-            Gold points are potential hidden gems (catalog rating ≥ 4.2 and fewer than 2,000 on lists).
-            Uses matched catalog metadata only — works for both NovelUpdates and AniList rows in the snapshot.
-          </p>
-          <ChartContainer config={cohortChartConfig} className="analytics-chart analytics-chart-scatter">
-            <ScatterChart margin={{ top: 16, right: 18, bottom: 28, left: 4 }}>
-              <CartesianGrid stroke="var(--chart-grid)" />
-              <XAxis
-                type="number"
-                dataKey="readerScale"
-                tick={{ fill: 'var(--muted)', fontSize: 10 }}
-                tickFormatter={(value) => Math.round(10 ** Number(value)).toLocaleString()}
-                tickLine={false}
-                axisLine={false}
-                label={{ value: 'List count · log scale', position: 'bottom', fill: 'var(--muted)', fontSize: 11 }}
-              />
-              <YAxis type="number" dataKey="rating" domain={[0, 5]} width={34} tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
-              <ChartTooltip
-                cursor={{ strokeDasharray: '3 3', stroke: 'var(--border-strong)' }}
-                content={
-                  <ChartTooltipContent
-                    config={cohortChartConfig}
-                    headingFormatter={(_, payload) => String(payload[0]?.payload?.title || 'Title')}
-                    valueFormatter={(value, key, payload) =>
-                      key === 'readerScale'
-                        ? Number(payload?.readers || 0).toLocaleString()
-                        : Number(value).toFixed(2)
-                    }
-                  />
-                }
-              />
-              <Scatter
-                data={scatterData}
-                isAnimationActive={!reducedMotion}
-                shape={(props: any) => {
-                  const point = props.payload;
-                  return (
-                    <circle
-                      cx={props.cx}
-                      cy={props.cy}
-                      r={6}
-                      fill={point.hidden ? '#d89113' : 'var(--chart-1)'}
-                      stroke="var(--surface)"
-                      strokeWidth={2}
-                      className="chart-selectable-point"
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`${point.title}, rating ${point.rating}`}
-                      onClick={() => setSelectedPoint(point)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          setSelectedPoint(point);
-                        }
+      {showCatalog && (
+        <section id="stats-catalog" className="stats-section" aria-labelledby="stats-catalog-title">
+          <h3 id="stats-catalog-title">Catalog</h3>
+          <div className="analytics-grid">
+            {yearData.length > 1 && (
+              <article className="analytics-card analytics-card-wide">
+                <h4>Release years</h4>
+                <ChartContainer config={yearChartConfig} className="analytics-chart analytics-chart-wide">
+                  <BarChart accessibilityLayer data={yearData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
+                    <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+                    <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} minTickGap={20} tick={{ fill: 'var(--muted)', fontSize: 10 }} />
+                    <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent config={yearChartConfig} />} />
+                    <Bar dataKey="count" fill="var(--color-count)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            )}
+            {scatterData.length > 0 && (
+              <article className="analytics-card analytics-card-wide scatter-card">
+                <h4>Hidden gems</h4>
+                <p>Gold points are possible hidden gems: rated 4.2+ with under 2,000 on lists.</p>
+                <ChartContainer config={cohortChartConfig} className="analytics-chart analytics-chart-scatter">
+                  <ScatterChart margin={{ top: 16, right: 18, bottom: 28, left: 4 }}>
+                    <CartesianGrid stroke="var(--chart-grid)" />
+                    <XAxis
+                      type="number"
+                      dataKey="readerScale"
+                      tick={{ fill: 'var(--muted)', fontSize: 10 }}
+                      tickFormatter={(value) => Math.round(10 ** Number(value)).toLocaleString()}
+                      tickLine={false}
+                      axisLine={false}
+                      label={{ value: 'List count · log scale', position: 'bottom', fill: 'var(--muted)', fontSize: 11 }}
+                    />
+                    <YAxis type="number" dataKey="rating" domain={[0, 5]} width={34} tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <ChartTooltip
+                      cursor={{ strokeDasharray: '3 3', stroke: 'var(--border-strong)' }}
+                      content={
+                        <ChartTooltipContent
+                          config={cohortChartConfig}
+                          headingFormatter={(_, payload) => String(payload[0]?.payload?.title || 'Title')}
+                          valueFormatter={(value, key, payload) =>
+                            key === 'readerScale'
+                              ? Number(payload?.readers || 0).toLocaleString()
+                              : Number(value).toFixed(2)
+                          }
+                        />
+                      }
+                    />
+                    <Scatter
+                      data={scatterData}
+                      isAnimationActive={!reducedMotion}
+                      shape={(props: any) => {
+                        const point = props.payload;
+                        return (
+                          <circle
+                            cx={props.cx}
+                            cy={props.cy}
+                            r={6}
+                            fill={point.hidden ? '#d89113' : 'var(--chart-1)'}
+                            stroke="var(--surface)"
+                            strokeWidth={2}
+                            className="chart-selectable-point"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`${point.title}, rating ${point.rating}`}
+                            onClick={() => setSelectedPoint(point)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setSelectedPoint(point);
+                              }
+                            }}
+                          />
+                        );
                       }}
                     />
-                  );
-                }}
-              />
-            </ScatterChart>
-          </ChartContainer>
-          {selectedPoint && (
-            <div className="chart-point-card" role="status">
-              <div>
-                <strong>{selectedPoint.title}</strong>
-                <span>
-                  {selectedPoint.rating} rating · {selectedPoint.readers.toLocaleString()} on lists
-                </span>
-                {selectedPoint.hidden && <span>Potential hidden gem</span>}
-              </div>
-              <a href={novelPageUrl(selectedPoint.id)}>Open title</a>
-            </div>
-          )}
-        </article>
+                  </ScatterChart>
+                </ChartContainer>
+                {selectedPoint && (
+                  <div className="chart-point-card" role="status">
+                    <div>
+                      <strong>{selectedPoint.title}</strong>
+                      <span>
+                        {selectedPoint.rating} rating · {selectedPoint.readers.toLocaleString()} on lists
+                      </span>
+                      {selectedPoint.hidden && <span>Potential hidden gem</span>}
+                    </div>
+                    <a href={novelPageUrl(selectedPoint.id)}>Open title</a>
+                  </div>
+                )}
+              </article>
+            )}
+            {languageData.length > 0 && (
+              <article className="analytics-card analytics-card-wide">
+                <h4>Languages</h4>
+                <ChartContainer config={languageChartConfig} className="analytics-chart analytics-chart-wide analytics-chart-bars">
+                  <BarChart data={languageData.slice(0, 8)} layout="vertical" margin={{ left: 4, right: 16, top: 8, bottom: 8 }}>
+                    <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
+                    <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <YAxis type="category" dataKey="language" width={84} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+                    <ChartTooltip content={<ChartTooltipContent config={languageChartConfig} />} />
+                    <Bar dataKey="count" fill="var(--color-count)" radius={[0, 6, 6, 0]} isAnimationActive={!reducedMotion} />
+                  </BarChart>
+                </ChartContainer>
+              </article>
+            )}
+          </div>
+        </section>
       )}
 
-      {!loading && !matchedIds.length && (
-        <p className="analytics-state">
-          No matched catalog titles yet — status and score charts still use your full local list.
-          Import more pages or sync AniList media into the catalog to unlock genres and release years.
-        </p>
+      {loading && <p className="analytics-state" aria-live="polite">Loading catalog details…</p>}
+      {error && <p className="analytics-state analytics-error">{error}</p>}
+
+      {ready && unavailable.length > 0 && (
+        <aside className="analytics-pending" aria-label="Not enough data yet">
+          <h4>Not enough data yet</h4>
+          <ul>
+            {unavailable.map((item) => (
+              <li key={item.title}><strong>{item.title}</strong> {item.reason}</li>
+            ))}
+          </ul>
+        </aside>
       )}
+
+      <p className="analytics-coverage">
+        Catalog charts and patterns use {scopedDetails.length.toLocaleString()} of {matchedInScope.toLocaleString()} matched titles
+        {scopedDetails.length < matchedInScope ? ' (rated and finished load first)' : ''}
+        {failed ? `, ${failed} unavailable` : ''}. Ranges are 95% intervals; sections without enough data are left out.
+      </p>
     </section>
   );
 }
