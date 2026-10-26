@@ -40,6 +40,16 @@ export type TasteProfile = {
   liked_tags: WeightedFacet[];
   avoid_genres: WeightedFacet[];
   avoid_tags: WeightedFacet[];
+  /**
+   * What sets liked titles apart from avoided ones, for display. Raw weights favour facets every
+   * title carries (Action, Male Protagonist), which land on both sides; these lean one way each.
+   */
+  distinct: {
+    liked_genres: WeightedFacet[];
+    liked_tags: WeightedFacet[];
+    avoid_genres: WeightedFacet[];
+    avoid_tags: WeightedFacet[];
+  };
   evidence: {
     total_entries: number;
     matched: number;
@@ -121,6 +131,42 @@ function topFacets(
     }))
     .sort((a, b) => b.weight - a.weight || b.count - a.count || a.name.localeCompare(b.name))
     .slice(0, limit);
+}
+
+/** Minimum likelihood ratio before a facet counts as leaning toward one side. */
+const LEAN_RATIO = 1.5;
+
+/**
+ * Split facets by which side they lean toward, comparing the share of liked titles that carry
+ * them with the share of avoided titles that do (so 12 liked vs 51 avoided titles compare fairly).
+ * A facet shows up on at most one side. With only one side to learn from there is nothing to
+ * contrast against, so that side keeps its strongest facets.
+ */
+export function contrastFacets(
+  liked: Map<string, { weight: number; count: number }>,
+  likedTotal: number,
+  avoided: Map<string, { weight: number; count: number }>,
+  avoidedTotal: number,
+  limit: number
+): { liked: WeightedFacet[]; avoid: WeightedFacet[] } {
+  if (likedTotal === 0 || avoidedTotal === 0) {
+    return { liked: topFacets(liked, 'like', limit), avoid: topFacets(avoided, 'avoid', limit) };
+  }
+  const likedSide = new Map<string, { weight: number; count: number }>();
+  const avoidSide = new Map<string, { weight: number; count: number }>();
+  const lean = new Map<string, number>();
+  for (const name of new Set([...liked.keys(), ...avoided.keys()])) {
+    const l = liked.get(name);
+    const a = avoided.get(name);
+    const ratio = Math.log(((l?.count ?? 0) + 0.5) / (likedTotal + 1)) - Math.log(((a?.count ?? 0) + 0.5) / (avoidedTotal + 1));
+    if (Math.abs(ratio) < Math.log(LEAN_RATIO)) continue;
+    if (ratio > 0 && l) likedSide.set(name, l);
+    else if (ratio < 0 && a) avoidSide.set(name, a);
+    lean.set(name, Math.abs(ratio) * Math.log(1 + (ratio > 0 ? l?.count ?? 0 : a?.count ?? 0)));
+  }
+  const rank = (side: Map<string, { weight: number; count: number }>, polarity: 'like' | 'avoid') =>
+    topFacets(side, polarity, side.size).sort((x, y) => (lean.get(y.name) ?? 0) - (lean.get(x.name) ?? 0) || x.name.localeCompare(y.name)).slice(0, limit);
+  return { liked: rank(likedSide, 'like'), avoid: rank(avoidSide, 'avoid') };
 }
 
 export function selectPositiveSeeds(
@@ -216,6 +262,9 @@ export function computeTasteProfile(
   const avoidGenreMap = accumulateFacets(negDetails, negWeight, 'genres');
   const avoidTagMap = accumulateFacets(negDetails, negWeight, 'tags');
 
+  const distinctGenres = contrastFacets(likedGenreMap, posDetails.length, avoidGenreMap, negDetails.length, 8);
+  const distinctTags = contrastFacets(likedTagMap, posDetails.length, avoidTagMap, negDetails.length, 12);
+
   const matched = profile.entries.filter((e) => e.novel_id != null).length;
   const unmatched = profile.entries.length - matched;
   const rated = profile.entries.filter((e) => e.rating != null).length;
@@ -264,6 +313,12 @@ export function computeTasteProfile(
     liked_tags: topFacets(likedTagMap, 'like', 16),
     avoid_genres: topFacets(avoidGenreMap, 'avoid', 8),
     avoid_tags: topFacets(avoidTagMap, 'avoid', 12),
+    distinct: {
+      liked_genres: distinctGenres.liked,
+      liked_tags: distinctTags.liked,
+      avoid_genres: distinctGenres.avoid,
+      avoid_tags: distinctTags.avoid,
+    },
     evidence: {
       total_entries: profile.entries.length,
       matched,

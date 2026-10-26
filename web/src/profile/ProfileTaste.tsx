@@ -117,13 +117,13 @@ export function ProfileTaste({
             <div className="taste-learned">
               <div>
                 <h3>You tend to like</h3>
-                <FacetRow label="Genres" kind="genre" facets={taste.liked_genres} empty="Needs matched titles to read genres." />
-                <FacetRow label="Tags" kind="tag" facets={taste.liked_tags} empty="Needs matched titles to read tags." />
+                <FacetRow label="Genres" kind="genre" facets={taste.distinct.liked_genres} empty="Needs matched titles to read genres." />
+                <FacetRow label="Tags" kind="tag" facets={taste.distinct.liked_tags} empty="Needs matched titles to read tags." />
               </div>
               <div>
                 <h3>You tend to avoid</h3>
-                <FacetRow label="Genres" kind="genre" facets={taste.avoid_genres} empty="No dropped or low-rated titles yet." avoid />
-                <FacetRow label="Tags" kind="tag" facets={taste.avoid_tags} empty="No negative tag signal yet." avoid />
+                <FacetRow label="Genres" kind="genre" facets={taste.distinct.avoid_genres} empty="No dropped or low-rated titles yet." avoid />
+                <FacetRow label="Tags" kind="tag" facets={taste.distinct.avoid_tags} empty="No negative tag signal yet." avoid />
               </div>
             </div>
             {taste.evidence.caveats.length > 0 && (
