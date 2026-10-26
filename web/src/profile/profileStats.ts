@@ -93,19 +93,18 @@ export function countByStatus(entries: ProfileEntry[]): Array<{ status: ReadingS
 
 /** Personal score histogram on the shared 1–5 scale (works for NU and AniList). */
 export function scoreDistribution(entries: ProfileEntry[]): Array<{ score: string; count: number; value: number }> {
-  const buckets = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
-  const counts = new Map(buckets.map((bucket) => [bucket, 0]));
+  const counts = new Map([1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((bucket) => [bucket, 0]));
   entries.forEach((entry) => {
     if (entry.rating == null || !Number.isFinite(entry.rating)) return;
     const rounded = Math.round(entry.rating * 2) / 2;
     const key = Math.min(5, Math.max(1, rounded));
     counts.set(key, (counts.get(key) || 0) + 1);
   });
-  return buckets.map((value) => ({
-    value,
-    score: value % 1 === 0 ? `${value}` : `${value}`,
-    count: counts.get(value) || 0,
-  }));
+  // Half-star buckets only appear when someone actually used them.
+  const hasHalves = [...counts].some(([value, count]) => value % 1 !== 0 && count > 0);
+  return [...counts]
+    .filter(([value]) => hasHalves || value % 1 === 0)
+    .map(([value, count]) => ({ value, score: `${value}`, count }));
 }
 
 export function mediaKindBreakdown(
@@ -125,7 +124,14 @@ export function mediaKindBreakdown(
   return rows.filter((row) => row.count > 0);
 }
 
-/** Group start dates by month for activity area charts. */
+/** The `YYYY-MM` after `month`. */
+function nextMonth(month: string): string {
+  const year = Number(month.slice(0, 4));
+  const index = Number(month.slice(5, 7));
+  return index === 12 ? `${year + 1}-01` : `${year}-${String(index + 1).padStart(2, '0')}`;
+}
+
+/** Group start / finish dates by month; empty months are filled so bars sit on a true time axis. */
 export function activityByMonth(entries: ProfileEntry[]): Array<{ month: string; started: number; finished: number }> {
   const months = new Map<string, { started: number; finished: number }>();
   const bump = (iso: string | undefined, key: 'started' | 'finished') => {
@@ -139,11 +145,16 @@ export function activityByMonth(entries: ProfileEntry[]): Array<{ month: string;
     bump(entry.started_on, 'started');
     bump(entry.finished_on, 'finished');
   });
-  return [...months.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([month, row]) => ({ month, ...row }));
+  const sorted = [...months.keys()].sort();
+  if (!sorted.length) return [];
+  const rows: Array<{ month: string; started: number; finished: number }> = [];
+  for (let month = sorted[0]; month <= sorted[sorted.length - 1]; month = nextMonth(month)) {
+    rows.push({ month, ...(months.get(month) || { started: 0, finished: 0 }) });
+  }
+  return rows;
 }
 
+/** Titles per release year; empty years are filled so bars sit on a true time axis. */
 export function releaseYearDistribution(
   details: NovelDetail[]
 ): Array<{ year: string; count: number }> {
@@ -152,9 +163,13 @@ export function releaseYearDistribution(
     if (!detail.year || detail.year < 1950) return;
     counts.set(detail.year, (counts.get(detail.year) || 0) + 1);
   });
-  return [...counts.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([year, count]) => ({ year: String(year), count }));
+  if (!counts.size) return [];
+  const first = Math.min(...counts.keys());
+  const last = Math.max(...counts.keys());
+  return Array.from({ length: last - first + 1 }, (_, index) => ({
+    year: String(first + index),
+    count: counts.get(first + index) || 0,
+  }));
 }
 
 export function genreBreakdown(
@@ -234,7 +249,7 @@ export interface FormatSummary {
   /** Anime: estimated days watched. Manga / novels: chapters read. */
   progressValue: number;
   progressLabel: string;
-  /** Mean of your scores on AniList's 0-100 scale; null when nothing is rated. */
+  /** Mean of your scores on the shared 1–5 scale; null when nothing is rated. */
   meanScore: number | null;
   statuses: Array<{ status: ReadingStatus; label: string; count: number }>;
 }
@@ -262,7 +277,7 @@ export function formatSummaries(
       total: rows.length,
       progressValue: kind === 'anime' ? Math.round((units * DEFAULT_EPISODE_MINUTES) / 144) / 10 : units,
       progressLabel: kind === 'anime' ? 'Days Watched' : 'Chapters Read',
-      meanScore: scores.length ? Math.round(mean(scores) * 200) / 10 : null,
+      meanScore: scores.length ? Math.round(mean(scores) * 100) / 100 : null,
       statuses: countByStatus(rows).filter((row) => row.count > 0),
     }];
   });

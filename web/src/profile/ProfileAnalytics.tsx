@@ -1,7 +1,5 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -87,28 +85,13 @@ async function mapPool<T, R>(items: T[], limit: number, worker: (item: T) => Pro
   return results;
 }
 
-function GradientDefs({ id, colorVar }: { id: string; colorVar: string }) {
-  return (
-    <defs>
-      <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="5%" stopColor={colorVar} stopOpacity={0.45} />
-        <stop offset="95%" stopColor={colorVar} stopOpacity={0.05} />
-      </linearGradient>
-    </defs>
-  );
-}
-
 export default function ProfileAnalytics({
   profile,
   source,
-  datasetVersion,
 }: {
   profile: LocalUserProfile;
   source: RecommendationDataSource | null;
-  datasetVersion: string;
-  onOpenNovel: (id: number) => void;
 }) {
-  const gradId = useId().replace(/:/g, '');
   const [scope, setScope] = useState<StatsScope>('all');
   const [details, setDetails] = useState<NovelDetail[]>([]);
   const [requested, setRequested] = useState(0);
@@ -234,21 +217,13 @@ export default function ProfileAnalytics({
   const showFormatFilter = availableScopes.size > 1;
 
   return (
-    <section className="profile-analytics" aria-labelledby="analytics-title">
-      <div className="profile-library-heading">
-        <div>
-          <span className="eyebrow">AniList-style overview</span>
-          <h2 id="analytics-title">Library stats</h2>
-        </div>
-        <span>{datasetVersion}</span>
-      </div>
-
+    <section className="profile-analytics" aria-label="Library stats">
       <p className="analytics-coverage">
-        Overview KPIs use all {profile.entries.length.toLocaleString()} local entries
+        Overview numbers use all {profile.entries.length.toLocaleString()} library entries
         {scope !== 'all' ? ` filtered to ${scope}` : ''}. Catalog charts (genres, years, popularity)
         use {scopedDetails.length.toLocaleString()} of {requested.toLocaleString()} matched titles
-        {failed ? ` (${failed} unavailable)` : ''}. NovelUpdates imports work without AniList dates;
-        activity-over-time appears when GDPR start/finish dates are present.
+        {failed ? ` (${failed} unavailable)` : ''}. Scores are on a 1–5 scale. The activity chart
+        needs start/finish dates, which AniList exports include.
       </p>
 
       {showFormatFilter && (
@@ -285,7 +260,7 @@ export default function ProfileAnalytics({
                 <strong>{summary.kind === 'anime' ? '~' : ''}{summary.progressValue.toLocaleString()}</strong>
                 <span>{summary.progressLabel}</span>
               </div>
-              <div><strong>{summary.meanScore != null ? summary.meanScore.toFixed(1) : '—'}</strong><span>Mean Score</span></div>
+              <div><strong>{summary.meanScore != null ? summary.meanScore.toFixed(2) : '—'}</strong><span>Mean score (of 5)</span></div>
             </div>
             <div className="analytics-summary-bar" role="img" aria-label={summary.statuses.map((row) => `${row.label} ${row.count}`).join(', ')}>
               {summary.statuses.map((row) => (
@@ -303,7 +278,7 @@ export default function ProfileAnalytics({
 
       <div className="analytics-kpi-grid">
         <div><strong>{kpis.total.toLocaleString()}</strong><span>Total titles</span></div>
-        <div><strong>{kpis.meanScore ? kpis.meanScore.toFixed(2) : '—'}</strong><span>Mean score</span></div>
+        <div><strong>{kpis.meanScore ? kpis.meanScore.toFixed(2) : '—'}</strong><span>Mean score (of 5)</span></div>
         <div><strong>{kpis.stdScore ? kpis.stdScore.toFixed(2) : '—'}</strong><span>Score std. dev.</span></div>
         <div><strong>{kpis.rated.toLocaleString()}</strong><span>Rated</span></div>
         <div><strong>{kpis.completionRate}%</strong><span>Completed</span></div>
@@ -360,24 +335,15 @@ export default function ProfileAnalytics({
 
         <article className="analytics-card">
           <h3>Score distribution</h3>
-          <p>Personal scores on the shared 1–5 scale (NovelUpdates stars and AniList scores both map here).</p>
+          <p>How many titles you gave each star rating (1–5 scale; NovelUpdates stars and AniList scores both map here).</p>
           <ChartContainer config={scoreChartConfig} className="analytics-chart">
-            <AreaChart accessibilityLayer data={scoreData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
-              <GradientDefs id={`${gradId}-score`} colorVar="var(--color-count)" />
+            <BarChart accessibilityLayer data={scoreData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
               <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-              <XAxis dataKey="score" tickLine={false} axisLine={false} tickMargin={8} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
+              <XAxis dataKey="score" tickLine={false} axisLine={false} tickMargin={8} tick={{ fill: 'var(--muted)', fontSize: 11 }} tickFormatter={(value) => `${value}★`} />
               <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
               <ChartTooltip cursor={false} content={<ChartTooltipContent config={scoreChartConfig} />} />
-              <Area
-                dataKey="count"
-                type="natural"
-                fill={`url(#${gradId}-score)`}
-                fillOpacity={1}
-                stroke="var(--color-count)"
-                strokeWidth={2}
-                isAnimationActive={!reducedMotion}
-              />
-            </AreaChart>
+              <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} maxBarSize={56} isAnimationActive={!reducedMotion} />
+            </BarChart>
           </ChartContainer>
         </article>
 
@@ -433,9 +399,7 @@ export default function ProfileAnalytics({
           <h3>Activity over time</h3>
           <p>From AniList start/finish dates when present. NovelUpdates HTML imports usually omit dates, so this chart stays empty for pure NU libraries.</p>
           <ChartContainer config={activityChartConfig} className="analytics-chart analytics-chart-wide">
-            <AreaChart accessibilityLayer data={activityData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
-              <GradientDefs id={`${gradId}-started`} colorVar="var(--color-started)" />
-              <GradientDefs id={`${gradId}-finished`} colorVar="var(--color-finished)" />
+            <BarChart accessibilityLayer data={activityData} barGap={1} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
               <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
               <XAxis
                 dataKey="month"
@@ -448,25 +412,9 @@ export default function ProfileAnalytics({
               />
               <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
               <ChartTooltip cursor={false} content={<ChartTooltipContent config={activityChartConfig} />} />
-              <Area
-                dataKey="started"
-                type="natural"
-                fill={`url(#${gradId}-started)`}
-                stroke="var(--color-started)"
-                strokeWidth={2}
-                stackId="a"
-                isAnimationActive={!reducedMotion}
-              />
-              <Area
-                dataKey="finished"
-                type="natural"
-                fill={`url(#${gradId}-finished)`}
-                stroke="var(--color-finished)"
-                strokeWidth={2}
-                stackId="b"
-                isAnimationActive={!reducedMotion}
-              />
-            </AreaChart>
+              <Bar dataKey="started" fill="var(--color-started)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+              <Bar dataKey="finished" fill="var(--color-finished)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+            </BarChart>
           </ChartContainer>
         </article>
       )}
@@ -476,21 +424,13 @@ export default function ProfileAnalytics({
           <h3>Release years</h3>
           <p>Publication / premiere year from matched catalog metadata.</p>
           <ChartContainer config={yearChartConfig} className="analytics-chart analytics-chart-wide">
-            <AreaChart accessibilityLayer data={yearData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
-              <GradientDefs id={`${gradId}-year`} colorVar="var(--color-count)" />
+            <BarChart accessibilityLayer data={yearData} margin={{ left: 8, right: 12, top: 12, bottom: 4 }}>
               <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
               <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} minTickGap={20} tick={{ fill: 'var(--muted)', fontSize: 10 }} />
               <YAxis allowDecimals={false} width={32} tickLine={false} axisLine={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} />
               <ChartTooltip cursor={false} content={<ChartTooltipContent config={yearChartConfig} />} />
-              <Area
-                dataKey="count"
-                type="natural"
-                fill={`url(#${gradId}-year)`}
-                stroke="var(--color-count)"
-                strokeWidth={2}
-                isAnimationActive={!reducedMotion}
-              />
-            </AreaChart>
+              <Bar dataKey="count" fill="var(--color-count)" radius={[2, 2, 0, 0]} isAnimationActive={!reducedMotion} />
+            </BarChart>
           </ChartContainer>
         </article>
       )}

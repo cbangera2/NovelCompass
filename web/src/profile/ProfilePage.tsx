@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, FileUp, Settings } from 'lucide-react';
+import { BookOpen, FileUp, Info, Settings, ShieldCheck } from 'lucide-react';
 import { createDataSource, RecommendationDataSource } from '../data';
 import { useDataModePreference } from '../dataModePreference';
 import { DatasetManifest } from '../types';
-import { Card } from '../design-system';
+import { Card, DSButton } from '../design-system';
+import { Tooltip } from '../ui';
 import { applyResolvedNovelIds } from './resolve';
 import { loadLocalProfile, saveLocalProfile, subscribeLocalProfile } from './store';
 import { LocalUserProfile, ReadingStatus } from './types';
@@ -19,6 +20,8 @@ const TABS: Array<{ id: ProfileTab; label: string; note: string }> = [
   { id: 'taste', label: 'Taste', note: 'What we learned' },
   { id: 'data', label: 'Import & data', note: 'Import, export, delete' },
 ];
+
+const IMPORT_SOURCES = ['MyAnimeList', 'AniList', 'Novel Updates', 'Novel Compass backup'];
 
 function tabFromUrl(): ProfileTab {
   const value = new URLSearchParams(window.location.search).get('tab');
@@ -96,44 +99,52 @@ export default function ProfilePage(): JSX.Element {
 
   return (
     <div className="profile-page">
-      <header className="profile-page-hero">
-        <div>
-          <span className="eyebrow">Your reading world</span>
-          <h1>{profile?.username ? `${profile.username}'s library` : 'Your local library'}</h1>
-          <p>Stored only in this browser. This is a private recommender profile, not a Novel Updates login or connected account. Theme and title preferences live in <a href={settingsHref}><Settings size={13} aria-hidden="true" /> Settings</a>.</p>
-        </div>
-      </header>
-
       {!profileLoaded ? (
         <Card className="profile-empty" aria-live="polite">
           <span className="profile-loading-indicator" aria-hidden="true" />
-          <h2>Loading your local library…</h2>
+          <h1>Loading your library…</h1>
           <p>Opening the profile stored for this site address.</p>
         </Card>
       ) : !profile ? (
-        <>
-          <Card className="profile-empty">
-            <BookOpen size={30} />
-            <h2>Bring your reading history into discovery</h2>
-            <p>Import a MyAnimeList, AniList, or Novel Updates export, or a Novel Compass backup. Files are read in this browser and nothing is stored until you confirm.</p>
-            <ProfileImportDialog
-              profile={null}
-              triggerClassName="profile-cta"
-              trigger={<><FileUp size={18} aria-hidden="true" /> Import my library</>}
-            />
-            {profileLoadError && <p className="profile-storage-error">{profileLoadError}</p>}
-            {window.location.hostname === 'localhost' && window.location.port && window.location.port !== '3000' &&
-              <p className="profile-storage-warning">This preview uses port {window.location.port}. Browser profiles imported at localhost:3000 are stored under that separate site address.</p>}
-          </Card>
-          <section className="profile-empty-features" aria-label="Local profile features">
-            <article><span>01</span><h3>Library</h3><p>Search Reading, Completed, and Plan-to-read titles with ratings and progress.</p></article>
-            <article><span>02</span><h3>Taste</h3><p>See recurring genres and tags with the exact contributing sample disclosed.</p></article>
-            <article><span>03</span><h3>Created lists</h3><p>Keep list summaries visible without pretending their membership was imported.</p></article>
-            <article><span>04</span><h3>Local controls</h3><p>Merge, replace, export, or completely delete your normalized profile data.</p></article>
-          </section>
-        </>
+        <Card className="profile-empty">
+          <BookOpen size={30} aria-hidden="true" />
+          <h1>Bring your reading history into discovery</h1>
+          <p>Import your list and Novel Compass learns what you like, hides what you have already read, and tunes For You to your taste.</p>
+          <ul className="profile-source-chips" aria-label="Supported imports">
+            {IMPORT_SOURCES.map((name) => <li key={name}>{name}</li>)}
+          </ul>
+          <ProfileImportDialog
+            profile={null}
+            triggerClassName="profile-cta"
+            trigger={<><FileUp size={18} aria-hidden="true" /> Import my library</>}
+          />
+          <p className="profile-trust"><ShieldCheck size={14} aria-hidden="true" /> Files are read in this browser and stay in this browser. Nothing is stored until you confirm.</p>
+          {profileLoadError && <p className="profile-storage-error">{profileLoadError}</p>}
+          {window.location.hostname === 'localhost' && window.location.port && window.location.port !== '3000' &&
+            <p className="profile-storage-warning">This preview uses port {window.location.port}. Browser profiles imported at localhost:3000 are stored under that separate site address.</p>}
+        </Card>
       ) : (
         <>
+          <header className="profile-header">
+            <div>
+              <h1>{profile.username ? `${profile.username}'s library` : 'Your library'}</h1>
+              <p className="profile-header-sub">
+                {profile.entries.length.toLocaleString()} titles · stored only in this browser
+                <Tooltip content="This is a private recommender profile on this device, not a Novel Updates login or connected account. Details are under Import & data.">
+                  <button type="button" className="profile-info" aria-label="About this profile's privacy"><Info size={14} aria-hidden="true" /></button>
+                </Tooltip>
+              </p>
+            </div>
+            <div className="profile-header-actions">
+              <ProfileImportDialog
+                profile={profile}
+                triggerClassName="profile-data-button profile-data-primary"
+                trigger={<><FileUp size={15} aria-hidden="true" /> Import</>}
+              />
+              <DSButton as="a" variant="outline" href={settingsHref}><Settings size={15} aria-hidden="true" /> Settings</DSButton>
+            </div>
+          </header>
+
           <section className="profile-page-stats" aria-label="Library totals">
             <div><strong>{profile.entries.length.toLocaleString()}</strong><span>Total titles</span></div>
             <div><strong>{counts.reading.toLocaleString()}</strong><span>Reading</span></div>
