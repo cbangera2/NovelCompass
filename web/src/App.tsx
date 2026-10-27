@@ -1,19 +1,13 @@
-import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  BookOpen,
   ExternalLink,
   Search,
-  Sparkles,
-  Star,
-  Users,
-  X
+  Sparkles
 } from 'lucide-react';
 import {
   DatasetManifest,
   RecommendResponse,
   RecommendRequest,
-  Recommendation,
-  NovelDetail,
   NovelSearchResult
 } from './types';
 import {
@@ -36,7 +30,7 @@ import { displayNovelTitle, passesMinRecRating, useDisplaySettings } from './set
 import { browseFacetUrl } from './metadataLinks';
 import { Checkbox, FieldGroup, Select, Tooltip } from './ui';
 import { Badge, Card, DSButton as Button } from './design-system';
-import { getMediaBadgeInfo, hasMixedFormats, novelPageUrl } from './novelLinks';
+import { hasMixedFormats, novelPageUrl } from './novelLinks';
 import { registerPreviews } from './CoverPreview';
 import { previewFromRecommendation } from './previewData';
 import { MediaBadges, NovelCard } from './components/NovelCard';
@@ -49,9 +43,6 @@ import { AdvancedFilters } from './components/AdvancedFilters';
 import { advancedActiveFilters, genreListsFrom, genreStatesFrom, type AdvancedFilterValues } from './components/advancedFilterModel';
 import { formatList, parseList } from './components/tokenInput';
 
-const NovelInsightsPanel = lazy(() => import('./NovelInsightsPanel').then((module) => ({
-  default: module.NovelInsightsPanel
-})));
 import { parseMediaTypesFromUrl, useMediaFilterState } from './mediaFilterState';
 import { loadFilterSnapshot, loadResultLayout, saveFilterSnapshot, saveResultLayout, type ResultLayout } from './preferences';
 import { ResultLayoutToggle } from './components/ResultLayoutToggle';
@@ -138,7 +129,6 @@ export default function App(): JSX.Element {
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
   const recommendationRequestRef = useRef(0);
   const autoRefreshReadyRef = useRef(false);
-  const detailRequestRef = useRef(0);
   const dataSourceRef = useRef<RecommendationDataSource | null>(null);
   const [resultLayout, setResultLayoutState] = useState<ResultLayout>(loadResultLayout);
   const setResultLayout = (next: ResultLayout) => {
@@ -190,11 +180,6 @@ export default function App(): JSX.Element {
   const [availableExhausted, setAvailableExhausted] = useState(false);
   const [observerSupported, setObserverSupported] = useState(true);
   const [incrementalError, setIncrementalError] = useState<string | null>(null);
-  const [activeDetailId, setActiveDetailId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<NovelDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [detailEvidence, setDetailEvidence] = useState<string[]>([]);
   const { profile, entries: profileEntries, feedback: feedbackByNovel } = useLocalProfile(dataset?.dataset_version);
   const [hideLibraryTitles, setHideLibraryTitles] = useState(true);
   const [forYouMode, setForYouMode] = useState(() =>
@@ -600,69 +585,6 @@ export default function App(): JSX.Element {
     }
   };
 
-  const openNovelDetail = async (novel: Recommendation) => {
-    const source = dataSourceRef.current;
-    if (!source) return;
-    const requestId = ++detailRequestRef.current;
-    setActiveDetailId(novel.target_id);
-    setDetail(null);
-    setDetailEvidence(novel.evidence_bullets);
-    setDetailError(null);
-    setDetailLoading(true);
-    try {
-      const body = await source.getNovel(novel.target_id);
-      if (detailRequestRef.current === requestId) setDetail(body);
-    } catch (detailFetchError: any) {
-      if (detailRequestRef.current === requestId) {
-        setDetailError(detailFetchError.message || 'Could not load this title.');
-      }
-    } finally {
-      if (detailRequestRef.current === requestId) setDetailLoading(false);
-    }
-  };
-
-  const closeNovelDetail = () => {
-    detailRequestRef.current += 1;
-    setActiveDetailId(null);
-    setDetail(null);
-    setDetailError(null);
-  };
-
-  const recommendFromDetail = () => {
-    if (!detail) return;
-    const nextSeed: NovelSearchResult = {
-      id: detail.id,
-      title: detail.title,
-      slug: detail.slug,
-      novelupdates_url: detail.novelupdates_url,
-      author: detail.author || '',
-      cover_url: detail.cover_url,
-      rating: detail.rating,
-      rating_votes: detail.rating_votes
-    };
-    chooseNovel(nextSeed);
-    pushSeedRoute(nextSeed);
-    closeNovelDetail();
-    window.requestAnimationFrame(() => {
-      searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-    fetchRecommendations(nextSeed);
-  };
-
-  useEffect(() => {
-    if (activeDetailId === null) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeNovelDetail();
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [activeDetailId]);
-
   const resetAdvanced = () => {
     setMinRatingVotes(0);
     setMaxReaders(0);
@@ -1042,7 +964,6 @@ export default function App(): JSX.Element {
                   evidence={rec.evidence_bullets}
                   sharedTags={rec.shared_tags}
                   tagHref={(tag: string) => browseFacetUrl('tag', tag)}
-                  onActivate={() => void openNovelDetail(rec)}
                   actions={actions}
                 />
               );
@@ -1066,170 +987,6 @@ export default function App(): JSX.Element {
           </div>
         </main>
       )}
-
-      {activeDetailId !== null && (
-        <NovelDetailDialog
-          detail={detail}
-          loading={detailLoading}
-          error={detailError}
-          evidence={detailEvidence}
-          onClose={closeNovelDetail}
-          onRecommend={recommendFromDetail}
-          profileEntry={detail ? profileEntries.get(detail.id) : undefined}
-          titlePreference={settings.titlePreference}
-          source={dataSource!}
-        />
-      )}
-    </div>
-  );
-}
-
-function NovelDetailDialog({
-  detail,
-  loading,
-  error,
-  evidence,
-  onClose,
-  onRecommend,
-  profileEntry,
-  titlePreference,
-  source
-}: {
-  detail: NovelDetail | null;
-  loading: boolean;
-  error: string | null;
-  evidence: string[];
-  onClose: () => void;
-  onRecommend: () => void;
-  profileEntry?: ProfileEntry;
-  titlePreference: 'catalog' | 'alternate';
-  source: RecommendationDataSource;
-}) {
-  return (
-    <div className="detail-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section
-        className="detail-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={detail ? 'novel-detail-title' : undefined}
-        aria-label={detail ? undefined : 'Title details'}
-        aria-busy={loading}
-      >
-        <button type="button" className="detail-close" onClick={onClose} aria-label="Close title details" autoFocus>
-          <X size={20} aria-hidden="true" />
-        </button>
-
-        {loading && <div className="detail-state"><Sparkles size={22} aria-hidden="true" /> Loading title details…</div>}
-        {error && <div className="detail-state detail-error">{error}</div>}
-
-        {detail && (
-          <>
-            <div className="detail-hero">
-              <CoverImage src={detail.cover_url} alt={`Cover of ${displayNovelTitle(detail.title, detail.associated_names, titlePreference)}`} variant="detail" />
-              <div className="detail-heading">
-                {(() => {
-                  const detailBadge = getMediaBadgeInfo(detail);
-                  return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
-                      <span className={`search-badge source-badge ${detailBadge.sourceKey}`}>
-                        {detailBadge.sourceLabel}
-                      </span>
-                      <span className={`search-badge format-badge ${detailBadge.formatKey}`}>
-                        {detailBadge.formatLabel}
-                      </span>
-                      <span className="eyebrow" style={{ margin: 0 }}>{detail.language
-                        ? <a href={browseFacetUrl('language', detail.language)}>{detail.language}</a>
-                        : 'Catalog title'}{detail.year ? ` · ${detail.year}` : ''}</span>
-                    </div>
-                  );
-                })()}
-                <h2 id="novel-detail-title">{displayNovelTitle(detail.title, detail.associated_names, titlePreference)}</h2>
-                <p className="detail-author">{detail.author
-                  ? <a href={browseFacetUrl('author', detail.author)}>{detail.author}</a>
-                  : 'Unknown author'}</p>
-                {profileEntry && <span className={`detail-library-badge status-${profileEntry.status}`}>
-                  In your library · {profileEntry.status.replace(/_/g, ' ')}
-                  {profileEntry.rating ? ` · ${profileEntry.rating}★` : ''}
-                  {profileEntry.progress ? ` · ${profileEntry.progress}` : ''}
-                </span>}
-                <div className="detail-stats">
-                  <span><Star size={15} fill="currentColor" aria-hidden="true" /> {detail.rating || '—'} <small>{detail.rating_votes.toLocaleString()} votes</small></span>
-                  <span><Users size={15} aria-hidden="true" /> {detail.reading_list_count.toLocaleString()} readers</span>
-                  {(detail.status_trans || detail.chapters_trans > 0 || detail.chapters_orig > 0) && (
-                    <span><BookOpen size={15} aria-hidden="true" /> {[
-                      detail.status_trans,
-                      detail.chapters_trans > 0 ? `${detail.chapters_trans} translated` : '',
-                      detail.chapters_orig > 0 ? `${detail.chapters_orig} original` : ''
-                    ].filter(Boolean).join(' · ')}</span>
-                  )}
-                </div>
-                <div className="detail-actions">
-                  <button type="button" className="detail-recommend-button" onClick={onRecommend}>
-                    <Sparkles size={16} aria-hidden="true" /> Find recommendations like this
-                  </button>
-                  <a
-                    href={detail.external_url || externalMediaUrl(detail.id, detail.source, detail.external_id, detail.media_type) || detail.novelupdates_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    View on {sourceDisplayName(detail.source, detail.id)} <ExternalLink size={15} aria-hidden="true" />
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div className="detail-body">
-              {detail.genres.length > 0 && (
-                <section className="detail-section">
-                  <h3>Genres</h3>
-                  <div className="detail-chips">{detail.genres.map((genre) => <a key={genre} href={browseFacetUrl('genre', genre)}>{genre}</a>)}</div>
-                </section>
-              )}
-              {detail.synopsis && (
-                <section className="detail-section">
-                  <h3>Synopsis</h3>
-                  <p className="detail-synopsis">{detail.synopsis}</p>
-                </section>
-              )}
-              {evidence.length > 0 && (
-                <section className="detail-section">
-                  <h3>Why it matched your starting title</h3>
-                  <ul className="evidence-list detail-evidence">
-                    {evidence.map((item, index) => (
-                      <li key={index} className="evidence-item">
-                        <span className="evidence-bullet" aria-hidden="true">✓</span><span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {detail.tags.length > 0 && (
-                <section className="detail-section">
-                  <h3>Tags</h3>
-                  <div className="detail-chips detail-tags">{detail.tags.map((tag) => <a key={tag} href={browseFacetUrl('tag', tag)}>{tag}</a>)}</div>
-                </section>
-              )}
-              {detail.associated_names.length > 0 && (
-                <section className="detail-section">
-                  <h3>Also known as</h3>
-                  <p>{detail.associated_names.join(' · ')}</p>
-                </section>
-              )}
-              <section className="detail-section detail-signals">
-                <h3>Discovery signals</h3>
-                <div>
-                  <span><strong>{detail.direct_recommendation_count}</strong> direct recommendations</span>
-                  <span><strong>{detail.recommendation_list_count}</strong> curated lists</span>
-                  <span><strong>{detail.related_series_count}</strong> related series</span>
-                </div>
-              </section>
-              <Suspense fallback={<div className="detail-loading" aria-busy="true">Loading catalog context…</div>}>
-                <NovelInsightsPanel novelId={detail.id} source={source} />
-              </Suspense>
-            </div>
-          </>
-        )}
-      </section>
     </div>
   );
 }
