@@ -70,6 +70,88 @@ def mock_node(mid, rec_targets, rel_target):
     }
 
 
+def test_partial_target_upsert_never_clobbers_full_record(memory_db):
+    """A rec/relation target carries a partial record (title only). When it
+    references an already-ingested full record, the full record's tags,
+    genres, status, language, title, and aliases must survive, while the
+    edge itself is still recorded."""
+    ingester = AniListIngester(memory_db, client=object())
+
+    full = mock_node(201, [], 0)
+    full["title"] = {
+        "english": None,
+        "romaji": "Romaji Title",
+        "native": "Native Title",
+        "userPreferred": "Preferred Title",
+    }
+    full["synonyms"] = ["Syn1"]
+    full["genres"] = ["Action", "Drama"]
+    full["tags"] = [{"name": "Demons"}]
+    full["status"] = "FINISHED"
+    full["countryOfOrigin"] = "JP"
+    full["relations"] = {"edges": []}
+    full["recommendations"] = {"nodes": []}
+    ingester.ingest_media_nodes([full])
+
+    before = memory_db.execute(
+        "SELECT title, associated_names, language, status_trans FROM novels WHERE id = ?",
+        (2_000_201,),
+    ).fetchone()
+    assert before["title"] == "Preferred Title"
+    assert before["language"] == "Japanese"
+    assert before["status_trans"] == "Completed"
+
+    # Referencing item whose rec target is the full record, in the partial
+    # shape the AniList query returns for mediaRecommendation (no native,
+    # no userPreferred, no country, no status, no genres/tags).
+    referrer = mock_node(202, [], 0)
+    referrer["recommendations"] = {
+        "nodes": [
+            {
+                "rating": 5,
+                "mediaRecommendation": {
+                    "id": 201,
+                    "type": "MANGA",
+                    "title": {"english": None, "romaji": "Romaji Title"},
+                    "format": "MANGA",
+                },
+            }
+        ]
+    }
+    referrer["relations"] = {"edges": []}
+    ingester.ingest_media_nodes([referrer])
+
+    after = memory_db.execute(
+        "SELECT title, associated_names, language, status_trans FROM novels WHERE id = ?",
+        (2_000_201,),
+    ).fetchone()
+    assert after["title"] == before["title"]
+    assert after["associated_names"] == before["associated_names"]
+    assert after["language"] == before["language"]
+    assert after["status_trans"] == before["status_trans"]
+    genres = sorted(
+        r[0]
+        for r in memory_db.execute(
+            "SELECT g.name FROM novel_genres ng JOIN genres g ON g.id = ng.genre_id WHERE ng.novel_id = ?",
+            (2_000_201,),
+        )
+    )
+    tags = sorted(
+        r[0]
+        for r in memory_db.execute(
+            "SELECT t.name FROM novel_tags nt JOIN tags t ON t.id = nt.tag_id WHERE nt.novel_id = ?",
+            (2_000_201,),
+        )
+    )
+    assert genres == ["Action", "Drama"]
+    assert tags == ["Demons"]
+    edge = memory_db.execute(
+        "SELECT 1 FROM direct_recs WHERE source_novel_id = ? AND target_novel_id = ?",
+        (2_000_202, 2_000_201),
+    ).fetchone()
+    assert edge is not None, "edge to the existing record must still be recorded"
+
+
 def test_ingest_media_nodes_keeps_recs_for_every_item(memory_db):
     ingester = AniListIngester(memory_db, client=object())
     nodes = [

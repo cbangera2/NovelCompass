@@ -169,7 +169,15 @@ class AniListIngester:
                     if rec_media and rec_media.get("id"):
                         if rec_media.get("title"):
                             target_item = map_anilist_media(rec_media)
-                            self.repo.upsert_manga(target_item)
+                            # Targets carry a partial record (title only).
+                            # Upserting one over an existing full record
+                            # would clobber it: tags/genres are deleted
+                            # then re-inserted from the partial's empty
+                            # lists, and language/status fall back to
+                            # 'English'/'Unknown'. Only insert missing
+                            # targets; the edge below is recorded either way.
+                            if not self.repo.novel_exists(target_item["id"]):
+                                self.repo.upsert_manga(target_item)
                         rec_type = (rec_media.get("type") or raw_type).upper()
                         rec_offset = ANILIST_ANIME_ID_OFFSET if rec_type == "ANIME" else ANILIST_MANGA_ID_OFFSET
                         rec_target_id = rec_offset + rec_media["id"]
@@ -183,7 +191,10 @@ class AniListIngester:
                     if rel_node and rel_node.get("id"):
                         if rel_node.get("title"):
                             rel_item = map_anilist_media(rel_node)
-                            self.repo.upsert_manga(rel_item)
+                            # Same partial-record hazard as above: only
+                            # insert missing targets.
+                            if not self.repo.novel_exists(rel_item["id"]):
+                                self.repo.upsert_manga(rel_item)
                         rel_type_str = (rel_node.get("type") or raw_type).upper()
                         rel_offset = ANILIST_ANIME_ID_OFFSET if rel_type_str == "ANIME" else ANILIST_MANGA_ID_OFFSET
                         rel_target_id = rel_offset + rel_node["id"]
