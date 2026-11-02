@@ -160,39 +160,49 @@ class AniListIngester:
                 db_id = self.repo.upsert_manga(item)
                 ingested_ids.append(db_id)
 
-            raw_type = (raw.get("type") or "MANGA").upper()
-            offset = ANILIST_ANIME_ID_OFFSET if raw_type == "ANIME" else ANILIST_MANGA_ID_OFFSET
+                raw_type = (raw.get("type") or "MANGA").upper()
 
-            # Ingest direct recommendations
-            direct_recs = []
-            for rec_node in item.get("raw_recommendations") or []:
-                rec_media = rec_node.get("mediaRecommendation")
-                if rec_media and rec_media.get("id"):
-                    if rec_media.get("title"):
-                        target_item = map_anilist_media(rec_media)
-                        self.repo.upsert_manga(target_item)
-                    rec_type = (rec_media.get("type") or raw_type).upper()
-                    rec_offset = ANILIST_ANIME_ID_OFFSET if rec_type == "ANIME" else ANILIST_MANGA_ID_OFFSET
-                    rec_target_id = rec_offset + rec_media["id"]
-                    votes = rec_node.get("rating") or 1
-                    direct_recs.append({"id": rec_target_id, "votes": max(1, votes)})
+                # Ingest direct recommendations
+                direct_recs = []
+                for rec_node in item.get("raw_recommendations") or []:
+                    rec_media = rec_node.get("mediaRecommendation")
+                    if rec_media and rec_media.get("id"):
+                        if rec_media.get("title"):
+                            target_item = map_anilist_media(rec_media)
+                            # Targets carry a partial record (title only).
+                            # Upserting one over an existing full record
+                            # would clobber it: tags/genres are deleted
+                            # then re-inserted from the partial's empty
+                            # lists, and language/status fall back to
+                            # 'English'/'Unknown'. Only insert missing
+                            # targets; the edge below is recorded either way.
+                            if not self.repo.novel_exists(target_item["id"]):
+                                self.repo.upsert_manga(target_item)
+                        rec_type = (rec_media.get("type") or raw_type).upper()
+                        rec_offset = ANILIST_ANIME_ID_OFFSET if rec_type == "ANIME" else ANILIST_MANGA_ID_OFFSET
+                        rec_target_id = rec_offset + rec_media["id"]
+                        votes = rec_node.get("rating") or 1
+                        direct_recs.append({"id": rec_target_id, "votes": max(1, votes)})
 
-            # Ingest relations
-            related_series = []
-            for rel_edge in item.get("raw_relations") or []:
-                rel_node = rel_edge.get("node")
-                if rel_node and rel_node.get("id"):
-                    if rel_node.get("title"):
-                        rel_item = map_anilist_media(rel_node)
-                        self.repo.upsert_manga(rel_item)
-                    rel_type_str = (rel_node.get("type") or raw_type).upper()
-                    rel_offset = ANILIST_ANIME_ID_OFFSET if rel_type_str == "ANIME" else ANILIST_MANGA_ID_OFFSET
-                    rel_target_id = rel_offset + rel_node["id"]
-                    rel_type = (rel_edge.get("relationType") or "related").lower()
-                    related_series.append({"id": rel_target_id, "relation_type": rel_type})
+                # Ingest relations
+                related_series = []
+                for rel_edge in item.get("raw_relations") or []:
+                    rel_node = rel_edge.get("node")
+                    if rel_node and rel_node.get("id"):
+                        if rel_node.get("title"):
+                            rel_item = map_anilist_media(rel_node)
+                            # Same partial-record hazard as above: only
+                            # insert missing targets.
+                            if not self.repo.novel_exists(rel_item["id"]):
+                                self.repo.upsert_manga(rel_item)
+                        rel_type_str = (rel_node.get("type") or raw_type).upper()
+                        rel_offset = ANILIST_ANIME_ID_OFFSET if rel_type_str == "ANIME" else ANILIST_MANGA_ID_OFFSET
+                        rel_target_id = rel_offset + rel_node["id"]
+                        rel_type = (rel_edge.get("relationType") or "related").lower()
+                        related_series.append({"id": rel_target_id, "relation_type": rel_type})
 
-            if direct_recs or related_series:
-                self.repo.replace_novel_relationships(db_id, direct_recs, related_series)
+                if direct_recs or related_series:
+                    self.repo.replace_novel_relationships(db_id, direct_recs, related_series)
 
         return ingested_ids
 

@@ -333,6 +333,12 @@ def export_static_dataset(
 
     try:
         source_novel_count = conn.execute("SELECT COUNT(*) FROM novels").fetchone()[0]
+        # Skip AniList target-only stubs: rows the ingester created from
+        # recommendation/relation targets with a title but no cover and no
+        # synopsis. They carry no browsable content, and the rec index
+        # already drops edges pointing at rows outside the exported set,
+        # so excluding them here also prunes those dangling edges.
+        # NovelUpdates rows are untouched: coverless NU entries still ship.
         novels = conn.execute(
             """SELECT id, slug, title, author, cover_url, rating, rating_votes,
                       reading_list_count, year, language, status_trans,
@@ -341,7 +347,13 @@ def export_static_dataset(
                       COALESCE(media_type, 'novel') as media_type,
                       COALESCE(source, 'novelupdates') as source,
                       external_id, external_url
-               FROM novels ORDER BY id"""
+               FROM novels
+               WHERE NOT (
+                   (COALESCE(source, '') = 'anilist' OR (source IS NULL AND id >= 2000000))
+                   AND (cover_url IS NULL OR cover_url = '')
+                   AND (synopsis IS NULL OR synopsis = '')
+               )
+               ORDER BY id"""
         ).fetchall()
 
         if catalog_limit is not None:

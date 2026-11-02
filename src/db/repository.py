@@ -98,6 +98,14 @@ class Repository:
 
             return novel_id
 
+    def novel_exists(self, novel_id: int) -> bool:
+        return (
+            self.conn.execute(
+                "SELECT 1 FROM novels WHERE id = ?", (novel_id,)
+            ).fetchone()
+            is not None
+        )
+
     def upsert_manga(self, manga_data: Dict[str, Any]) -> int:
         if not manga_data.get("id"):
             raise ValueError("Manga ID is required")
