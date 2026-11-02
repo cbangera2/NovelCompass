@@ -140,7 +140,7 @@ jobs:
           test -s web/dist/data/catalog.json
           test -s web/dist/extension-data/v1/latest.json
           grep -q '"/assets/' web/dist/index.html
-          grep -q '"/favicon.svg"' web/dist/index.html
+          grep -q 'href="/favicon.svg' web/dist/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
