@@ -9,6 +9,14 @@ const CROSS_FORMAT_EVENT = 'novel-compass-include-other-formats-changed';
 
 const ALL_TYPES: MediaTypeChoice[] = ['novel', 'manga', 'anime'];
 
+export function defaultMediaTypesForHostname(hostname: string): MediaTypeChoice[] {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  if (host === 'animecompass.cbangera.com') return ['anime'];
+  if (host === 'mangacompass.cbangera.com') return ['manga'];
+  if (host === 'novelcompass.cbangera.com') return ['novel'];
+  return [...ALL_TYPES];
+}
+
 const SHORT_LABELS: Record<MediaTypeChoice, string> = {
   novel: 'novels',
   manga: 'manga',
@@ -45,9 +53,12 @@ export function parseMediaTypesFromUrl(searchOrParams?: string | URLSearchParams
 export function getSelectedMediaTypes(searchOrParams?: string | URLSearchParams): MediaTypeChoice[] {
   const fromUrl = parseMediaTypesFromUrl(searchOrParams);
   if (fromUrl) return fromUrl;
+  const domainDefault = typeof window !== 'undefined'
+    ? defaultMediaTypesForHostname(window.location.hostname)
+    : [...ALL_TYPES];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [...ALL_TYPES];
+    if (!raw) return domainDefault;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
       const clean = parsed.filter((t): t is MediaTypeChoice =>
@@ -56,9 +67,9 @@ export function getSelectedMediaTypes(searchOrParams?: string | URLSearchParams)
       if (clean.length) return clean;
     }
   } catch {
-    // fallback to all
+    // fall back to the domain default
   }
-  return [...ALL_TYPES];
+  return domainDefault;
 }
 
 export function setSelectedMediaTypes(types: MediaTypeChoice[]): void {
